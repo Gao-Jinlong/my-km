@@ -1,13 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
-  transpilePackages: ['shared', 'ui'],
-  experimental: {
-    serverActions: true,
-  },
-  images: {
-    domains: ['localhost'],
-  },
-}
+    reactStrictMode: true,
+    transpilePackages: ['shared', 'ui'],
+    experimental: {
+        serverActions: true,
+    },
+    images: {
+        domains: ['localhost'],
+    },
+};
 
-module.exports = nextConfig
+module.exports = nextConfig;

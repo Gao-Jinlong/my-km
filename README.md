@@ -203,18 +203,9 @@ pnpm check:all
 
 ### Git 提交规范
 
-项目使用 Husky 和 lint-staged 进行 Git 提交前检查：
+项目使用 Husky 和 lint-staged 进行 Git 提交前检查。
 
-```bash
-feat: 新功能
-fix: 修复 Bug
-docs: 文档更新
-style: 代码格式调整
-refactor: 重构
-perf: 性能优化
-test: 测试相关
-chore: 构建/工具相关
-```
+详细的提交消息规范请参阅：[Git 提交规范文档](./docs/git-commit-convention.md)
 
 ### 添加新的依赖
 

@@ -30,8 +30,6 @@
     "pnpm": ">=8.0.0"
   },
   "lint-staged": {
-    "*.{ts,tsx,js,jsx,json,md}": [
-      "biome check --write --no-errors-on-unmatched"
-    ]
+    "*.{ts,tsx,js,jsx,json,md}": ["biome check --write --no-errors-on-unmatched"]
   }
 }

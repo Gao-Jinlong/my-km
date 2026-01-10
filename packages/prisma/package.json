@@ -19,8 +19,5 @@
     "prisma": "^6.0.0",
     "typescript": "^5.1.3"
   },
-  "files": [
-    "dist",
-    "prisma"
-  ]
+  "files": ["dist", "prisma"]
 }
