@@ -4,7 +4,10 @@
   "private": true,
   "description": "个人知识库系统 - Monorepo 项目",
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "pnpm dev:db && turbo run dev",
+    "dev:db": "docker-compose up -d postgres",
+    "dev:server": "pnpm --filter server dev",
+    "dev:web": "pnpm --filter web dev",
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint && biome check .",
@@ -21,7 +24,7 @@
     "oxlint": "^0.4.0",
     "prettier": "^3.2.4",
     "turbo": "^1.12.4",
-    "typescript": "^5.3.3",
+    "typescript": "^5.7.3",
     "husky": "^8.0.3",
     "lint-staged": "^15.2.0"
   },

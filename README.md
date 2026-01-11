@@ -13,46 +13,6 @@
 - ✨ **AI 辅助编辑**: 内容润色、总结、扩写等
 - 📄 **Markdown 编辑**: 实时预览的 Markdown 编辑体验
 
-## 🛠️ 技术栈
-
-### 前端 (apps/web)
-- **框架**: Next.js 14 (App Router)
-- **语言**: TypeScript
-- **UI 组件**: shadcn/ui
-- **样式**: Tailwind CSS
-- **状态管理**: Zustand
-- **表单**: React Hook Form + Zod
-
-### 后端 (apps/server)
-- **框架**: NestJS 11
-- **语言**: TypeScript (严格模式)
-- **ORM**: Prisma 6
-- **数据库**: PostgreSQL + pgvector
-- **API 文档**: Swagger
-- **验证**: class-validator + class-transformer
-- **日志**: NestJS 内置 Logger
-- **AI 集成**: 智谱AI / 阿里云
-
-### 共享包 (packages)
-- **shared**: 共享类型定义、常量、工具函数
-- **ui**: 共享 UI 组件库
-
-## 📦 项目结构
-
-```
-my-km/
-├── apps/
-│   ├── web/              # Next.js 前端应用
-│   └── server/           # NestJS 后端应用
-├── packages/
-│   ├── shared/           # 共享类型和工具
-│   └── ui/               # 共享 UI 组件
-├── docs/                 # 项目文档
-├── docker-compose.yml    # Docker Compose 配置
-├── pnpm-workspace.yaml   # pnpm workspace 配置
-└── package.json          # 根 package.json
-```
-
 ## 🚀 快速开始
 
 ### 环境要求
@@ -277,15 +237,3 @@ pnpm list --depth 0                # 列出所有顶层依赖
 
 - [技术规格文档](./docs/technical-specification.md) - 详细的技术选型和架构设计
 - [API 文档](http://localhost:3001/api/docs) - Swagger API 文档（启动后端后访问）
-
-## 🤝 贡献指南
-
-欢迎贡献代码、提出问题或建议！
-
-## 📄 许可证
-
-MIT License
-
----
-
-**注意**: 此项目仅为框架，具体业务功能需要根据需求进一步开发。

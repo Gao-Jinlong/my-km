@@ -92,6 +92,7 @@
             "linter": {
                 "rules": {
                     "correctness": {
+                        "noUnusedImports": "off",
                         "useExhaustiveDependencies": "off",
                         "useHookAtTopLevel": "off"
                     },
@@ -100,6 +101,9 @@
                     },
                     "nursery": {
                         "useSortedClasses": "off"
+                    },
+                    "style": {
+                        "useImportType": "off"
                     }
                 }
             }
