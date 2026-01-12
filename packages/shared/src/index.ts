@@ -10,3 +10,4 @@ export * from './constants/api';
 // Utils
 export * from './utils/date';
 export * from './utils/format';
+export * from './trace.util';

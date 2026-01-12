@@ -71,7 +71,7 @@ docs/
 
 ### 核心技术
 - **前端**: Next.js 14 + shadcn/ui
-- **后端**: NestJS 10 + Prisma
+- **后端**: NestJS 11 + Prisma
 - **数据库**: PostgreSQL + pgvector
 - **AI**: 智谱AI / 阿里云百炼
 

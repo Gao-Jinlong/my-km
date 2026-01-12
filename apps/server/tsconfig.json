@@ -20,6 +20,9 @@
         "forceConsistentCasingInFileNames": true,
         "noImplicitAny": true,
         "strictBindCallApply": true,
-        "noFallthroughCasesInSwitch": true
+        "noFallthroughCasesInSwitch": true,
+        "paths": {
+            "@my-km/shared": ["../../packages/shared/src"]
+        }
     }
 }

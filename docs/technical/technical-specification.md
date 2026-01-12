@@ -19,19 +19,20 @@
 
 - **Monorepo**: pnpm workspace
 - **语言**: TypeScript 5+
-- **代码规范**: Biome + Oxlint + Husky（Rust 实现，超高性能）
+- **代码规范**: Biome + Husky（Rust 实现，超高性能）
 
 ### Web 端
 
-- **框架**: Next.js 14 (App Router)
-- **UI**: shadcn/ui + Tailwind CSS
+- **框架**: Next.js 16 (App Router)
+- **UI**: shadcn/ui + Tailwind CSS 4
 - **状态管理**: Zustand
 - **表单**: React Hook Form + Zod
 - **HTTP**: ky
+- **React**: 19.2.3
 
 ### Server 端
 
-- **框架**: NestJS 10
+- **框架**: NestJS 11
 - **ORM**: Prisma
 - **数据库**: PostgreSQL 15 + pgvector
 - **API 文档**: Swagger
@@ -56,15 +57,6 @@
   - 内置代码格式化
   - 自动修复问题
 
-#### Oxlint（可选）
-
-- **功能**: 额外的 Linting
-- **性能**: 比 ESLint 快 **50-100 倍**
-- **特性**:
-  - 覆盖更多规则
-  - 与 Biome 配合使用
-  - 零配置即可使用
-
 #### 配置示例
 
 ```json
@@ -73,7 +65,7 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "check": "biome check --write . && oxlint"
+    "check": "biome check --write ."
   }
 }
 ```
@@ -219,8 +211,15 @@ docker-compose down
 - [阿里云百炼平台](https://help.aliyun.com/zh/model-studio/)
 - [OpenAI API](https://platform.openai.com/docs)
 
+### 规范文档
+
+- [API 设计规范](./api-design.md)
+- [数据库设计](./database-design.md)
+- [日志规范](./logging-standard.md)
+- [Git 提交规范](./git-commit-convention.md)
+
 
 ---
-**文档版本**: 3.0.0
-**最后更新**: 2026-01-09
+**文档版本**: 3.1.0
+**最后更新**: 2026-01-12
 **状态**: 基础框架已完成，引入 Rust 工具链

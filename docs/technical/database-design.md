@@ -1,5 +1,10 @@
 # 数据库设计文档
 
+> ⚠️ **重要提示**: 本文档描述的是**设计阶段**的数据库结构。
+> 当前实际 Prisma Schema 仅包含 User 模型，核心业务表（Article、Category、Tag 等）尚未实现。
+>
+> 请查看 [`packages/prisma/prisma/schema.prisma`](../../packages/prisma/prisma/schema.prisma) 了解当前实际状态。
+
 ## 📋 概述
 
 本文档描述了个人知识库系统的数据库设计，包括表结构、关系、索引和扩展。
@@ -281,5 +286,5 @@ pnpm prisma:seed
 
 ---
 
-**文档版本**: 1.0.0
-**最后更新**: 2026-01-09
+**文档版本**: 0.2.0（设计阶段）
+**最后更新**: 2026-01-12
