@@ -189,4 +189,61 @@ export class EnvironmentVariables {
     @IsString()
     @IsOptional()
     MAILDEV_FROM_NAME?: string;
+
+    // ============ Redis ============
+
+    /**
+     * Redis 主机
+     * @default localhost
+     */
+    @IsString()
+    @IsOptional()
+    REDIS_HOST?: string;
+
+    /**
+     * Redis 端口
+     * @default 6379
+     */
+    @IsInt()
+    @Min(1000)
+    @Max(65535)
+    @Transform(({ value }) => Number.parseInt(value, 10))
+    @IsOptional()
+    REDIS_PORT?: number;
+
+    /**
+     * Redis 密码（可选）
+     */
+    @IsString()
+    @IsOptional()
+    REDIS_PASSWORD?: string;
+
+    /**
+     * Redis 数据库索引
+     * @default 0
+     */
+    @IsInt()
+    @Min(0)
+    @Max(15)
+    @Transform(({ value }) => Number.parseInt(value, 10))
+    @IsOptional()
+    REDIS_DB?: number;
+
+    /**
+     * 缓存 TTL (秒)
+     * @default 300 (5 分钟)
+     */
+    @IsInt()
+    @Min(1)
+    @Transform(({ value }) => Number.parseInt(value, 10))
+    @IsOptional()
+    CACHE_TTL?: number;
+
+    /**
+     * 缓存键前缀
+     * @default my-km:
+     */
+    @IsString()
+    @IsOptional()
+    CACHE_KEY_PREFIX?: string;
 }

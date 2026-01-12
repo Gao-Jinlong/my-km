@@ -10,6 +10,8 @@ import { BusinessException } from '../common/exceptions/business.exception';
 import { ErrorCode } from '../common/constants/error-codes';
 import { randomBytes } from 'node:crypto';
 import { EnvConfig } from '../config/env.config';
+import { CacheService } from '../cache/cache.service';
+import { CacheTTL } from '../cache/cache.constants';
 
 @Injectable()
 export class AuthService {
@@ -20,6 +22,7 @@ export class AuthService {
         private readonly tokenService: TokenService,
         private readonly emailService: EmailService,
         private readonly envConfig: EnvConfig,
+        private readonly cache: CacheService,
     ) {}
 
     /**
@@ -147,6 +150,14 @@ export class AuthService {
             where: { id: user.id },
             data: { lastLoginAt: new Date() },
         });
+
+        // Cache user session (optional)
+        const sessionKey = this.cache.getSessionKey(user.id);
+        await this.cache.set(sessionKey, {
+            userId: user.id,
+            email: user.email,
+            lastLoginAt: new Date(),
+        }, CacheTTL.SESSION);
 
         return {
             accessToken,

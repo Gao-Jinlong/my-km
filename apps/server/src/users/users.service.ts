@@ -10,6 +10,8 @@ import { PasswordService } from '../auth/services/password.service';
 import { BusinessException } from '../common/exceptions/business.exception';
 import { ErrorCode } from '../common/constants/error-codes';
 import { LoggerService } from '../logger/logger.service';
+import { CacheService } from '../cache/cache.service';
+import { CacheTTL } from '../cache/cache.constants';
 
 // Safe user select for queries (excludes password)
 const SAFE_USER_SELECT = {
@@ -31,6 +33,7 @@ export class UsersService {
         private prisma: PrismaService,
         private passwordService: PasswordService,
         private logger: LoggerService,
+        private cache: CacheService,
     ) {
         this.logger.setContext('UsersService');
     }
@@ -103,6 +106,16 @@ export class UsersService {
      * Find user by ID
      */
     async findOne(id: string) {
+        // 1. Try to get from cache
+        const cacheKey = this.cache.getUserKey(id);
+        const cachedUser = await this.cache.get<Omit<User, 'password'>>(cacheKey);
+
+        if (cachedUser) {
+            this.logger.debug('User found in cache', { userId: id });
+            return cachedUser;
+        }
+
+        // 2. Cache miss, query database
         const user = await this.prisma.user.findUnique({
             where: { id },
             select: SAFE_USER_SELECT,
@@ -113,7 +126,10 @@ export class UsersService {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND, '用户不存在');
         }
 
-        this.logger.info('Retrieved user by ID', { userId: id });
+        // 3. Write to cache
+        await this.cache.set(cacheKey, user, CacheTTL.USER);
+        this.logger.info('User cached', { userId: id });
+
         return user;
     }
 
@@ -121,16 +137,35 @@ export class UsersService {
      * Find user by email (internal use, excludes password)
      */
     async findByEmail(email: string): Promise<Omit<User, 'password'> | null> {
+        // 1. Try to get from cache
+        const cacheKey = this.cache.getUserByEmailKey(email);
+        const cachedUser = await this.cache.get<Omit<User, 'password'>>(cacheKey);
+
+        if (cachedUser) {
+            this.logger.debug('User found in cache by email', { email });
+            return cachedUser;
+        }
+
+        // 2. Cache miss, query database
         const user = await this.prisma.user.findUnique({
             where: { email },
             select: SAFE_USER_SELECT,
         });
+
+        if (!user) {
+            return null;
+        }
+
+        // 3. Write to cache
+        await this.cache.set(cacheKey, user, CacheTTL.USER_EMAIL);
+        this.logger.info('User cached by email', { email });
 
         return user;
     }
 
     /**
      * Find user by email with password (for authentication only)
+     * Note: Authentication queries should not cache password hashes
      */
     async findByEmailWithPassword(email: string): Promise<User | null> {
         return this.prisma.user.findUnique({
@@ -189,7 +224,11 @@ export class UsersService {
             select: SAFE_USER_SELECT,
         });
 
-        this.logger.info('User created successfully', {
+        // Write to cache (new user)
+        await this.cache.set(this.cache.getUserKey(user.id), user, CacheTTL.USER);
+        await this.cache.set(this.cache.getUserByEmailKey(user.email), user, CacheTTL.USER_EMAIL);
+
+        this.logger.info('User created and cached', {
             userId: user.id,
             email: user.email,
             traceId,
@@ -248,7 +287,15 @@ export class UsersService {
             select: SAFE_USER_SELECT,
         });
 
-        this.logger.info('User updated successfully', {
+        // Refresh cache
+        await this.cache.set(this.cache.getUserKey(id), updatedUser, CacheTTL.USER);
+
+        // If email was updated, delete old email cache
+        if (email && email !== existingUser.email) {
+            await this.cache.del(this.cache.getUserByEmailKey(existingUser.email));
+        }
+
+        this.logger.info('User updated and cache refreshed', {
             userId: id,
             updatedFields: Object.keys(data),
             traceId,
@@ -280,7 +327,11 @@ export class UsersService {
             },
         });
 
-        this.logger.info('User soft deleted', {
+        // Clear cache
+        await this.cache.del(this.cache.getUserKey(id));
+        await this.cache.del(this.cache.getUserByEmailKey(existingUser.email));
+
+        this.logger.info('User deleted and cache cleared', {
             userId: id,
             email: existingUser.email,
             traceId,
@@ -397,7 +448,10 @@ export class UsersService {
             },
         });
 
-        this.logger.info('Password changed successfully', {
+        // Clear cache (security consideration)
+        await this.cache.del(this.cache.getUserKey(id));
+
+        this.logger.info('Password changed and cache cleared', {
             userId: id,
             traceId,
         });

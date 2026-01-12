@@ -156,6 +156,39 @@ export class EnvConfig implements OnModuleInit {
         return this.config.MAILDEV_FROM_NAME || 'My-KM';
     }
 
+    // ============ Redis ============
+
+    get redisHost(): string {
+        return this.config.REDIS_HOST || 'localhost';
+    }
+
+    get redisPort(): number {
+        return this.config.REDIS_PORT || 6379;
+    }
+
+    get redisPassword(): string | undefined {
+        return this.config.REDIS_PASSWORD;
+    }
+
+    get redisDb(): number {
+        return this.config.REDIS_DB || 0;
+    }
+
+    get redisUrl(): string {
+        if (this.redisPassword) {
+            return `redis://:${this.redisPassword}@${this.redisHost}:${this.redisPort}/${this.redisDb}`;
+        }
+        return `redis://${this.redisHost}:${this.redisPort}/${this.redisDb}`;
+    }
+
+    get cacheTtl(): number {
+        return this.config.CACHE_TTL || 300; // 默认 5 分钟
+    }
+
+    get cacheKeyPrefix(): string {
+        return this.config.CACHE_KEY_PREFIX || 'my-km:';
+    }
+
     // ============ Raw Config ============
 
     /**
