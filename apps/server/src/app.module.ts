@@ -6,9 +6,10 @@ import { LoggerMiddleware } from './logger/logger.middleware';
 import { LoggerModule } from './logger/logger.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
-    imports: [ConfigModule, LoggerModule, PrismaModule, UsersModule],
+    imports: [ConfigModule, LoggerModule, PrismaModule, UsersModule, AuthModule],
     controllers: [AppController],
     providers: [AppService],
 })

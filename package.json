@@ -4,10 +4,13 @@
   "private": true,
   "description": "个人知识库系统 - Monorepo 项目",
   "scripts": {
-    "dev": "pnpm dev:db && turbo run dev",
+    "dev": "pnpm dev:db && concurrently \"pnpm dev:mail\" \"pnpm dev:all\"",
     "dev:db": "docker-compose up -d postgres",
+    "dev:mail": "maildev",
+    "dev:all": "turbo run dev",
     "dev:server": "pnpm --filter server dev",
     "dev:web": "pnpm --filter web dev",
+    "maildev": "maildev",
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint && biome check .",
@@ -21,11 +24,12 @@
   "devDependencies": {
     "@biomejs/biome": "^1.8.3",
     "@types/node": "^20.11.0",
+    "concurrently": "^9.2.1",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.2.0",
     "prettier": "^3.2.4",
     "turbo": "^1.12.4",
-    "typescript": "^5.7.3",
-    "husky": "^8.0.3",
-    "lint-staged": "^15.2.0"
+    "typescript": "^5.7.3"
   },
   "engines": {
     "node": ">=18.0.0",

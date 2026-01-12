@@ -4,9 +4,10 @@
 
 为 My-KM 个人知识管理系统添加完整的用户认证功能，支持多用户系统，每个用户管理自己的知识库，数据相互隔离。
 
-**文档版本**: 1.0.0
+**文档版本**: 1.0.2
 **创建日期**: 2026-01-12
-**状态**: 待实施
+**更新日期**: 2026-01-12
+**状态**: 🚧 实施中（Phase 2 已完成）
 
 ---
 
@@ -767,29 +768,115 @@ async update(id: string, data: UpdateArticleDto, userId: string) {
 
 ## 📦 实施步骤
 
-### Phase 1: 数据库和基础服务 (1-2 天)
+### Phase 1: 数据库和基础服务 (1-2 天) ✅ 已完成
 
-- [ ] 更新 Prisma schema
-- [ ] 运行数据库迁移
-- [ ] 安装依赖包
-- [ ] 创建 Auth 模块结构
-- [ ] 实现 PasswordService (bcrypt)
-- [ ] 实现 JwtService
+- [x] 更新 Prisma schema
+- [x] 运行数据库迁移
+- [x] 安装依赖包
+- [x] 创建 Auth 模块结构
+- [x] 实现 PasswordService (bcrypt)
+- [x] 实现 JwtService
 
-### Phase 2: 核心认证功能 (2-3 天)
+#### 已完成的工作（2026-01-12）
 
-- [ ] 实现注册接口
-- [ ] 实现登录接口
-- [ ] 实现 JWT Guard
-- [ ] 实现登出接口
-- [ ] 实现 Token 刷新接口
+**1. 数据库更新**
+- ✅ 更新 User 表（CUID ID，新增字段：username, avatar, bio, isEmailVerified, isActive, lastLoginAt）
+- ✅ 创建 Account 表（OAuth 账户关联）
+- ✅ 创建 Session 表（Refresh Token 管理）
+- ✅ 创建 EmailVerification 表（邮箱验证）
+- ✅ 创建 PasswordReset 表（密码重置）
+- ✅ 运行数据库迁移（已清空旧数据并重建）
 
-### Phase 3: 邮件功能 (1-2 天)
+**2. 错误码扩展**
+- ✅ 新增 7 个认证相关错误码（AUTH_EMAIL_NOT_VERIFIED, AUTH_WEAK_PASSWORD, AUTH_TOKEN_INVALID, AUTH_TOKEN_EXPIRED, AUTH_ACCOUNT_LOCKED, AUTH_EMAIL_ALREADY_EXISTS, AUTH_SESSION_NOT_FOUND）
 
-- [ ] 配置 Resend
-- [ ] 创建邮件模板
-- [ ] 实现邮箱验证接口
-- [ ] 实现密码重置接口
+**3. 依赖安装**
+- ✅ JWT: @nestjs/jwt, @nestjs/passport, passport-jwt
+- ✅ 密码加密: bcrypt
+- ✅ 邮件服务: @nestjs-modules/mailer, nodemailer, handlebars
+- ✅ 开发工具: maildev (本地邮件测试)
+- ✅ 类型定义: @types/bcrypt, @types/passport-jwt, @types/uuid, @types/nodemailer
+
+**4. 环境变量配置**
+- ✅ JWT_SECRET, JWT_ACCESS_EXPIRATION, JWT_REFRESH_EXPIRATION
+- ✅ MAILDEV_HOST, MAILDEV_PORT, MAILDEV_WEB_PORT, MAILDEV_FROM, MAILDEV_FROM_NAME
+- ✅ 更新 .env.example 和 .env 文件
+
+**5. 核心服务**
+- ✅ [PasswordService](apps/server/src/auth/services/password.service.ts) - bcrypt 密码哈希（salt rounds: 12）
+- ✅ [JwtTokenService](apps/server/src/auth/services/jwt-token.service.ts) - JWT Token 生成和验证
+- ✅ [TokenService](apps/server/src/auth/services/token.service.ts) - Session 管理和 Token 轮换
+
+**6. 认证基础设施**
+- ✅ [JwtStrategy](apps/server/src/auth/strategies/jwt.strategy.ts) - Passport JWT 策略
+- ✅ [JwtAuthGuard](apps/server/src/auth/guards/jwt-auth.guard.ts) - JWT 认证守卫
+- ✅ [OptionalJwtAuthGuard](apps/server/src/auth/guards/jwt-auth.guard.ts) - 可选认证守卫
+- ✅ [@CurrentUser()](apps/server/src/auth/decorators/current-user.decorator.ts) - 当前用户装饰器
+- ✅ [@Public()](apps/server/src/auth/decorators/current-user.decorator.ts) - 公开路由装饰器
+
+**7. DTO 验证**
+- ✅ [RegisterDto](apps/server/src/auth/dto/register.dto.ts) - 注册 DTO（密码强度验证）
+- ✅ [LoginDto](apps/server/src/auth/dto/login.dto.ts) - 登录 DTO（支持记住我）
+- ✅ [RefreshTokenDto](apps/server/src/auth/dto/refresh-token.dto.ts) - Token 刷新 DTO
+- ✅ [ForgotPasswordDto](apps/server/src/auth/dto/forgot-password.dto.ts) - 忘记密码 DTO
+- ✅ [ResetPasswordDto](apps/server/src/auth/dto/reset-password.dto.ts) - 重置密码 DTO
+
+### Phase 2: 核心认证功能 (2-3 天) ✅ 已完成
+
+- [x] 实现注册接口
+- [x] 实现登录接口
+- [x] 实现 JWT Guard
+- [x] 实现登出接口
+- [x] 实现 Token 刷新接口
+
+#### 已完成的工作（2026-01-12）
+
+**1. 邮件服务**
+- ✅ [EmailModule](apps/server/src/email/email.module.ts) - 邮件模块配置（使用 maildev）
+- ✅ [EmailService](apps/server/src/email/email.service.ts) - 邮件发送服务
+- ✅ [验证邮件模板](apps/server/src/email/templates/verification-email.hbs) - 精美的 HTML 邮件模板
+- ✅ [密码重置邮件模板](apps/server/src/email/templates/reset-password-email.hbs) - 包含安全提示的重置邮件
+- ✅ [欢迎邮件模板](apps/server/src/email/templates/welcome-email.hbs) - 用户注册成功后的欢迎邮件
+
+**2. 认证服务**
+- ✅ [AuthService](apps/server/src/auth/auth.service.ts) - 完整的认证业务逻辑
+  - ✅ `register()` - 用户注册、密码哈希、发送验证邮件
+  - ✅ `login()` - 验证凭据、生成 JWT Tokens、创建 Session
+  - ✅ `logout()` - 撤销 Session
+  - ✅ `refreshTokens()` - Token 轮换机制
+  - ✅ `verifyEmail()` - 验证邮箱、发送欢迎邮件
+  - ✅ `resendVerificationEmail()` - 重发验证邮件
+  - ✅ `forgotPassword()` - 发送密码重置邮件
+  - ✅ `resetPassword()` - 验证 Token、更新密码、撤销所有 Session
+
+**3. 认证控制器**
+- ✅ [AuthController](apps/server/src/auth/auth.controller.ts) - REST API 端点
+  - ✅ `POST /auth/register` - 注册新用户
+  - ✅ `POST /auth/login` - 用户登录
+  - ✅ `POST /auth/logout` - 用户登出
+  - ✅ `POST /auth/refresh` - 刷新 Token
+  - ✅ `GET /auth/verify-email` - 验证邮箱
+  - ✅ `POST /auth/resend-verification` - 重发验证邮件
+  - ✅ `POST /auth/forgot-password` - 请求密码重置
+  - ✅ `POST /auth/reset-password` - 重置密码
+
+**4. 模块配置**
+- ✅ [AuthModule](apps/server/src/auth/auth.module.ts) - 认证模块配置
+- ✅ 集成到 [AppModule](apps/server/src/app.module.ts)
+
+**5. 错误修复**
+- ✅ 修复 TypeScript 类型错误（Request headers 类型）
+- ✅ 修复错误码引用（使用正确的 ErrorCode 枚举）
+- ✅ 构建成功，无编译错误
+
+### Phase 3: 邮件功能 (1-2 天) ✅ 已完成
+
+- [x] 配置 Maildev
+- [x] 创建邮件模板
+- [x] 实现邮箱验证接口
+- [x] 实现密码重置接口
+
+> **注意**: Phase 3 与 Phase 2 同步完成，邮件功能已在核心认证中实现。
 
 ### Phase 4: OAuth 集成 (2-3 天)
 

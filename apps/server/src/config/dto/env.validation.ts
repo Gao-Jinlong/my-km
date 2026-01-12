@@ -114,4 +114,79 @@ export class EnvironmentVariables {
     @IsString()
     @IsOptional()
     ALLOWED_ORIGINS?: string;
+
+    // ============ JWT ============
+
+    /**
+     * JWT 密钥（用于签名 token）
+     * @warning 生产环境必须使用强随机字符串
+     */
+    @IsString()
+    JWT_SECRET: string;
+
+    /**
+     * Access Token 有效期
+     * @default 15m
+     * @example 15m, 30m, 1h
+     */
+    @IsString()
+    @IsOptional()
+    JWT_ACCESS_EXPIRATION?: string;
+
+    /**
+     * Refresh Token 有效期
+     * @default 7d
+     * @example 7d, 30d
+     */
+    @IsString()
+    @IsOptional()
+    JWT_REFRESH_EXPIRATION?: string;
+
+    // ============ Maildev ============
+
+    /**
+     * Maildev 主机
+     * @default localhost
+     */
+    @IsString()
+    @IsOptional()
+    MAILDEV_HOST?: string;
+
+    /**
+     * Maildev SMTP 端口
+     * @default 1025
+     */
+    @IsInt()
+    @Min(1000)
+    @Max(65535)
+    @Transform(({ value }) => Number.parseInt(value, 10))
+    @IsOptional()
+    MAILDEV_PORT?: number;
+
+    /**
+     * Maildev Web 界面端口
+     * @default 1080
+     */
+    @IsInt()
+    @Min(1000)
+    @Max(65535)
+    @Transform(({ value }) => Number.parseInt(value, 10))
+    @IsOptional()
+    MAILDEV_WEB_PORT?: number;
+
+    /**
+     * 发件人邮箱
+     * @default noreply@my-km.com
+     */
+    @IsString()
+    @IsOptional()
+    MAILDEV_FROM?: string;
+
+    /**
+     * 发件人名称
+     * @default My-KM
+     */
+    @IsString()
+    @IsOptional()
+    MAILDEV_FROM_NAME?: string;
 }

@@ -1,10 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsNotEmpty, IsOptional, IsString, Length, Matches } from 'class-validator';
 
-export class CreateUserDto {
+/**
+ * 用户注册 DTO
+ */
+export class RegisterDto {
     @ApiProperty({
         example: 'user@example.com',
-        description: 'User email address',
+        description: '用户邮箱',
     })
     @IsEmail({}, { message: '请输入有效的邮箱地址' })
     @IsNotEmpty({ message: '邮箱不能为空' })
@@ -12,21 +15,20 @@ export class CreateUserDto {
 
     @ApiProperty({
         example: 'SecurePass123!',
-        description: 'User password (at least 8 chars, uppercase, lowercase, number, special char)',
+        description: '用户密码（至少 8 位，包含大小写字母、数字和特殊字符）',
         minLength: 8,
-        required: false,
     })
-    @IsOptional()
+    @IsNotEmpty({ message: '密码不能为空' })
     @IsString()
     @Length(8, 128, { message: '密码长度必须在 8-128 位之间' })
     @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, {
         message: '密码必须包含大小写字母、数字和特殊字符 (@$!%*?&)',
     })
-    password?: string;
+    password: string;
 
     @ApiProperty({
         example: 'johndoe',
-        description: 'Username (optional, auto-generated from email if not provided)',
+        description: '用户名（可选，未填写时使用邮箱前缀）',
         required: false,
     })
     @IsOptional()
@@ -36,23 +38,4 @@ export class CreateUserDto {
         message: '用户名只能包含字母、数字、下划线和连字符',
     })
     username?: string;
-
-    @ApiProperty({
-        example: 'https://example.com/avatar.jpg',
-        description: 'Avatar URL',
-        required: false,
-    })
-    @IsOptional()
-    @IsString()
-    avatar?: string;
-
-    @ApiProperty({
-        example: 'Software developer and knowledge management enthusiast',
-        description: 'User bio',
-        required: false,
-    })
-    @IsOptional()
-    @IsString()
-    @Length(0, 500, { message: '个人简介不能超过 500 字符' })
-    bio?: string;
 }

@@ -124,6 +124,38 @@ export class EnvConfig implements OnModuleInit {
         return this.config.ALLOWED_ORIGINS.split(',').map(origin => origin.trim());
     }
 
+    // ============ JWT ============
+
+    get jwtSecret(): string {
+        return this.config.JWT_SECRET;
+    }
+
+    get jwtAccessExpiration(): string {
+        return this.config.JWT_ACCESS_EXPIRATION || '15m';
+    }
+
+    get jwtRefreshExpiration(): string {
+        return this.config.JWT_REFRESH_EXPIRATION || '7d';
+    }
+
+    // ============ Maildev ============
+
+    get maildevHost(): string {
+        return this.config.MAILDEV_HOST || 'localhost';
+    }
+
+    get maildevPort(): number {
+        return this.config.MAILDEV_PORT || 1025;
+    }
+
+    get maildevFrom(): string {
+        return this.config.MAILDEV_FROM || 'noreply@my-km.com';
+    }
+
+    get maildevFromName(): string {
+        return this.config.MAILDEV_FROM_NAME || 'My-KM';
+    }
+
     // ============ Raw Config ============
 
     /**

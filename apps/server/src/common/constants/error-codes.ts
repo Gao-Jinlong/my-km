@@ -62,6 +62,15 @@ export enum ErrorCode {
     // ============ 限流错误 (WARN) ============
     RATE_LIMIT_EXCEEDED = 'RATE_LIMIT_EXCEEDED',
     TOO_MANY_REQUESTS = 'TOO_MANY_REQUESTS',
+
+    // ============ 认证相关 (ERROR/WARN) ============
+    AUTH_EMAIL_NOT_VERIFIED = 'AUTH_EMAIL_NOT_VERIFIED',
+    AUTH_WEAK_PASSWORD = 'AUTH_WEAK_PASSWORD',
+    AUTH_TOKEN_INVALID = 'AUTH_TOKEN_INVALID',
+    AUTH_TOKEN_EXPIRED = 'AUTH_TOKEN_EXPIRED',
+    AUTH_ACCOUNT_LOCKED = 'AUTH_ACCOUNT_LOCKED',
+    AUTH_EMAIL_ALREADY_EXISTS = 'AUTH_EMAIL_ALREADY_EXISTS',
+    AUTH_SESSION_NOT_FOUND = 'AUTH_SESSION_NOT_FOUND',
 }
 
 /**
@@ -116,6 +125,15 @@ export const ERROR_CODE_TO_STATUS: Record<ErrorCode, number> = {
     // ============ 429 (Rate Limit) ============
     [ErrorCode.RATE_LIMIT_EXCEEDED]: 429,
     [ErrorCode.TOO_MANY_REQUESTS]: 429,
+
+    // ============ 认证相关 ============
+    [ErrorCode.AUTH_EMAIL_NOT_VERIFIED]: 403,
+    [ErrorCode.AUTH_WEAK_PASSWORD]: 400,
+    [ErrorCode.AUTH_TOKEN_INVALID]: 401,
+    [ErrorCode.AUTH_TOKEN_EXPIRED]: 401,
+    [ErrorCode.AUTH_ACCOUNT_LOCKED]: 403,
+    [ErrorCode.AUTH_EMAIL_ALREADY_EXISTS]: 409,
+    [ErrorCode.AUTH_SESSION_NOT_FOUND]: 401,
 };
 
 /**
@@ -147,6 +165,7 @@ export const ERROR_CODE_TO_LOG_LEVEL: Record<ErrorCode, 'fatal' | 'error' | 'war
     [ErrorCode.INVALID_CREDENTIALS]: 'error',
     [ErrorCode.AI_SERVICE_ERROR]: 'error',
     [ErrorCode.EMBEDDING_ERROR]: 'error',
+    [ErrorCode.AUTH_EMAIL_ALREADY_EXISTS]: 'error',
 
     // ============ WARN ============
     [ErrorCode.VALIDATION_ERROR]: 'warn',
@@ -156,6 +175,12 @@ export const ERROR_CODE_TO_LOG_LEVEL: Record<ErrorCode, 'fatal' | 'error' | 'war
     [ErrorCode.RATE_LIMIT_EXCEEDED]: 'warn',
     [ErrorCode.TOO_MANY_REQUESTS]: 'warn',
     [ErrorCode.AI_QUOTA_EXCEEDED]: 'warn',
+    [ErrorCode.AUTH_EMAIL_NOT_VERIFIED]: 'warn',
+    [ErrorCode.AUTH_WEAK_PASSWORD]: 'warn',
+    [ErrorCode.AUTH_TOKEN_INVALID]: 'warn',
+    [ErrorCode.AUTH_TOKEN_EXPIRED]: 'warn',
+    [ErrorCode.AUTH_ACCOUNT_LOCKED]: 'warn',
+    [ErrorCode.AUTH_SESSION_NOT_FOUND]: 'warn',
 };
 
 /**
@@ -191,4 +216,11 @@ export const ERROR_CODE_MESSAGES: Record<ErrorCode, string> = {
     [ErrorCode.EMBEDDING_ERROR]: 'Embedding error',
     [ErrorCode.RATE_LIMIT_EXCEEDED]: 'Rate limit exceeded',
     [ErrorCode.TOO_MANY_REQUESTS]: 'Too many requests',
+    [ErrorCode.AUTH_EMAIL_NOT_VERIFIED]: 'Email not verified',
+    [ErrorCode.AUTH_WEAK_PASSWORD]: 'Password is too weak',
+    [ErrorCode.AUTH_TOKEN_INVALID]: 'Invalid token',
+    [ErrorCode.AUTH_TOKEN_EXPIRED]: 'Token has expired',
+    [ErrorCode.AUTH_ACCOUNT_LOCKED]: 'Account is locked',
+    [ErrorCode.AUTH_EMAIL_ALREADY_EXISTS]: 'Email already exists',
+    [ErrorCode.AUTH_SESSION_NOT_FOUND]: 'Session not found',
 };
