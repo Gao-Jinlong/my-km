@@ -9,6 +9,7 @@ import { JwtTokenService } from './services/jwt-token.service';
 import { TokenService } from './services/token.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailModule } from '../email/email.module';
+import { UsersModule } from '../users/users.module';
 import { EnvConfig } from '../config/env.config';
 
 @Module({
@@ -24,6 +25,7 @@ import { EnvConfig } from '../config/env.config';
             }),
         }),
         EmailModule,
+        UsersModule, // Import UsersModule to use UsersService in AuthService
     ],
     controllers: [AuthController],
     providers: [

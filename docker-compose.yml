@@ -19,6 +19,22 @@ services:
       timeout: 5s
       retries: 5
 
+  # Redis 缓存服务
+  redis:
+    image: redis:7-alpine
+    container_name: km-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
   # NestJS 后端 (开发模式，使用 nodemon)
   server:
     build:
@@ -29,6 +45,11 @@ services:
       - "3001:3001"
     environment:
       DATABASE_URL: postgresql://kmuser:kmpass@postgres:5432/km_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+      CACHE_TTL: 300
+      CACHE_KEY_PREFIX: "my-km:"
       ZHIPUAI_API_KEY: ${ZHIPUAI_API_KEY}
       AI_PROVIDER: ${AI_PROVIDER:-zhipu}
       PORT: 3001
@@ -36,6 +57,8 @@ services:
       WEB_URL: http://localhost:3000
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - ./apps/server:/app
@@ -61,3 +84,4 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:

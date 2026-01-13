@@ -12,6 +12,7 @@ import { ErrorCode } from '../common/constants/error-codes';
 import { LoggerService } from '../logger/logger.service';
 import { CacheService } from '../cache/cache.service';
 import { CacheTTL } from '../cache/cache.constants';
+import { randomBytes } from 'node:crypto';
 
 // Safe user select for queries (excludes password)
 const SAFE_USER_SELECT = {
@@ -460,5 +461,277 @@ export class UsersService {
             message: '密码修改成功',
             userId: id,
         };
+    }
+
+    /**
+     * User registration (moved from AuthService)
+     * Creates user and email verification token
+     */
+    async registerUser(email: string, password: string, username?: string, traceId?: string) {
+        // Check if email already exists
+        const existingUser = await this.prisma.user.findUnique({
+            where: { email },
+        });
+
+        if (existingUser) {
+            this.logger.warn('Email already exists', undefined, { email, traceId });
+            throw new BusinessException(ErrorCode.AUTH_EMAIL_ALREADY_EXISTS, '邮箱已被使用');
+        }
+
+        // Check if username already exists
+        if (username) {
+            const existingUsername = await this.prisma.user.findUnique({
+                where: { username },
+            });
+
+            if (existingUsername) {
+                this.logger.warn('Username already exists', undefined, { username, traceId });
+                throw new BusinessException(ErrorCode.USER_ALREADY_EXISTS, '用户名已被使用');
+            }
+        }
+
+        // Hash password
+        const hashedPassword = await this.passwordService.hashPassword(password);
+
+        // Generate username from email if not provided
+        const finalUsername = username || email.split('@')[0];
+
+        // Create user
+        const user = await this.prisma.user.create({
+            data: {
+                email,
+                password: hashedPassword,
+                username: finalUsername,
+                isEmailVerified: false,
+                isActive: true,
+            },
+            select: SAFE_USER_SELECT,
+        });
+
+        // Generate email verification token
+        const token = this.generateSecureToken();
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + 24); // 24 hours expiry
+
+        await this.prisma.emailVerification.create({
+            data: {
+                userId: user.id,
+                token,
+                expiresAt,
+            },
+        });
+
+        // Write to cache
+        await this.cache.set(this.cache.getUserKey(user.id), user, CacheTTL.USER);
+        await this.cache.set(this.cache.getUserByEmailKey(user.email), user, CacheTTL.USER_EMAIL);
+
+        this.logger.info('User registered with verification token', {
+            userId: user.id,
+            email: user.email,
+            traceId,
+        });
+
+        // Return user and token (email sending will be handled by caller/EmailService)
+        return {
+            user,
+            verificationToken: token,
+        };
+    }
+
+    /**
+     * Update current user's profile
+     */
+    async updateProfile(userId: string, data: Partial<Pick<UpdateUserDto, 'username' | 'avatar' | 'bio'>>, traceId?: string) {
+        // Check if user exists
+        const existingUser = await this.prisma.user.findUnique({
+            where: { id: userId },
+        });
+
+        if (!existingUser) {
+            this.logger.warn('User not found for profile update', undefined, { userId, traceId });
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND, '用户不存在');
+        }
+
+        // Check username uniqueness if updating
+        if (data.username && data.username !== existingUser.username) {
+            const usernameExists = await this.prisma.user.findUnique({
+                where: { username: data.username },
+            });
+
+            if (usernameExists) {
+                this.logger.warn('Username already exists', undefined, { username: data.username, userId, traceId });
+                throw new BusinessException(ErrorCode.USER_ALREADY_EXISTS, '用户名已被使用');
+            }
+        }
+
+        // Update user profile
+        const updatedUser = await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+                ...data,
+                updatedAt: new Date(),
+            },
+            select: SAFE_USER_SELECT,
+        });
+
+        // Refresh cache
+        await this.cache.set(this.cache.getUserKey(userId), updatedUser, CacheTTL.USER);
+
+        this.logger.info('User profile updated and cache refreshed', {
+            userId,
+            updatedFields: Object.keys(data),
+            traceId,
+        });
+
+        return updatedUser;
+    }
+
+    /**
+     * Change own password (with old password verification)
+     */
+    async changeOwnPassword(userId: string, oldPassword: string, newPassword: string, traceId?: string) {
+        // Check if user exists
+        const existingUser = await this.prisma.user.findUnique({
+            where: { id: userId },
+        });
+
+        if (!existingUser) {
+            this.logger.warn('User not found for password change', undefined, { userId, traceId });
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND, '用户不存在');
+        }
+
+        // Verify user has password (not OAuth user)
+        if (!existingUser.password) {
+            this.logger.warn('User has no password (OAuth user)', undefined, { userId, traceId });
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, '该账户使用第三方登录，无法修改密码');
+        }
+
+        // Verify old password
+        const isOldPasswordValid = await this.passwordService.comparePassword(
+            oldPassword,
+            existingUser.password,
+        );
+
+        if (!isOldPasswordValid) {
+            this.logger.warn('Invalid old password', undefined, { userId, traceId });
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, '当前密码错误');
+        }
+
+        // Check if new password is same as old
+        const isSamePassword = await this.passwordService.comparePassword(
+            newPassword,
+            existingUser.password,
+        );
+
+        if (isSamePassword) {
+            this.logger.warn('New password same as old', undefined, { userId, traceId });
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, '新密码不能与当前密码相同');
+        }
+
+        // Hash new password
+        const hashedPassword = await this.passwordService.hashPassword(newPassword);
+
+        // Update password
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+                password: hashedPassword,
+                updatedAt: new Date(),
+            },
+        });
+
+        // Clear cache (security consideration)
+        await this.cache.del(this.cache.getUserKey(userId));
+
+        this.logger.info('Own password changed and cache cleared', {
+            userId,
+            traceId,
+        });
+
+        return {
+            message: '密码修改成功',
+            userId,
+        };
+    }
+
+    /**
+     * Delete own account
+     */
+    async deleteAccount(userId: string, traceId?: string) {
+        // Check if user exists
+        const existingUser = await this.prisma.user.findUnique({
+            where: { id: userId },
+        });
+
+        if (!existingUser) {
+            this.logger.warn('User not found for account deletion', undefined, { userId, traceId });
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND, '用户不存在');
+        }
+
+        // Soft delete
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+                isActive: false,
+                updatedAt: new Date(),
+            },
+        });
+
+        // Clear cache
+        await this.cache.del(this.cache.getUserKey(userId));
+        await this.cache.del(this.cache.getUserByEmailKey(existingUser.email));
+
+        this.logger.info('User account deleted and cache cleared', {
+            userId,
+            email: existingUser.email,
+            traceId,
+        });
+
+        return {
+            message: '账户已删除',
+            userId,
+        };
+    }
+
+    /**
+     * Mark email as verified (helper for Auth module)
+     */
+    async markEmailVerified(userId: string): Promise<void> {
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: { isEmailVerified: true },
+        });
+
+        // Clear cache to refresh user data
+        await this.cache.del(this.cache.getUserKey(userId));
+
+        this.logger.info('User email marked as verified', { userId });
+    }
+
+    /**
+     * Update password directly (helper for Auth module password reset)
+     */
+    async updatePassword(userId: string, newPassword: string): Promise<void> {
+        const hashedPassword = await this.passwordService.hashPassword(newPassword);
+
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+                password: hashedPassword,
+                updatedAt: new Date(),
+            },
+        });
+
+        // Clear cache (security consideration)
+        await this.cache.del(this.cache.getUserKey(userId));
+
+        this.logger.info('Password updated directly', { userId });
+    }
+
+    /**
+     * Generate secure random token
+     */
+    private generateSecureToken(): string {
+        return randomBytes(32).toString('hex');
     }
 }

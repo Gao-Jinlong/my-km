@@ -1,22 +1,133 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { QueryUsersDto } from './dto/query-users.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
+import { RegisterDto } from './dto/register.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ChangeOwnPasswordDto } from './dto/change-own-password.dto';
 import { UsersService } from './users.service';
+import { EmailService } from '../email/email.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Public } from '../auth/decorators/current-user.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { Request } from 'express';
 
 @ApiTags('users')
 @Controller('users')
 export class UsersController {
-    constructor(private readonly usersService: UsersService) {}
+    constructor(
+        private readonly usersService: UsersService,
+        private readonly emailService: EmailService,
+    ) {}
 
+    /**
+     * User registration (public endpoint)
+     * Moved from Auth module as part of refactoring
+     */
+    @Public()
     @Post()
-    @ApiOperation({ summary: 'Create a new user' })
+    @ApiOperation({ summary: 'Register a new user' })
+    @ApiResponse({ status: 201, description: 'User registered successfully. Verification email sent.' })
+    @ApiResponse({ status: 400, description: 'Bad request - validation error' })
+    @ApiResponse({ status: 409, description: 'Conflict - email or username already exists' })
+    async register(@Body() registerDto: RegisterDto, @Req() req: Request) {
+        const { email, password, username } = registerDto;
+        const traceId = (req as any).traceId;
+
+        const result = await this.usersService.registerUser(email, password, username, traceId);
+
+        // Send verification email asynchronously
+        this.emailService
+            .sendVerificationEmail(result.user.email, result.user.username || result.user.email, result.verificationToken)
+            .catch((error) => {
+                console.error('发送验证邮件失败:', error);
+            });
+
+        return {
+            user: result.user,
+            message: '注册成功，请查收验证邮件',
+        };
+    }
+
+    /**
+     * Get current user profile (authenticated endpoint)
+     */
+    @Get('me')
+    @UseGuards(JwtAuthGuard)
+    @ApiOperation({ summary: 'Get current user profile' })
+    @ApiResponse({ status: 200, description: 'Return current user profile' })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    async getCurrentUser(@CurrentUser('id') userId: string) {
+        return this.usersService.findOne(userId);
+    }
+
+    /**
+     * Update current user profile (authenticated endpoint)
+     */
+    @Patch('me')
+    @UseGuards(JwtAuthGuard)
+    @ApiOperation({ summary: 'Update current user profile' })
+    @ApiResponse({ status: 200, description: 'Profile updated successfully' })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    @ApiResponse({ status: 409, description: 'Conflict - username already exists' })
+    async updateCurrentProfile(
+        @CurrentUser('id') userId: string,
+        @Body() updateProfileDto: UpdateProfileDto,
+        @Req() req: Request,
+    ) {
+        const traceId = (req as any).traceId;
+        return this.usersService.updateProfile(userId, updateProfileDto, traceId);
+    }
+
+    /**
+     * Change own password (authenticated endpoint)
+     */
+    @Patch('me/password')
+    @UseGuards(JwtAuthGuard)
+    @ApiOperation({ summary: 'Change own password' })
+    @ApiResponse({ status: 200, description: 'Password changed successfully' })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    @ApiResponse({ status: 400, description: 'Invalid old password' })
+    async changeOwnPassword(
+        @CurrentUser('id') userId: string,
+        @Body() changeOwnPasswordDto: ChangeOwnPasswordDto,
+        @Req() req: Request,
+    ) {
+        const traceId = (req as any).traceId;
+        return this.usersService.changeOwnPassword(
+            userId,
+            changeOwnPasswordDto.oldPassword,
+            changeOwnPasswordDto.newPassword,
+            traceId,
+        );
+    }
+
+    /**
+     * Delete own account (authenticated endpoint)
+     */
+    @Delete('me')
+    @UseGuards(JwtAuthGuard)
+    @ApiOperation({ summary: 'Delete own account' })
+    @ApiResponse({ status: 200, description: 'Account deleted successfully' })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    async deleteOwnAccount(@CurrentUser('id') userId: string, @Req() req: Request) {
+        const traceId = (req as any).traceId;
+        return this.usersService.deleteAccount(userId, traceId);
+    }
+
+    /**
+     * Create a new user (admin endpoint)
+     * Note: This endpoint is for administrative use. Role-based guards will be added later.
+     */
+    @Post('admin')
+    @UseGuards(JwtAuthGuard)
+    @ApiOperation({ summary: 'Create a new user (admin only)' })
     @ApiResponse({ status: 201, description: 'User created successfully' })
     @ApiResponse({ status: 400, description: 'Bad request - validation error' })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
     @ApiResponse({ status: 409, description: 'Conflict - email or username already exists' })
     create(@Body() createUserDto: CreateUserDto, @Req() req: Request) {
         const traceId = (req as any).traceId;
@@ -24,7 +135,7 @@ export class UsersController {
     }
 
     @Get()
-    @ApiOperation({ summary: 'Get all users with pagination' })
+    @ApiOperation({ summary: 'Get all users with pagination (admin only)' })
     @ApiResponse({ status: 200, description: 'Return paginated users' })
     @ApiQuery({ name: 'page', required: false, type: Number })
     @ApiQuery({ name: 'limit', required: false, type: Number })

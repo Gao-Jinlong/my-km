@@ -16,6 +16,16 @@ export class CacheService {
     constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
 
     /**
+     * Check if value is cacheable
+     * Replaces cache-manager-ioredis-yet's isCacheable option
+     */
+    private isCacheable(value: unknown): boolean {
+        if (value === null || value === undefined) return false;
+        if (value instanceof Error) return false;
+        return true;
+    }
+
+    /**
      * 获取缓存值
      */
     async get<T>(key: string): Promise<T | undefined> {
@@ -38,6 +48,12 @@ export class CacheService {
      */
     async set<T>(key: string, value: T, ttl?: number): Promise<void> {
         try {
+            // Apply isCacheable filter (moved from store to service)
+            if (!this.isCacheable(value)) {
+                this.logger.debug(`Value not cacheable, skipping: ${key}`);
+                return;
+            }
+
             await this.cacheManager.set(key, value, ttl);
             this.logger.debug(`Cache set: ${key} (TTL: ${ttl || 'default'})`);
         } catch (error) {
@@ -62,10 +78,17 @@ export class CacheService {
      */
     async reset(): Promise<void> {
         try {
-            // Cache the cache manager to clear all keys
-            // Note: This is a potentially expensive operation
+            // Handle cache-manager v6+ stores array
             const cache = this.cacheManager as any;
-            if (cache.store && cache.store.reset) {
+            if (cache.stores && Array.isArray(cache.stores)) {
+                await Promise.all(cache.stores.map((store: unknown) => {
+                    // Keyv stores use .clear() instead of .reset()
+                    if (store && typeof store === 'object' && 'clear' in store) {
+                        return (store as { clear: () => Promise<void> }).clear();
+                    }
+                    return Promise.resolve();
+                }));
+            } else if (cache.store?.reset) {
                 await cache.store.reset();
             } else if (cache.cache) {
                 await cache.cache.reset();

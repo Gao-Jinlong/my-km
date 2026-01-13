@@ -1,6 +1,5 @@
 import { Controller, Post, Get, Body, Query, UseGuards, Req } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -12,15 +11,6 @@ import { CurrentUser } from './decorators/current-user.decorator';
 @Controller('auth')
 export class AuthController {
     constructor(private readonly authService: AuthService) {}
-
-    /**
-     * 注册新用户
-     */
-    @Public()
-    @Post('register')
-    async register(@Body() registerDto: RegisterDto) {
-        return this.authService.register(registerDto);
-    }
 
     /**
      * 用户登录

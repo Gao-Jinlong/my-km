@@ -1,17 +1,17 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PasswordService } from './services/password.service';
 import { JwtTokenService } from './services/jwt-token.service';
 import { TokenService } from './services/token.service';
 import { EmailService } from '../email/email.service';
-import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { UsersService } from '../users/users.service';
 import { BusinessException } from '../common/exceptions/business.exception';
 import { ErrorCode } from '../common/constants/error-codes';
-import { randomBytes } from 'node:crypto';
 import { EnvConfig } from '../config/env.config';
 import { CacheService } from '../cache/cache.service';
 import { CacheTTL } from '../cache/cache.constants';
+import { randomBytes } from 'node:crypto';
 
 @Injectable()
 export class AuthService {
@@ -23,84 +23,8 @@ export class AuthService {
         private readonly emailService: EmailService,
         private readonly envConfig: EnvConfig,
         private readonly cache: CacheService,
+        private readonly usersService: UsersService,
     ) {}
-
-    /**
-     * 用户注册
-     * @param registerDto 注册数据
-     * @returns 用户信息
-     */
-    async register(registerDto: RegisterDto) {
-        const { email, password, username } = registerDto;
-
-        // 检查邮箱是否已存在
-        const existingUser = await this.prisma.user.findUnique({
-            where: { email },
-        });
-
-        if (existingUser) {
-            throw new BusinessException(ErrorCode.AUTH_EMAIL_ALREADY_EXISTS);
-        }
-
-        // 如果提供了用户名，检查用户名是否已存在
-        if (username) {
-            const existingUsername = await this.prisma.user.findUnique({
-                where: { username },
-            });
-
-            if (existingUsername) {
-                throw new BusinessException(ErrorCode.USER_ALREADY_EXISTS, '用户名已被使用');
-            }
-        }
-
-        // 哈希密码
-        const hashedPassword = await this.passwordService.hashPassword(password);
-
-        // 创建用户
-        const user = await this.prisma.user.create({
-            data: {
-                email,
-                password: hashedPassword,
-                username: username || email.split('@')[0], // 如果没有提供用户名，使用邮箱前缀
-                isEmailVerified: false,
-                isActive: true,
-            },
-            select: {
-                id: true,
-                email: true,
-                username: true,
-                avatar: true,
-                isEmailVerified: true,
-                isActive: true,
-                createdAt: true,
-            },
-        });
-
-        // 生成邮箱验证 token
-        const token = this.generateSecureToken();
-        const expiresAt = new Date();
-        expiresAt.setHours(expiresAt.getHours() + 24); // 24 小时后过期
-
-        await this.prisma.emailVerification.create({
-            data: {
-                userId: user.id,
-                token,
-                expiresAt,
-            },
-        });
-
-        // 发送验证邮件（异步，不阻塞响应）
-        this.emailService
-            .sendVerificationEmail(user.email, user.username || user.email, token)
-            .catch((error) => {
-                console.error('发送验证邮件失败:', error);
-            });
-
-        return {
-            user,
-            message: '注册成功，请查收验证邮件',
-        };
-    }
 
     /**
      * 用户登录
@@ -110,10 +34,8 @@ export class AuthService {
     async login(loginDto: LoginDto, ipAddress?: string, userAgent?: string) {
         const { email, password, rememberMe } = loginDto;
 
-        // 查找用户
-        const user = await this.prisma.user.findUnique({
-            where: { email },
-        });
+        // 查找用户（使用 UsersService）
+        const user = await this.usersService.findByEmailWithPassword(email);
 
         if (!user) {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, '邮箱或密码错误');
@@ -146,10 +68,7 @@ export class AuthService {
         );
 
         // 更新最后登录时间
-        await this.prisma.user.update({
-            where: { id: user.id },
-            data: { lastLoginAt: new Date() },
-        });
+        await this.usersService.updateLastLogin(user.id);
 
         // Cache user session (optional)
         const sessionKey = this.cache.getSessionKey(user.id);
@@ -216,11 +135,8 @@ export class AuthService {
             throw new BusinessException(ErrorCode.AUTH_TOKEN_EXPIRED, '验证链接已过期');
         }
 
-        // 更新用户状态
-        await this.prisma.user.update({
-            where: { id: verification.userId },
-            data: { isEmailVerified: true },
-        });
+        // 更新用户状态（使用 UsersService）
+        await this.usersService.markEmailVerified(verification.userId);
 
         // 删除验证 token
         await this.prisma.emailVerification.delete({
@@ -358,14 +274,8 @@ export class AuthService {
             throw new BusinessException(ErrorCode.AUTH_TOKEN_EXPIRED, '重置链接已过期');
         }
 
-        // 哈希新密码
-        const hashedPassword = await this.passwordService.hashPassword(newPassword);
-
-        // 更新密码
-        await this.prisma.user.update({
-            where: { id: reset.userId },
-            data: { password: hashedPassword },
-        });
+        // 更新密码（使用 UsersService）
+        await this.usersService.updatePassword(reset.userId, newPassword);
 
         // 标记 token 为已使用
         await this.prisma.passwordReset.update({
@@ -382,7 +292,7 @@ export class AuthService {
     }
 
     /**
-     * 生成安全的随机 token
+     * Generate secure random token (for email verification and password reset)
      */
     private generateSecureToken(): string {
         return randomBytes(32).toString('hex');
