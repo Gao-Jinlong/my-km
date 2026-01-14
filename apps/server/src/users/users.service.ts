@@ -273,7 +273,11 @@ export class UsersService {
             });
 
             if (usernameExists) {
-                this.logger.warn('Username already exists', undefined, { username, userId: id, traceId });
+                this.logger.warn('Username already exists', undefined, {
+                    username,
+                    userId: id,
+                    traceId,
+                });
                 throw new BusinessException(ErrorCode.USER_ALREADY_EXISTS, '用户名已被使用');
             }
         }
@@ -354,7 +358,10 @@ export class UsersService {
         });
 
         if (!existingUser) {
-            this.logger.warn('User not found for status update', undefined, { userId: id, traceId });
+            this.logger.warn('User not found for status update', undefined, {
+                userId: id,
+                traceId,
+            });
             throw new BusinessException(ErrorCode.USER_NOT_FOUND, '用户不存在');
         }
 
@@ -406,14 +413,23 @@ export class UsersService {
         });
 
         if (!existingUser) {
-            this.logger.warn('User not found for password change', undefined, { userId: id, traceId });
+            this.logger.warn('User not found for password change', undefined, {
+                userId: id,
+                traceId,
+            });
             throw new BusinessException(ErrorCode.USER_NOT_FOUND, '用户不存在');
         }
 
         // Verify old password
         if (!existingUser.password) {
-            this.logger.warn('User has no password (OAuth user)', undefined, { userId: id, traceId });
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, '该账户使用第三方登录，无法修改密码');
+            this.logger.warn('User has no password (OAuth user)', undefined, {
+                userId: id,
+                traceId,
+            });
+            throw new BusinessException(
+                ErrorCode.VALIDATION_ERROR,
+                '该账户使用第三方登录，无法修改密码',
+            );
         }
 
         const isOldPasswordValid = await this.passwordService.comparePassword(
@@ -541,7 +557,11 @@ export class UsersService {
     /**
      * Update current user's profile
      */
-    async updateProfile(userId: string, data: Partial<Pick<UpdateUserDto, 'username' | 'avatar' | 'bio'>>, traceId?: string) {
+    async updateProfile(
+        userId: string,
+        data: Partial<Pick<UpdateUserDto, 'username' | 'avatar' | 'bio'>>,
+        traceId?: string,
+    ) {
         // Check if user exists
         const existingUser = await this.prisma.user.findUnique({
             where: { id: userId },
@@ -559,7 +579,11 @@ export class UsersService {
             });
 
             if (usernameExists) {
-                this.logger.warn('Username already exists', undefined, { username: data.username, userId, traceId });
+                this.logger.warn('Username already exists', undefined, {
+                    username: data.username,
+                    userId,
+                    traceId,
+                });
                 throw new BusinessException(ErrorCode.USER_ALREADY_EXISTS, '用户名已被使用');
             }
         }
@@ -589,7 +613,12 @@ export class UsersService {
     /**
      * Change own password (with old password verification)
      */
-    async changeOwnPassword(userId: string, oldPassword: string, newPassword: string, traceId?: string) {
+    async changeOwnPassword(
+        userId: string,
+        oldPassword: string,
+        newPassword: string,
+        traceId?: string,
+    ) {
         // Check if user exists
         const existingUser = await this.prisma.user.findUnique({
             where: { id: userId },
@@ -603,7 +632,10 @@ export class UsersService {
         // Verify user has password (not OAuth user)
         if (!existingUser.password) {
             this.logger.warn('User has no password (OAuth user)', undefined, { userId, traceId });
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, '该账户使用第三方登录，无法修改密码');
+            throw new BusinessException(
+                ErrorCode.VALIDATION_ERROR,
+                '该账户使用第三方登录，无法修改密码',
+            );
         }
 
         // Verify old password

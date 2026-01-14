@@ -1,21 +1,33 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { QueryUsersDto } from './dto/query-users.dto';
-import { ChangePasswordDto } from './dto/change-password.dto';
-import { UpdateUserStatusDto } from './dto/update-user-status.dto';
-import { RegisterDto } from './dto/register.dto';
-import { UpdateProfileDto } from './dto/update-profile.dto';
-import { ChangeOwnPasswordDto } from './dto/change-own-password.dto';
-import { UsersService } from './users.service';
-import { EmailService } from '../email/email.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import {
+    Body,
+    Controller,
+    Delete,
+    Get,
+    Param,
+    Patch,
+    Post,
+    Put,
+    Query,
+    Req,
+    UseGuards,
+} from '@nestjs/common';
+import { ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { Public } from '../auth/decorators/current-user.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import type { Request } from 'express';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { EmailService } from '../email/email.service';
+import { ChangeOwnPasswordDto } from './dto/change-own-password.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { CreateUserDto } from './dto/create-user.dto';
+import { QueryUsersDto } from './dto/query-users.dto';
+import { RegisterDto } from './dto/register.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UpdateUserStatusDto } from './dto/update-user-status.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { UsersService } from './users.service';
 
-@ApiTags('users')
+@ApiTags('Users')
 @Controller('users')
 export class UsersController {
     constructor(
@@ -28,9 +40,12 @@ export class UsersController {
      * Moved from Auth module as part of refactoring
      */
     @Public()
-    @Post()
+    @Post('register')
     @ApiOperation({ summary: 'Register a new user' })
-    @ApiResponse({ status: 201, description: 'User registered successfully. Verification email sent.' })
+    @ApiResponse({
+        status: 201,
+        description: 'User registered successfully. Verification email sent.',
+    })
     @ApiResponse({ status: 400, description: 'Bad request - validation error' })
     @ApiResponse({ status: 409, description: 'Conflict - email or username already exists' })
     async register(@Body() registerDto: RegisterDto, @Req() req: Request) {
@@ -41,8 +56,12 @@ export class UsersController {
 
         // Send verification email asynchronously
         this.emailService
-            .sendVerificationEmail(result.user.email, result.user.username || result.user.email, result.verificationToken)
-            .catch((error) => {
+            .sendVerificationEmail(
+                result.user.email,
+                result.user.username || result.user.email,
+                result.verificationToken,
+            )
+            .catch(error => {
                 console.error('发送验证邮件失败:', error);
             });
 

@@ -878,15 +878,7 @@ async update(id: string, data: UpdateArticleDto, userId: string) {
 
 > **注意**: Phase 3 与 Phase 2 同步完成，邮件功能已在核心认证中实现。
 
-### Phase 4: OAuth 集成 (2-3 天)
-
-- [ ] 配置 GitHub OAuth App
-- [ ] 配置 Google OAuth Client
-- [ ] 实现 GitHub OAuth 流程
-- [ ] 实现 Google OAuth 流程
-- [ ] 实现账号关联逻辑
-
-### Phase 5: 前端集成 (3-4 天)
+### Phase 4: 前端集成 (3-4 天)
 
 - [ ] 创建 AuthContext
 - [ ] 实现登录页面
@@ -894,7 +886,16 @@ async update(id: string, data: UpdateArticleDto, userId: string) {
 - [ ] 实现密码重置页面
 - [ ] 实现个人资料页面
 - [ ] 实现路由保护
-- [ ] 集成 OAuth 按钮
+
+### Phase 5: OAuth 集成 (2-3 天)
+
+- [ ] 配置 GitHub OAuth App
+- [ ] 配置 Google OAuth Client
+- [ ] 实现 GitHub OAuth 流程
+- [ ] 实现 Google OAuth 流程
+- [ ] 实现账号关联逻辑
+- [ ] 集成 OAuth 登入到前端
+
 
 ### Phase 6: 数据隔离 (2-3 天)
 

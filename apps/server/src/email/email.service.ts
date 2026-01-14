@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
+import { Injectable } from '@nestjs/common';
 import { EnvConfig } from '../config/env.config';
 
 @Injectable()
@@ -72,7 +72,6 @@ export class EmailService {
      * 获取前端 URL
      */
     private getFrontendUrl(): string {
-        // TODO: 将来可以添加到 EnvConfig 中
-        return 'http://localhost:3000';
+        return this.envConfig.frontendUrl;
     }
 }

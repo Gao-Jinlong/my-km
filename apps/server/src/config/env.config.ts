@@ -156,6 +156,12 @@ export class EnvConfig implements OnModuleInit {
         return this.config.MAILDEV_FROM_NAME || 'My-KM';
     }
 
+    // ============ Frontend ============
+
+    get frontendUrl(): string {
+        return this.config.FRONTEND_URL || 'http://localhost:4000';
+    }
+
     // ============ Redis ============
 
     get redisHost(): string {

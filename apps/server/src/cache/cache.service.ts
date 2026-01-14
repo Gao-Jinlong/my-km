@@ -81,13 +81,15 @@ export class CacheService {
             // Handle cache-manager v6+ stores array
             const cache = this.cacheManager as any;
             if (cache.stores && Array.isArray(cache.stores)) {
-                await Promise.all(cache.stores.map((store: unknown) => {
-                    // Keyv stores use .clear() instead of .reset()
-                    if (store && typeof store === 'object' && 'clear' in store) {
-                        return (store as { clear: () => Promise<void> }).clear();
-                    }
-                    return Promise.resolve();
-                }));
+                await Promise.all(
+                    cache.stores.map((store: unknown) => {
+                        // Keyv stores use .clear() instead of .reset()
+                        if (store && typeof store === 'object' && 'clear' in store) {
+                            return (store as { clear: () => Promise<void> }).clear();
+                        }
+                        return Promise.resolve();
+                    }),
+                );
             } else if (cache.store?.reset) {
                 await cache.store.reset();
             } else if (cache.cache) {

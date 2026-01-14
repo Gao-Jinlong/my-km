@@ -24,6 +24,7 @@
   "dependencies": {
     "@keyv/redis": "^2.8.5",
     "@my-km/prisma": "workspace:*",
+    "@nestjs-modules/mailer": "^2.0.2",
     "@nestjs/cache-manager": "^3.1.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",

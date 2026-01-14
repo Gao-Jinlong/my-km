@@ -50,12 +50,6 @@ async function bootstrap() {
         .setDescription('Personal Knowledge Management API')
         .setVersion('1.0')
         .addBearerAuth()
-        .addTag('auth', 'Authentication endpoints')
-        .addTag('articles', 'Article management')
-        .addTag('categories', 'Category management')
-        .addTag('tags', 'Tag management')
-        .addTag('search', 'Search functionality')
-        .addTag('ai', 'AI-powered features')
         .build();
 
     const documentFactory = () => SwaggerModule.createDocument(app, config);
@@ -75,7 +69,7 @@ async function bootstrap() {
         credentials: true,
     });
 
-    const port = process.env.PORT ?? 3001;
+    const port = process.env.PORT ?? 3000;
     await app.listen(port);
 
     // 记录启动信息

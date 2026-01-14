@@ -1,17 +1,17 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { PasswordService } from './services/password.service';
-import { JwtTokenService } from './services/jwt-token.service';
-import { TokenService } from './services/token.service';
-import { EmailService } from '../email/email.service';
-import { LoginDto } from './dto/login.dto';
-import { UsersService } from '../users/users.service';
-import { BusinessException } from '../common/exceptions/business.exception';
-import { ErrorCode } from '../common/constants/error-codes';
-import { EnvConfig } from '../config/env.config';
-import { CacheService } from '../cache/cache.service';
-import { CacheTTL } from '../cache/cache.constants';
 import { randomBytes } from 'node:crypto';
+import { Injectable } from '@nestjs/common';
+import { CacheTTL } from '../cache/cache.constants';
+import { CacheService } from '../cache/cache.service';
+import { ErrorCode } from '../common/constants/error-codes';
+import { BusinessException } from '../common/exceptions/business.exception';
+import { EnvConfig } from '../config/env.config';
+import { EmailService } from '../email/email.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { UsersService } from '../users/users.service';
+import { LoginDto } from './dto/login.dto';
+import { JwtTokenService } from './services/jwt-token.service';
+import { PasswordService } from './services/password.service';
+import { TokenService } from './services/token.service';
 
 @Injectable()
 export class AuthService {
@@ -42,7 +42,10 @@ export class AuthService {
         }
 
         // 验证密码
-        const isPasswordValid = await this.passwordService.comparePassword(password, user.password || '');
+        const isPasswordValid = await this.passwordService.comparePassword(
+            password,
+            user.password || '',
+        );
 
         if (!isPasswordValid) {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, '邮箱或密码错误');
@@ -72,11 +75,15 @@ export class AuthService {
 
         // Cache user session (optional)
         const sessionKey = this.cache.getSessionKey(user.id);
-        await this.cache.set(sessionKey, {
-            userId: user.id,
-            email: user.email,
-            lastLoginAt: new Date(),
-        }, CacheTTL.SESSION);
+        await this.cache.set(
+            sessionKey,
+            {
+                userId: user.id,
+                email: user.email,
+                lastLoginAt: new Date(),
+            },
+            CacheTTL.SESSION,
+        );
 
         return {
             accessToken,
@@ -145,8 +152,11 @@ export class AuthService {
 
         // 发送欢迎邮件（异步）
         this.emailService
-            .sendWelcomeEmail(verification.user.email, verification.user.username || verification.user.email)
-            .catch((error) => {
+            .sendWelcomeEmail(
+                verification.user.email,
+                verification.user.username || verification.user.email,
+            )
+            .catch(error => {
                 console.error('发送欢迎邮件失败:', error);
             });
 

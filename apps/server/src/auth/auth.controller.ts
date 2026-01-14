@@ -18,7 +18,8 @@ export class AuthController {
     @Public()
     @Post('login')
     async login(@Body() loginDto: LoginDto, @Req() req: any) {
-        const ipAddress = (req.headers['x-forwarded-for'] as string) || (req.headers['x-real-ip'] as string);
+        const ipAddress =
+            (req.headers['x-forwarded-for'] as string) || (req.headers['x-real-ip'] as string);
         const userAgent = req.headers['user-agent'] as string;
 
         return this.authService.login(loginDto, ipAddress, userAgent);
@@ -42,7 +43,8 @@ export class AuthController {
     @Public()
     @Post('refresh')
     async refresh(@Body() refreshTokenDto: RefreshTokenDto, @Req() req: any) {
-        const ipAddress = (req.headers['x-forwarded-for'] as string) || (req.headers['x-real-ip'] as string);
+        const ipAddress =
+            (req.headers['x-forwarded-for'] as string) || (req.headers['x-real-ip'] as string);
         const userAgent = req.headers['user-agent'] as string;
 
         return this.authService.refreshTokens(refreshTokenDto.refreshToken, userAgent, ipAddress);

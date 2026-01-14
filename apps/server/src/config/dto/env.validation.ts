@@ -190,6 +190,18 @@ export class EnvironmentVariables {
     @IsOptional()
     MAILDEV_FROM_NAME?: string;
 
+    // ============ Frontend ============
+
+    /**
+     * 前端 URL（用于生成邮件中的链接）
+     * @default http://localhost:4000
+     * @example http://localhost:4000
+     * @example https://my-km.com
+     */
+    @IsString()
+    @IsOptional()
+    FRONTEND_URL?: string;
+
     // ============ Redis ============
 
     /**

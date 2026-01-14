@@ -2,8 +2,8 @@ import { join } from 'node:path';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
 import { Module } from '@nestjs/common';
-import { EmailService } from './email.service';
 import { EnvConfig } from '../config/env.config';
+import { EmailService } from './email.service';
 
 // 模板目录路径 - 兼容开发和生产环境
 const TEMPLATES_DIR = join(process.cwd(), 'src', 'email', 'templates');

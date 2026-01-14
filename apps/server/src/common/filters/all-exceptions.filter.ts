@@ -21,6 +21,7 @@ import { Request, Response } from 'express';
 import { LoggerService } from '../../logger/logger.service';
 import { ERROR_CODE_TO_LOG_LEVEL, ErrorCode } from '../constants/error-codes';
 import { BusinessException } from '../exceptions/business.exception';
+import type { ErrorDetail } from '../exceptions/business.exception';
 
 /**
  * 错误响应接口
@@ -77,6 +78,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
             errorCode = this.getErrorCodeFromStatus(status);
             message = exception.message;
 
+            // 处理验证错误的详细信息
+            const exceptionResponse = exception.getResponse();
+            if (status === 400 && typeof exceptionResponse === 'object' && exceptionResponse !== null) {
+                const responseBody = exceptionResponse as Record<string, any>;
+
+                // 检查是否为验证错误 (消息数组格式)
+                if (Array.isArray(responseBody.message)) {
+                    message = 'Validation failed';
+                    details = this.formatValidationErrors(responseBody.message);
+                }
+            }
+
             // 记录警告日志
             this.logger.warn('HTTP exception', undefined, {
                 traceId,
@@ -84,6 +97,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
                 message,
                 path: request.path,
                 method: request.method,
+                ...(details && { validationDetails: details }),
             });
         } else if (exception instanceof Error) {
             // 未知错误
@@ -184,5 +198,33 @@ export class AllExceptionsFilter implements ExceptionFilter {
      */
     private isDevelopment(): boolean {
         return process.env.NODE_ENV === 'development';
+    }
+
+    /**
+     * 格式化验证错误消息为统一的错误详情格式
+     *
+     * 支持多种验证错误消息格式:
+     * - "email must be an email" -> { field: "email", message: "must be an email" }
+     * - "password should not be empty" -> { field: "password", message: "should not be empty" }
+     *
+     * @param messages - class-validator 生成的错误消息数组
+     * @returns 格式化后的错误详情数组
+     */
+    private formatValidationErrors(messages: string[]): ErrorDetail[] {
+        return messages.map((msg) => {
+            // class-validator 的默认消息格式通常是: "{field} {constraint message}"
+            // 例如: "email must be an email"
+
+            // 使用正则表达式匹配第一个单词作为字段名
+            const match = msg.match(/^(\w+)\s+(.+)$/);
+
+            if (match) {
+                const [, field, message] = match;
+                return { field, message };
+            }
+
+            // 如果无法解析,返回整个消息作为错误消息
+            return { message: msg };
+        });
     }
 }
