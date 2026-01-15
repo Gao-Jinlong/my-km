@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to My-KM</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .greeting {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .message {
+            margin-bottom: 20px;
+            color: #666;
+        }
+        .features {
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 30px 0;
+        }
+        .feature {
+            margin: 15px 0;
+            padding-left: 30px;
+            position: relative;
+        }
+        .feature:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #667eea;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        .button-container {
+            text-align: center;
+            margin: 40px 0;
+        }
+        .button {
+            display: inline-block;
+            padding: 14px 32px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 16px;
+            transition: transform 0.2s;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px 30px;
+            text-align: center;
+            font-size: 12px;
+            color: #999;
+            border-top: 1px solid #e9ecef;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎉 Welcome to My-KM!</h1>
+        </div>
+        <div class="content">
+            <p class="greeting">Hi {{username}},</p>
+            <p class="message">
+                Congratulations on successfully registering for My-KM Personal Knowledge Management System!
+            </p>
+            <p class="message">
+                We're excited to be your partner in this knowledge management journey. My-KM will help you organize, manage, and retrieve your knowledge more efficiently.
+            </p>
+            <div class="features">
+                <p style="margin: 0 0 15px 0; font-weight: 600; color: #333;">You can now:</p>
+                <div class="feature">Create and manage articles</div>
+                <div class="feature">Organize categories and tags</div>
+                <div class="feature">Use AI-assisted writing and Q&A</div>
+                <div class="feature">Access your knowledge base anywhere</div>
+            </div>
+            <div class="button-container">
+                <a href="{{frontendUrl}}" class="button">Get Started</a>
+            </div>
+            <p class="message">
+                If you have any questions or suggestions, feel free to contact us anytime.
+            </p>
+            <p class="message">
+                Enjoy using My-KM!
+            </p>
+        </div>
+        <div class="footer">
+            <p>© {{year}} My-KM. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

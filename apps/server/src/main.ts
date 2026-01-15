@@ -1,10 +1,11 @@
 import { ValidationPipe, VersioningType } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
-import { Reflector } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { I18nMiddleware } from './i18n';
 import { LoggerService } from './logger/logger.service';
 import 'dotenv/config';
 
@@ -16,6 +17,12 @@ async function bootstrap() {
     // 使用自定义 Logger Service
     const logger = await app.resolve(LoggerService);
     app.useLogger(logger);
+
+    // 应用 I18n 中间件（需要在其他中间件之前）
+    const i18nMiddleware = await app.resolve(I18nMiddleware);
+    app.use((req: Request, res: Response, next: NextFunction) =>
+        i18nMiddleware.use(req, res, next),
+    );
 
     // 配置全局验证管道
     app.useGlobalPipes(
@@ -64,9 +71,29 @@ async function bootstrap() {
     });
 
     // 启用 CORS
+    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:4000'];
+
     app.enableCors({
-        origin: process.env.ALLOWED_ORIGINS?.split(',') || '*',
+        origin: (
+            origin: string | undefined,
+            callback: (err: Error | null, allow: boolean) => void,
+        ) => {
+            // 允许没有 origin 的请求（如移动应用、Postman 等）
+            if (!origin) {
+                return callback(null, true);
+            }
+
+            // 检查 origin 是否在允许列表中
+            if (allowedOrigins.includes(origin)) {
+                callback(null, true);
+            } else {
+                callback(new Error(`CORS: Origin ${origin} not allowed`), false);
+            }
+        },
         credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Locale'],
+        exposedHeaders: ['Content-Range', 'X-Content-Range'],
     });
 
     const port = process.env.PORT ?? 3000;

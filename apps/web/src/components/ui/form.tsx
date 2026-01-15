@@ -64,7 +64,7 @@ const useFormField = () => {
 
 const FormItem = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
     ({ className, ...props }, ref) => {
-        const { id } = useFormField();
+        useFormField();
 
         return <div ref={ref} className={cn('space-y-2', className)} {...props} />;
     },
@@ -111,7 +111,7 @@ const FormDescription = React.forwardRef<
         <p
             ref={ref}
             id={formDescriptionId}
-            className={cn('text-sm text-slate-500 dark:text-slate-400', className)}
+            className={cn('text-slate-500 text-sm dark:text-slate-400', className)}
             {...props}
         />
     );
@@ -134,7 +134,7 @@ const FormMessage = React.forwardRef<
         <p
             ref={ref}
             id={formMessageId}
-            className={cn('text-sm font-medium text-red-500 dark:text-red-900', className)}
+            className={cn('font-medium text-red-500 text-sm dark:text-red-900', className)}
             {...props}
         >
             {body}

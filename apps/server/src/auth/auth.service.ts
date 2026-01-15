@@ -6,6 +6,8 @@ import { ErrorCode } from '../common/constants/error-codes';
 import { BusinessException } from '../common/exceptions/business.exception';
 import { EnvConfig } from '../config/env.config';
 import { EmailService } from '../email/email.service';
+import type { Locale } from '../i18n/constants/locales';
+import { I18nService } from '../i18n/i18n.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { LoginDto } from './dto/login.dto';
@@ -24,6 +26,7 @@ export class AuthService {
         private readonly envConfig: EnvConfig,
         private readonly cache: CacheService,
         private readonly usersService: UsersService,
+        private readonly i18nService: I18nService,
     ) {}
 
     /**
@@ -31,14 +34,18 @@ export class AuthService {
      * @param loginDto 登录数据
      * @returns Tokens 和用户信息
      */
-    async login(loginDto: LoginDto, ipAddress?: string, userAgent?: string) {
+    async login(loginDto: LoginDto, ipAddress?: string, userAgent?: string, locale?: Locale) {
         const { email, password, rememberMe } = loginDto;
+        const localeKey: Locale = locale || 'zh-CN';
 
         // 查找用户（使用 UsersService）
         const user = await this.usersService.findByEmailWithPassword(email);
 
         if (!user) {
-            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, '邮箱或密码错误');
+            throw new BusinessException(
+                ErrorCode.INVALID_CREDENTIALS,
+                this.i18nService.getErrorMessage('AUTH_INVALID_CREDENTIALS', localeKey),
+            );
         }
 
         // 验证密码
@@ -48,7 +55,10 @@ export class AuthService {
         );
 
         if (!isPasswordValid) {
-            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, '邮箱或密码错误');
+            throw new BusinessException(
+                ErrorCode.INVALID_CREDENTIALS,
+                this.i18nService.getErrorMessage('AUTH_INVALID_CREDENTIALS', localeKey),
+            );
         }
 
         // 检查邮箱是否已验证
@@ -122,7 +132,9 @@ export class AuthService {
      * 验证邮箱
      * @param token 验证 token
      */
-    async verifyEmail(token: string) {
+    async verifyEmail(token: string, locale?: Locale) {
+        const localeKey: Locale = locale || 'zh-CN';
+
         // 查找验证记录
         const verification = await this.prisma.emailVerification.findUnique({
             where: { token },
@@ -130,7 +142,10 @@ export class AuthService {
         });
 
         if (!verification) {
-            throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID, '无效的验证链接');
+            throw new BusinessException(
+                ErrorCode.AUTH_TOKEN_INVALID,
+                this.i18nService.getErrorMessage('AUTH_INVALID_TOKEN', localeKey),
+            );
         }
 
         // 检查是否过期
@@ -139,7 +154,10 @@ export class AuthService {
             await this.prisma.emailVerification.delete({
                 where: { id: verification.id },
             });
-            throw new BusinessException(ErrorCode.AUTH_TOKEN_EXPIRED, '验证链接已过期');
+            throw new BusinessException(
+                ErrorCode.AUTH_TOKEN_EXPIRED,
+                this.i18nService.getErrorMessage('AUTH_TOKEN_EXPIRED', localeKey),
+            );
         }
 
         // 更新用户状态（使用 UsersService）
@@ -155,13 +173,14 @@ export class AuthService {
             .sendWelcomeEmail(
                 verification.user.email,
                 verification.user.username || verification.user.email,
+                locale || 'zh-CN',
             )
             .catch(error => {
                 console.error('发送欢迎邮件失败:', error);
             });
 
         return {
-            message: '邮箱验证成功',
+            message: this.i18nService.getErrorMessage('AUTH_VERIFICATION_SUCCESS', localeKey),
         };
     }
 
@@ -169,17 +188,25 @@ export class AuthService {
      * 重新发送验证邮件
      * @param userId 用户 ID
      */
-    async resendVerificationEmail(userId: string) {
+    async resendVerificationEmail(userId: string, locale?: Locale) {
+        const localeKey: Locale = locale || 'zh-CN';
+
         const user = await this.prisma.user.findUnique({
             where: { id: userId },
         });
 
         if (!user) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, '用户不存在');
+            throw new BusinessException(
+                ErrorCode.NOT_FOUND,
+                this.i18nService.getErrorMessage('AUTH_USER_NOT_FOUND', localeKey),
+            );
         }
 
         if (user.isEmailVerified) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, '邮箱已验证');
+            throw new BusinessException(
+                ErrorCode.VALIDATION_ERROR,
+                this.i18nService.getErrorMessage('AUTH_VERIFICATION_ALREADY_VERIFIED', localeKey),
+            );
         }
 
         // 删除旧的验证 token（如果存在）
@@ -205,10 +232,11 @@ export class AuthService {
             user.email,
             user.username || user.email,
             token,
+            locale || 'zh-CN',
         );
 
         return {
-            message: '验证邮件已发送',
+            message: this.i18nService.getErrorMessage('AUTH_VERIFICATION_SENT', localeKey),
         };
     }
 
@@ -216,7 +244,9 @@ export class AuthService {
      * 请求密码重置
      * @param email 邮箱
      */
-    async forgotPassword(email: string) {
+    async forgotPassword(email: string, locale?: Locale) {
+        const localeKey: Locale = locale || 'zh-CN';
+
         const user = await this.prisma.user.findUnique({
             where: { email },
         });
@@ -224,7 +254,10 @@ export class AuthService {
         // 即使用户不存在也返回成功，防止邮箱枚举攻击
         if (!user) {
             return {
-                message: '如果该邮箱已注册，您将收到密码重置邮件',
+                message: this.i18nService.getErrorMessage(
+                    'AUTH_PASSWORD_RESET_EMAIL_SENT',
+                    localeKey,
+                ),
             };
         }
 
@@ -251,10 +284,11 @@ export class AuthService {
             user.email,
             user.username || user.email,
             token,
+            locale || 'zh-CN',
         );
 
         return {
-            message: '如果该邮箱已注册，您将收到密码重置邮件',
+            message: this.i18nService.getErrorMessage('AUTH_PASSWORD_RESET_EMAIL_SENT', localeKey),
         };
     }
 
@@ -263,7 +297,9 @@ export class AuthService {
      * @param token 重置 token
      * @param newPassword 新密码
      */
-    async resetPassword(token: string, newPassword: string) {
+    async resetPassword(token: string, newPassword: string, locale?: Locale) {
+        const localeKey: Locale = locale || 'zh-CN';
+
         // 查找重置记录
         const reset = await this.prisma.passwordReset.findUnique({
             where: { token },
@@ -271,17 +307,26 @@ export class AuthService {
         });
 
         if (!reset) {
-            throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID, '无效的重置链接');
+            throw new BusinessException(
+                ErrorCode.AUTH_TOKEN_INVALID,
+                this.i18nService.getErrorMessage('AUTH_INVALID_TOKEN', localeKey),
+            );
         }
 
         // 检查是否已使用
         if (reset.usedAt) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, '此链接已被使用');
+            throw new BusinessException(
+                ErrorCode.VALIDATION_ERROR,
+                this.i18nService.getErrorMessage('AUTH_PASSWORD_RESET_LINK_USED', localeKey),
+            );
         }
 
         // 检查是否过期
         if (reset.expiresAt < new Date()) {
-            throw new BusinessException(ErrorCode.AUTH_TOKEN_EXPIRED, '重置链接已过期');
+            throw new BusinessException(
+                ErrorCode.AUTH_TOKEN_EXPIRED,
+                this.i18nService.getErrorMessage('AUTH_TOKEN_EXPIRED', localeKey),
+            );
         }
 
         // 更新密码（使用 UsersService）
@@ -297,7 +342,7 @@ export class AuthService {
         await this.tokenService.revokeAllUserSessions(reset.userId);
 
         return {
-            message: '密码重置成功，请使用新密码登录',
+            message: this.i18nService.getErrorMessage('AUTH_PASSWORD_RESET_SUCCESS', localeKey),
         };
     }
 

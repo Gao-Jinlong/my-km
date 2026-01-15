@@ -78,12 +78,14 @@ export function useAuth() {
             // TODO: 实现 getMe API 调用
             // const user = await usersApi.getMe()
             // setUser(user)
+            // eslint-disable-next-line no-unreachable
+            throw new Error('Not implemented');
         } catch (error) {
             console.error('Failed to refresh user:', error);
         } finally {
             setLoading(false);
         }
-    }, [isAuthenticated, setLoading, setUser]);
+    }, [isAuthenticated, setLoading]);
 
     return {
         // 状态

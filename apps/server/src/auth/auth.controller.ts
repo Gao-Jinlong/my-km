@@ -1,12 +1,13 @@
-import { Controller, Post, Get, Body, Query, UseGuards, Req } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { CurrentLocale } from '../i18n';
+import type { Locale } from '../i18n/constants/locales';
 import { AuthService } from './auth.service';
+import { CurrentUser, Public } from './decorators/current-user.decorator';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
-import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { Public } from './decorators/current-user.decorator';
-import { CurrentUser } from './decorators/current-user.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -17,12 +18,18 @@ export class AuthController {
      */
     @Public()
     @Post('login')
-    async login(@Body() loginDto: LoginDto, @Req() req: any) {
+    async login(
+        @Body() loginDto: LoginDto,
+        @Req() req: {
+            headers: { 'x-forwarded-for'?: string; 'x-real-ip'?: string; 'user-agent'?: string };
+        },
+        @CurrentLocale() locale: Locale,
+    ) {
         const ipAddress =
             (req.headers['x-forwarded-for'] as string) || (req.headers['x-real-ip'] as string);
         const userAgent = req.headers['user-agent'] as string;
 
-        return this.authService.login(loginDto, ipAddress, userAgent);
+        return this.authService.login(loginDto, ipAddress, userAgent, locale);
     }
 
     /**
@@ -30,10 +37,10 @@ export class AuthController {
      */
     @Post('logout')
     @UseGuards(JwtAuthGuard)
-    async logout(@Body() logoutDto: { refreshToken: string }) {
+    async logout(@Body() logoutDto: { refreshToken: string }, @CurrentLocale() locale: Locale) {
         await this.authService.logout(logoutDto.refreshToken);
         return {
-            message: '登出成功',
+            message: this.authService['i18nService'].getErrorMessage('AUTH_LOGOUT_SUCCESS', locale),
         };
     }
 
@@ -42,7 +49,13 @@ export class AuthController {
      */
     @Public()
     @Post('refresh')
-    async refresh(@Body() refreshTokenDto: RefreshTokenDto, @Req() req: any) {
+    async refresh(
+        @Body() refreshTokenDto: RefreshTokenDto,
+        @Req() req: {
+            headers: { 'x-forwarded-for'?: string; 'x-real-ip'?: string; 'user-agent'?: string };
+        },
+        @CurrentLocale() _locale: Locale,
+    ) {
         const ipAddress =
             (req.headers['x-forwarded-for'] as string) || (req.headers['x-real-ip'] as string);
         const userAgent = req.headers['user-agent'] as string;
@@ -55,8 +68,8 @@ export class AuthController {
      */
     @Public()
     @Get('verify-email')
-    async verifyEmail(@Query('token') token: string) {
-        return this.authService.verifyEmail(token);
+    async verifyEmail(@Query('token') token: string, @CurrentLocale() locale: Locale) {
+        return this.authService.verifyEmail(token, locale);
     }
 
     /**
@@ -64,8 +77,11 @@ export class AuthController {
      */
     @Post('resend-verification')
     @UseGuards(JwtAuthGuard)
-    async resendVerificationEmail(@CurrentUser('id') userId: string) {
-        return this.authService.resendVerificationEmail(userId);
+    async resendVerificationEmail(
+        @CurrentUser('id') userId: string,
+        @CurrentLocale() locale: Locale,
+    ) {
+        return this.authService.resendVerificationEmail(userId, locale);
     }
 
     /**
@@ -73,8 +89,11 @@ export class AuthController {
      */
     @Public()
     @Post('forgot-password')
-    async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
-        return this.authService.forgotPassword(forgotPasswordDto.email);
+    async forgotPassword(
+        @Body() forgotPasswordDto: ForgotPasswordDto,
+        @CurrentLocale() locale: Locale,
+    ) {
+        return this.authService.forgotPassword(forgotPasswordDto.email, locale);
     }
 
     /**
@@ -82,7 +101,14 @@ export class AuthController {
      */
     @Public()
     @Post('reset-password')
-    async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
-        return this.authService.resetPassword(resetPasswordDto.token, resetPasswordDto.newPassword);
+    async resetPassword(
+        @Body() resetPasswordDto: ResetPasswordDto,
+        @CurrentLocale() locale: Locale,
+    ) {
+        return this.authService.resetPassword(
+            resetPasswordDto.token,
+            resetPasswordDto.newPassword,
+            locale,
+        );
     }
 }

@@ -4,8 +4,8 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { authApi } from '@/api/auth';
@@ -20,9 +20,12 @@ import {
     CardTitle,
     Form,
 } from '@/components/ui';
+import { Link } from '@/i18n/routing';
 import { type ResetPasswordFormValues, resetPasswordSchema } from '@/utils/validation';
 
 export function ResetPasswordForm() {
+    const t = useTranslations('auth.resetPassword');
+    const tErrors = useTranslations('errors');
     const router = useRouter();
     const searchParams = useSearchParams();
     const token = searchParams.get('token');
@@ -51,8 +54,8 @@ export function ResetPasswordForm() {
             setTimeout(() => {
                 router.push('/login?reset=true');
             }, 3000);
-        } catch (err: any) {
-            const errorMessage = err?.message || '重置失败，请稍后再试';
+        } catch (err) {
+            const errorMessage = (err as Error)?.message || tErrors('generic');
             setError(errorMessage);
         } finally {
             setIsLoading(false);
@@ -64,21 +67,19 @@ export function ResetPasswordForm() {
         return (
             <Card className="w-full max-w-md">
                 <CardHeader>
-                    <CardTitle>无效的链接</CardTitle>
-                    <CardDescription>重置密码链接无效或已过期</CardDescription>
+                    <CardTitle>{t('invalidTokenTitle')}</CardTitle>
+                    <CardDescription>{t('invalidTokenDescription')}</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-600 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-400">
-                        <p className="font-medium">请重新请求密码重置</p>
-                        <p className="mt-2 text-xs">
-                            您的重置链接无效或已过期。请重新请求密码重置。
-                        </p>
+                        <p className="font-medium">{t('requestNewText')}</p>
+                        <p className="mt-2 text-xs">{t('invalidTokenDescription')}</p>
                     </div>
                 </CardContent>
                 <CardFooter>
                     <Link href="/forgot-password" className="w-full">
                         <Button variant="outline" className="w-full">
-                            请求新的重置链接
+                            {t('requestNewLink')}
                         </Button>
                     </Link>
                 </CardFooter>
@@ -90,18 +91,18 @@ export function ResetPasswordForm() {
         return (
             <Card className="w-full max-w-md">
                 <CardHeader>
-                    <CardTitle>密码已重置！</CardTitle>
-                    <CardDescription>您现在可以使用新密码登录</CardDescription>
+                    <CardTitle>{t('successTitle')}</CardTitle>
+                    <CardDescription>{t('successDescription')}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-600 dark:border-green-800 dark:bg-green-950 dark:text-green-400">
-                        <p className="font-medium">重置成功</p>
-                        <p className="mt-2 text-xs">您的密码已成功重置。正在跳转到登录页面...</p>
+                    <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-green-600 text-sm dark:border-green-800 dark:bg-green-950 dark:text-green-400">
+                        <p className="font-medium">{t('resetSuccess')}</p>
+                        <p className="mt-2 text-xs">{t('resetSuccessText')}</p>
                     </div>
                 </CardContent>
                 <CardFooter>
                     <Link href="/login" className="w-full">
-                        <Button className="w-full">前往登录</Button>
+                        <Button className="w-full">{t('gotoLogin')}</Button>
                     </Link>
                 </CardFooter>
             </Card>
@@ -111,15 +112,15 @@ export function ResetPasswordForm() {
     return (
         <Card className="w-full max-w-md">
             <CardHeader>
-                <CardTitle>重置密码</CardTitle>
-                <CardDescription>输入您的新密码</CardDescription>
+                <CardTitle>{t('title')}</CardTitle>
+                <CardDescription>{t('description')}</CardDescription>
             </CardHeader>
             <CardContent>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                         {/* 错误提示 */}
                         {error && (
-                            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+                            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-red-600 text-sm dark:border-red-800 dark:bg-red-950 dark:text-red-400">
                                 {error}
                             </div>
                         )}
@@ -127,23 +128,23 @@ export function ResetPasswordForm() {
                         {/* 新密码字段 */}
                         <PasswordField
                             name="password"
-                            label="新密码"
+                            label={t('password')}
                             placeholder="••••••••"
                             autoComplete="new-password"
-                            description="至少 8 个字符，包含大小写字母和数字"
+                            description={t('passwordDescription')}
                         />
 
                         {/* 确认密码字段 */}
                         <PasswordField
                             name="confirmPassword"
-                            label="确认新密码"
+                            label={t('confirmPassword')}
                             placeholder="••••••••"
                             autoComplete="new-password"
                         />
 
                         {/* 提交按钮 */}
                         <Button type="submit" className="w-full" disabled={isLoading}>
-                            {isLoading ? '重置中...' : '重置密码'}
+                            {isLoading ? t('submitting') : t('submit')}
                         </Button>
                     </form>
                 </Form>
@@ -151,9 +152,9 @@ export function ResetPasswordForm() {
             <CardFooter>
                 <Link
                     href="/login"
-                    className="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
+                    className="text-slate-600 text-sm hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
                 >
-                    返回登录
+                    {t('backToLogin')}
                 </Link>
             </CardFooter>
         </Card>

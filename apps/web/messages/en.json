@@ -1,0 +1,126 @@
+{
+    "meta": {
+        "title": "My-KM - Knowledge Management System",
+        "description": "Powerful personal knowledge management platform"
+    },
+    "nav": {
+        "home": "Home",
+        "dashboard": "Dashboard",
+        "login": "Login",
+        "register": "Register",
+        "logout": "Logout"
+    },
+    "auth": {
+        "login": {
+            "title": "Login",
+            "description": "Sign in to your account to access My-KM",
+            "email": "Email",
+            "password": "Password",
+            "rememberMe": "Remember me",
+            "submit": "Login",
+            "submitting": "Logging in...",
+            "noAccount": "Don't have an account?",
+            "register": "Register",
+            "forgotPassword": "Forgot password?"
+        },
+        "register": {
+            "title": "Register",
+            "description": "Create a new account to get started with My-KM",
+            "email": "Email",
+            "password": "Password",
+            "confirmPassword": "Confirm Password",
+            "submit": "Register",
+            "submitting": "Registering...",
+            "hasAccount": "Already have an account?",
+            "login": "Login",
+            "successTitle": "Registration Successful!",
+            "successDescription": "We have sent a verification email to your inbox",
+            "checkEmail": "Please check your email",
+            "emailSent": "We have sent a verification email to {{email}}. Please click the link in the email to verify your account.",
+            "goToLogin": "Go to Login"
+        },
+        "forgotPassword": {
+            "title": "Forgot Password",
+            "description": "Enter your email address and we'll send you a password reset link",
+            "email": "Email",
+            "submit": "Send Reset Link",
+            "submitting": "Sending...",
+            "backToLogin": "Back to Login",
+            "successTitle": "Email Sent",
+            "successDescription": "If this email is registered, you will receive a password reset email",
+            "checkEmail": "Please check your email and click the reset link"
+        },
+        "resetPassword": {
+            "title": "Reset Password",
+            "description": "Please enter your new password",
+            "password": "New Password",
+            "confirmPassword": "Confirm New Password",
+            "submit": "Reset Password",
+            "submitting": "Resetting...",
+            "invalidLink": "This reset link is invalid or has expired",
+            "passwordDescription": "At least 8 characters, including uppercase, lowercase and numbers",
+            "invalidTokenTitle": "Invalid Link",
+            "invalidTokenDescription": "The password reset link is invalid or has expired",
+            "requestNewLink": "Request New Reset Link",
+            "requestNewText": "Please request a new password reset",
+            "successTitle": "Password Reset!",
+            "successDescription": "You can now login with your new password",
+            "resetSuccess": "Reset Successful",
+            "resetSuccessText": "Your password has been successfully reset. Redirecting to login page...",
+            "gotoLogin": "Go to Login",
+            "backToLogin": "Back to Login"
+        },
+        "verifyEmail": {
+            "title": "Verify Email",
+            "verifying": "Verifying...",
+            "verifyingDescription": "Verifying your email, please wait...",
+            "success": "Email Verified Successfully!",
+            "successDescription": "Your email has been successfully verified, you can now login",
+            "invalidToken": "Invalid Verification Link",
+            "invalidTokenDescription": "This verification link is invalid or has already been used",
+            "tokenExpired": "Verification Link Expired",
+            "tokenExpiredDescription": "The verification link has expired, please request a new verification email",
+            "resendButton": "Resend Verification Email",
+            "resending": "Sending...",
+            "resendTitle": "Need to resend verification email?",
+            "resendHint": "Please go to the login page and log in with your credentials, the system will prompt you to verify your email",
+            "gotoLogin": "Go to Login"
+        }
+    },
+    "validation": {
+        "email": "Please enter a valid email address",
+        "passwordRequired": "Please enter your password",
+        "passwordMinLength": "Password must be at least 8 characters",
+        "passwordLowercase": "Password must contain lowercase letters",
+        "passwordUppercase": "Password must contain uppercase letters",
+        "passwordNumber": "Password must contain numbers",
+        "passwordMismatch": "Passwords do not match",
+        "usernameMinLength": "Username must be at least 3 characters",
+        "usernameMaxLength": "Username must be at most 20 characters",
+        "usernamePattern": "Username can only contain letters, numbers, underscores and hyphens",
+        "bioMaxLength": "Bio must be at most 500 characters"
+    },
+    "errors": {
+        "generic": "Operation failed, please try again later",
+        "network": "Network connection failed, please check your network",
+        "unauthorized": "You need to login to access this page",
+        "forbidden": "You don't have permission to access this page",
+        "notFound": "Page not found",
+        "serverError": "Server error, please try again later",
+        "invalidCredentials": "Invalid email or password",
+        "userExists": "This email is already registered",
+        "userNotFound": "User not found",
+        "invalidToken": "Invalid link",
+        "tokenExpired": "Link has expired"
+    },
+    "home": {
+        "title": "Welcome to My-KM",
+        "subtitle": "Powerful Personal Knowledge Management Platform",
+        "description": "My-KM is a powerful knowledge management system that helps you better organize and utilize your knowledge assets.",
+        "getStarted": "Get Started"
+    },
+    "dashboard": {
+        "title": "Dashboard",
+        "welcome": "Welcome back!"
+    }
+}
