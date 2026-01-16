@@ -1,0 +1,423 @@
+{
+    "version": "1.0.0",
+    "generatedAt": "2026-01-16T03:09:51.095Z",
+    "endpoints": [
+        {
+            "path": "/auth/login",
+            "method": "POST",
+            "summary": "用户登录",
+            "controller": "auth",
+            "file": "apps/server/src/auth/auth.controller.ts"
+        },
+        {
+            "path": "/auth/logout",
+            "method": "POST",
+            "summary": "用户登出",
+            "controller": "auth",
+            "file": "apps/server/src/auth/auth.controller.ts"
+        },
+        {
+            "path": "/auth/refresh",
+            "method": "POST",
+            "summary": "刷新 Token",
+            "controller": "auth",
+            "file": "apps/server/src/auth/auth.controller.ts"
+        },
+        {
+            "path": "/auth/verify-email",
+            "method": "GET",
+            "summary": "验证邮箱",
+            "controller": "auth",
+            "file": "apps/server/src/auth/auth.controller.ts"
+        },
+        {
+            "path": "/auth/resend-verification",
+            "method": "POST",
+            "summary": "重新发送验证邮件",
+            "controller": "auth",
+            "file": "apps/server/src/auth/auth.controller.ts"
+        },
+        {
+            "path": "/auth/forgot-password",
+            "method": "POST",
+            "summary": "请求密码重置",
+            "controller": "auth",
+            "file": "apps/server/src/auth/auth.controller.ts"
+        },
+        {
+            "path": "/auth/reset-password",
+            "method": "POST",
+            "summary": "重置密码",
+            "controller": "auth",
+            "file": "apps/server/src/auth/auth.controller.ts"
+        },
+        {
+            "path": "/users/register",
+            "method": "POST",
+            "summary": "User registration (public endpoint)",
+            "controller": "users",
+            "file": "apps/server/src/users/users.controller.ts"
+        },
+        {
+            "path": "/users/me",
+            "method": "GET",
+            "summary": "Get current user profile (authenticated endpoint)",
+            "controller": "users",
+            "file": "apps/server/src/users/users.controller.ts"
+        },
+        {
+            "path": "/users/me",
+            "method": "PATCH",
+            "summary": "Update current user profile (authenticated endpoint)",
+            "controller": "users",
+            "file": "apps/server/src/users/users.controller.ts"
+        },
+        {
+            "path": "/users/me/password",
+            "method": "PATCH",
+            "summary": "Change own password (authenticated endpoint)",
+            "controller": "users",
+            "file": "apps/server/src/users/users.controller.ts"
+        },
+        {
+            "path": "/users/me",
+            "method": "DELETE",
+            "summary": "Delete own account (authenticated endpoint)",
+            "controller": "users",
+            "file": "apps/server/src/users/users.controller.ts"
+        },
+        {
+            "path": "/users/admin",
+            "method": "POST",
+            "summary": "Create a new user (admin endpoint)",
+            "controller": "users",
+            "file": "apps/server/src/users/users.controller.ts"
+        },
+        {
+            "path": "/users/:id",
+            "method": "GET",
+            "summary": "GET :id",
+            "controller": "users",
+            "file": "apps/server/src/users/users.controller.ts"
+        },
+        {
+            "path": "/users/:id",
+            "method": "PUT",
+            "summary": "PUT :id",
+            "controller": "users",
+            "file": "apps/server/src/users/users.controller.ts"
+        },
+        {
+            "path": "/users/:id",
+            "method": "DELETE",
+            "summary": "DELETE :id",
+            "controller": "users",
+            "file": "apps/server/src/users/users.controller.ts"
+        },
+        {
+            "path": "/users/:id/status",
+            "method": "PATCH",
+            "summary": "PATCH :id/status",
+            "controller": "users",
+            "file": "apps/server/src/users/users.controller.ts"
+        },
+        {
+            "path": "/users/:id/change-password",
+            "method": "POST",
+            "summary": "POST :id/change-password",
+            "controller": "users",
+            "file": "apps/server/src/users/users.controller.ts"
+        },
+        {
+            "path": "/users/:id/last-login",
+            "method": "POST",
+            "summary": "POST :id/last-login",
+            "controller": "users",
+            "file": "apps/server/src/users/users.controller.ts"
+        }
+    ],
+    "byController": {
+        "auth": [
+            {
+                "path": "/auth/login",
+                "method": "POST",
+                "summary": "用户登录",
+                "controller": "auth",
+                "file": "apps/server/src/auth/auth.controller.ts"
+            },
+            {
+                "path": "/auth/logout",
+                "method": "POST",
+                "summary": "用户登出",
+                "controller": "auth",
+                "file": "apps/server/src/auth/auth.controller.ts"
+            },
+            {
+                "path": "/auth/refresh",
+                "method": "POST",
+                "summary": "刷新 Token",
+                "controller": "auth",
+                "file": "apps/server/src/auth/auth.controller.ts"
+            },
+            {
+                "path": "/auth/verify-email",
+                "method": "GET",
+                "summary": "验证邮箱",
+                "controller": "auth",
+                "file": "apps/server/src/auth/auth.controller.ts"
+            },
+            {
+                "path": "/auth/resend-verification",
+                "method": "POST",
+                "summary": "重新发送验证邮件",
+                "controller": "auth",
+                "file": "apps/server/src/auth/auth.controller.ts"
+            },
+            {
+                "path": "/auth/forgot-password",
+                "method": "POST",
+                "summary": "请求密码重置",
+                "controller": "auth",
+                "file": "apps/server/src/auth/auth.controller.ts"
+            },
+            {
+                "path": "/auth/reset-password",
+                "method": "POST",
+                "summary": "重置密码",
+                "controller": "auth",
+                "file": "apps/server/src/auth/auth.controller.ts"
+            }
+        ],
+        "users": [
+            {
+                "path": "/users/register",
+                "method": "POST",
+                "summary": "User registration (public endpoint)",
+                "controller": "users",
+                "file": "apps/server/src/users/users.controller.ts"
+            },
+            {
+                "path": "/users/me",
+                "method": "GET",
+                "summary": "Get current user profile (authenticated endpoint)",
+                "controller": "users",
+                "file": "apps/server/src/users/users.controller.ts"
+            },
+            {
+                "path": "/users/me",
+                "method": "PATCH",
+                "summary": "Update current user profile (authenticated endpoint)",
+                "controller": "users",
+                "file": "apps/server/src/users/users.controller.ts"
+            },
+            {
+                "path": "/users/me/password",
+                "method": "PATCH",
+                "summary": "Change own password (authenticated endpoint)",
+                "controller": "users",
+                "file": "apps/server/src/users/users.controller.ts"
+            },
+            {
+                "path": "/users/me",
+                "method": "DELETE",
+                "summary": "Delete own account (authenticated endpoint)",
+                "controller": "users",
+                "file": "apps/server/src/users/users.controller.ts"
+            },
+            {
+                "path": "/users/admin",
+                "method": "POST",
+                "summary": "Create a new user (admin endpoint)",
+                "controller": "users",
+                "file": "apps/server/src/users/users.controller.ts"
+            },
+            {
+                "path": "/users/:id",
+                "method": "GET",
+                "summary": "GET :id",
+                "controller": "users",
+                "file": "apps/server/src/users/users.controller.ts"
+            },
+            {
+                "path": "/users/:id",
+                "method": "PUT",
+                "summary": "PUT :id",
+                "controller": "users",
+                "file": "apps/server/src/users/users.controller.ts"
+            },
+            {
+                "path": "/users/:id",
+                "method": "DELETE",
+                "summary": "DELETE :id",
+                "controller": "users",
+                "file": "apps/server/src/users/users.controller.ts"
+            },
+            {
+                "path": "/users/:id/status",
+                "method": "PATCH",
+                "summary": "PATCH :id/status",
+                "controller": "users",
+                "file": "apps/server/src/users/users.controller.ts"
+            },
+            {
+                "path": "/users/:id/change-password",
+                "method": "POST",
+                "summary": "POST :id/change-password",
+                "controller": "users",
+                "file": "apps/server/src/users/users.controller.ts"
+            },
+            {
+                "path": "/users/:id/last-login",
+                "method": "POST",
+                "summary": "POST :id/last-login",
+                "controller": "users",
+                "file": "apps/server/src/users/users.controller.ts"
+            }
+        ]
+    },
+    "byMethod": {
+        "POST": [
+            {
+                "path": "/auth/login",
+                "method": "POST",
+                "summary": "用户登录",
+                "controller": "auth",
+                "file": "apps/server/src/auth/auth.controller.ts"
+            },
+            {
+                "path": "/auth/logout",
+                "method": "POST",
+                "summary": "用户登出",
+                "controller": "auth",
+                "file": "apps/server/src/auth/auth.controller.ts"
+            },
+            {
+                "path": "/auth/refresh",
+                "method": "POST",
+                "summary": "刷新 Token",
+                "controller": "auth",
+                "file": "apps/server/src/auth/auth.controller.ts"
+            },
+            {
+                "path": "/auth/resend-verification",
+                "method": "POST",
+                "summary": "重新发送验证邮件",
+                "controller": "auth",
+                "file": "apps/server/src/auth/auth.controller.ts"
+            },
+            {
+                "path": "/auth/forgot-password",
+                "method": "POST",
+                "summary": "请求密码重置",
+                "controller": "auth",
+                "file": "apps/server/src/auth/auth.controller.ts"
+            },
+            {
+                "path": "/auth/reset-password",
+                "method": "POST",
+                "summary": "重置密码",
+                "controller": "auth",
+                "file": "apps/server/src/auth/auth.controller.ts"
+            },
+            {
+                "path": "/users/register",
+                "method": "POST",
+                "summary": "User registration (public endpoint)",
+                "controller": "users",
+                "file": "apps/server/src/users/users.controller.ts"
+            },
+            {
+                "path": "/users/admin",
+                "method": "POST",
+                "summary": "Create a new user (admin endpoint)",
+                "controller": "users",
+                "file": "apps/server/src/users/users.controller.ts"
+            },
+            {
+                "path": "/users/:id/change-password",
+                "method": "POST",
+                "summary": "POST :id/change-password",
+                "controller": "users",
+                "file": "apps/server/src/users/users.controller.ts"
+            },
+            {
+                "path": "/users/:id/last-login",
+                "method": "POST",
+                "summary": "POST :id/last-login",
+                "controller": "users",
+                "file": "apps/server/src/users/users.controller.ts"
+            }
+        ],
+        "GET": [
+            {
+                "path": "/auth/verify-email",
+                "method": "GET",
+                "summary": "验证邮箱",
+                "controller": "auth",
+                "file": "apps/server/src/auth/auth.controller.ts"
+            },
+            {
+                "path": "/users/me",
+                "method": "GET",
+                "summary": "Get current user profile (authenticated endpoint)",
+                "controller": "users",
+                "file": "apps/server/src/users/users.controller.ts"
+            },
+            {
+                "path": "/users/:id",
+                "method": "GET",
+                "summary": "GET :id",
+                "controller": "users",
+                "file": "apps/server/src/users/users.controller.ts"
+            }
+        ],
+        "PATCH": [
+            {
+                "path": "/users/me",
+                "method": "PATCH",
+                "summary": "Update current user profile (authenticated endpoint)",
+                "controller": "users",
+                "file": "apps/server/src/users/users.controller.ts"
+            },
+            {
+                "path": "/users/me/password",
+                "method": "PATCH",
+                "summary": "Change own password (authenticated endpoint)",
+                "controller": "users",
+                "file": "apps/server/src/users/users.controller.ts"
+            },
+            {
+                "path": "/users/:id/status",
+                "method": "PATCH",
+                "summary": "PATCH :id/status",
+                "controller": "users",
+                "file": "apps/server/src/users/users.controller.ts"
+            }
+        ],
+        "DELETE": [
+            {
+                "path": "/users/me",
+                "method": "DELETE",
+                "summary": "Delete own account (authenticated endpoint)",
+                "controller": "users",
+                "file": "apps/server/src/users/users.controller.ts"
+            },
+            {
+                "path": "/users/:id",
+                "method": "DELETE",
+                "summary": "DELETE :id",
+                "controller": "users",
+                "file": "apps/server/src/users/users.controller.ts"
+            }
+        ],
+        "PUT": [
+            {
+                "path": "/users/:id",
+                "method": "PUT",
+                "summary": "PUT :id",
+                "controller": "users",
+                "file": "apps/server/src/users/users.controller.ts"
+            }
+        ]
+    }
+}

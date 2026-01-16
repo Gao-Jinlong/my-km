@@ -20,6 +20,7 @@ export interface TextFieldProps<TFieldValues extends FieldValues = FieldValues> 
     type?: 'text' | 'email' | 'password' | 'search' | 'url' | 'tel';
     autoComplete?: string;
     className?: string;
+    autoFocus?: boolean;
 }
 
 export function TextField<TFieldValues extends FieldValues = FieldValues>({
@@ -31,6 +32,7 @@ export function TextField<TFieldValues extends FieldValues = FieldValues>({
     type = 'text',
     autoComplete,
     className,
+    autoFocus = false,
 }: TextFieldProps<TFieldValues>) {
     const form = useFormContext<TFieldValues>();
 
@@ -51,6 +53,7 @@ export function TextField<TFieldValues extends FieldValues = FieldValues>({
                             placeholder={placeholder}
                             type={type}
                             autoComplete={autoComplete}
+                            autoFocus={autoFocus}
                             {...field}
                         />
                     </FormControl>

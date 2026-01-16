@@ -11,6 +11,10 @@
         "logout": "Logout"
     },
     "auth": {
+        "shared": {
+            "showPassword": "Show password",
+            "hidePassword": "Hide password"
+        },
         "login": {
             "title": "Login",
             "description": "Sign in to your account to access My-KM",
@@ -117,7 +121,15 @@
         "title": "Welcome to My-KM",
         "subtitle": "Powerful Personal Knowledge Management Platform",
         "description": "My-KM is a powerful knowledge management system that helps you better organize and utilize your knowledge assets.",
-        "getStarted": "Get Started"
+        "getStarted": "Get Started",
+        "login": "Login",
+        "feature1Title": "Smart Notes",
+        "feature1Description": "Capture and organize your ideas with Markdown support",
+        "feature2Title": "Knowledge Graph",
+        "feature2Description": "Connect ideas and visualize your knowledge network",
+        "feature3Title": "AI Powered",
+        "feature3Description": "Get intelligent insights from your knowledge base",
+        "footer": "© 2026 My-KM. Built with Next.js 16 and TypeScript."
     },
     "dashboard": {
         "title": "Dashboard",

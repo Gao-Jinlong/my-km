@@ -5,7 +5,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { authApi } from '@/api/auth';
 import { EmailField } from '@/components/form-fields';
@@ -19,11 +19,15 @@ import {
     CardTitle,
     Form,
 } from '@/components/ui';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { Link } from '@/i18n/routing';
+import { getLastEmail } from '@/utils/email-storage';
 import { type ForgotPasswordFormValues, forgotPasswordSchema } from '@/utils/validation';
+import { FormStatusAlert } from './form-status-alert';
 
 export function ForgotPasswordForm() {
     const t = useTranslations('auth.forgotPassword');
+    const _tValidation = useTranslations('validation');
     const tErrors = useTranslations('errors');
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
@@ -35,6 +39,14 @@ export function ForgotPasswordForm() {
             email: '',
         },
     });
+
+    // Load last used email on mount
+    useEffect(() => {
+        const lastEmail = getLastEmail();
+        if (lastEmail) {
+            form.setValue('email', lastEmail);
+        }
+    }, [form]);
 
     const onSubmit = async (data: ForgotPasswordFormValues) => {
         setError(null);
@@ -52,25 +64,22 @@ export function ForgotPasswordForm() {
 
     if (success) {
         return (
-            <Card className="w-full max-w-md">
-                <CardHeader>
+            <Card className="w-full max-w-md animate-scale-in transition-shadow duration-300 hover:shadow-lg">
+                <CardHeader className="space-y-2">
                     <CardTitle>{t('checkEmail')}</CardTitle>
                     <CardDescription>{t('successDescription')}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-green-600 text-sm dark:border-green-800 dark:bg-green-950 dark:text-green-400">
-                        <p className="font-medium">{t('successTitle')}</p>
-                        <p className="mt-2 text-xs">
-                            {t('checkEmail')}{' '}
-                            <span className="font-medium">{form.getValues().email}</span>
-                        </p>
-                    </div>
+                    <FormStatusAlert
+                        type="success"
+                        message={`${t('checkEmail')} ${form.getValues().email}`}
+                    />
                 </CardContent>
                 <CardFooter className="flex flex-col space-y-2">
                     <Link href="/login" className="w-full">
-                        <Button variant="outline" className="w-full">
+                        <LoadingButton variant="outline" className="w-full">
                             {t('backToLogin')}
-                        </Button>
+                        </LoadingButton>
                     </Link>
                     <Button
                         variant="link"
@@ -88,35 +97,47 @@ export function ForgotPasswordForm() {
     }
 
     return (
-        <Card className="w-full max-w-md">
-            <CardHeader>
+        <Card className="w-full max-w-md transition-shadow duration-300 hover:shadow-lg">
+            <CardHeader className="space-y-2">
                 <CardTitle>{t('title')}</CardTitle>
                 <CardDescription>{t('description')}</CardDescription>
             </CardHeader>
             <CardContent>
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
                         {/* 错误提示 */}
                         {error && (
-                            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-red-600 text-sm dark:border-red-800 dark:bg-red-950 dark:text-red-400">
-                                {error}
-                            </div>
+                            <FormStatusAlert
+                                type="error"
+                                message={error}
+                                onDismiss={() => setError(null)}
+                            />
                         )}
 
                         {/* 邮箱字段 */}
-                        <EmailField name="email" label={t('email')} placeholder="your@email.com" />
+                        <EmailField
+                            name="email"
+                            label={t('email')}
+                            placeholder="your@email.com"
+                            autoFocus
+                        />
 
                         {/* 提交按钮 */}
-                        <Button type="submit" className="w-full" disabled={isLoading}>
-                            {isLoading ? t('submitting') : t('submit')}
-                        </Button>
+                        <LoadingButton
+                            type="submit"
+                            className="w-full"
+                            loading={isLoading}
+                            loadingText={t('submitting')}
+                        >
+                            {t('submit')}
+                        </LoadingButton>
                     </form>
                 </Form>
             </CardContent>
             <CardFooter>
                 <Link
                     href="/login"
-                    className="text-slate-600 text-sm hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
+                    className="text-slate-600 text-sm transition-colors hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
                 >
                     {t('backToLogin')}
                 </Link>

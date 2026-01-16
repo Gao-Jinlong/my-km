@@ -27,7 +27,7 @@ export default function Home() {
                         <Link href="/register">{t('getStarted')}</Link>
                     </Button>
                     <Button variant="outline" size="lg">
-                        <Link href="/login">Login</Link>
+                        <Link href="/login">{t('login')}</Link>
                     </Button>
                 </div>
 
@@ -35,23 +35,23 @@ export default function Home() {
                 <div className="mt-20 grid grid-cols-1 gap-8 sm:grid-cols-3">
                     <div className="rounded-lg bg-white p-6 shadow-lg dark:bg-gray-800">
                         <div className="mb-4 text-4xl">📝</div>
-                        <h3 className="mb-2 font-semibold text-lg">智能笔记</h3>
+                        <h3 className="mb-2 font-semibold text-lg">{t('feature1Title')}</h3>
                         <p className="text-gray-600 text-sm dark:text-gray-400">
-                            使用 Markdown 支持捕捉和整理您的想法
+                            {t('feature1Description')}
                         </p>
                     </div>
                     <div className="rounded-lg bg-white p-6 shadow-lg dark:bg-gray-800">
                         <div className="mb-4 text-4xl">🔍</div>
-                        <h3 className="mb-2 font-semibold text-lg">知识图谱</h3>
+                        <h3 className="mb-2 font-semibold text-lg">{t('feature2Title')}</h3>
                         <p className="text-gray-600 text-sm dark:text-gray-400">
-                            连接想法并可视化您的知识网络
+                            {t('feature2Description')}
                         </p>
                     </div>
                     <div className="rounded-lg bg-white p-6 shadow-lg dark:bg-gray-800">
                         <div className="mb-4 text-4xl">🤖</div>
-                        <h3 className="mb-2 font-semibold text-lg">AI 驱动</h3>
+                        <h3 className="mb-2 font-semibold text-lg">{t('feature3Title')}</h3>
                         <p className="text-gray-600 text-sm dark:text-gray-400">
-                            从您的知识库中获得智能洞察
+                            {t('feature3Description')}
                         </p>
                     </div>
                 </div>
@@ -59,7 +59,7 @@ export default function Home() {
 
             {/* Footer */}
             <footer className="mt-20 text-center text-gray-600 text-sm dark:text-gray-400">
-                <p>© 2026 My-KM. Built with Next.js 16 and TypeScript.</p>
+                <p>{t('footer')}</p>
             </footer>
         </div>
     );

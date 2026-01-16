@@ -20,11 +20,14 @@ import {
     CardTitle,
     Form,
 } from '@/components/ui';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { Link } from '@/i18n/routing';
 import { type ResetPasswordFormValues, resetPasswordSchema } from '@/utils/validation';
+import { FormStatusAlert } from './form-status-alert';
 
 export function ResetPasswordForm() {
     const t = useTranslations('auth.resetPassword');
+    const _tValidation = useTranslations('validation');
     const tErrors = useTranslations('errors');
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -65,16 +68,13 @@ export function ResetPasswordForm() {
     // 如果没有 token，显示错误
     if (!token) {
         return (
-            <Card className="w-full max-w-md">
-                <CardHeader>
+            <Card className="w-full max-w-md transition-shadow duration-300 hover:shadow-lg">
+                <CardHeader className="space-y-2">
                     <CardTitle>{t('invalidTokenTitle')}</CardTitle>
                     <CardDescription>{t('invalidTokenDescription')}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-600 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-400">
-                        <p className="font-medium">{t('requestNewText')}</p>
-                        <p className="mt-2 text-xs">{t('invalidTokenDescription')}</p>
-                    </div>
+                    <FormStatusAlert type="warning" message={t('requestNewText')} />
                 </CardContent>
                 <CardFooter>
                     <Link href="/forgot-password" className="w-full">
@@ -89,20 +89,17 @@ export function ResetPasswordForm() {
 
     if (success) {
         return (
-            <Card className="w-full max-w-md">
-                <CardHeader>
+            <Card className="w-full max-w-md animate-scale-in transition-shadow duration-300 hover:shadow-lg">
+                <CardHeader className="space-y-2">
                     <CardTitle>{t('successTitle')}</CardTitle>
                     <CardDescription>{t('successDescription')}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-green-600 text-sm dark:border-green-800 dark:bg-green-950 dark:text-green-400">
-                        <p className="font-medium">{t('resetSuccess')}</p>
-                        <p className="mt-2 text-xs">{t('resetSuccessText')}</p>
-                    </div>
+                    <FormStatusAlert type="success" message={t('resetSuccessText')} />
                 </CardContent>
                 <CardFooter>
                     <Link href="/login" className="w-full">
-                        <Button className="w-full">{t('gotoLogin')}</Button>
+                        <LoadingButton className="w-full">{t('gotoLogin')}</LoadingButton>
                     </Link>
                 </CardFooter>
             </Card>
@@ -110,19 +107,21 @@ export function ResetPasswordForm() {
     }
 
     return (
-        <Card className="w-full max-w-md">
-            <CardHeader>
+        <Card className="w-full max-w-md transition-shadow duration-300 hover:shadow-lg">
+            <CardHeader className="space-y-2">
                 <CardTitle>{t('title')}</CardTitle>
                 <CardDescription>{t('description')}</CardDescription>
             </CardHeader>
             <CardContent>
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
                         {/* 错误提示 */}
                         {error && (
-                            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-red-600 text-sm dark:border-red-800 dark:bg-red-950 dark:text-red-400">
-                                {error}
-                            </div>
+                            <FormStatusAlert
+                                type="error"
+                                message={error}
+                                onDismiss={() => setError(null)}
+                            />
                         )}
 
                         {/* 新密码字段 */}
@@ -131,6 +130,7 @@ export function ResetPasswordForm() {
                             label={t('password')}
                             placeholder="••••••••"
                             autoComplete="new-password"
+                            autoFocus
                             description={t('passwordDescription')}
                         />
 
@@ -143,16 +143,21 @@ export function ResetPasswordForm() {
                         />
 
                         {/* 提交按钮 */}
-                        <Button type="submit" className="w-full" disabled={isLoading}>
-                            {isLoading ? t('submitting') : t('submit')}
-                        </Button>
+                        <LoadingButton
+                            type="submit"
+                            className="w-full"
+                            loading={isLoading}
+                            loadingText={t('submitting')}
+                        >
+                            {t('submit')}
+                        </LoadingButton>
                     </form>
                 </Form>
             </CardContent>
             <CardFooter>
                 <Link
                     href="/login"
-                    className="text-slate-600 text-sm hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
+                    className="text-slate-600 text-sm transition-colors hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
                 >
                     {t('backToLogin')}
                 </Link>

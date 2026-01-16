@@ -1,19 +1,19 @@
 'use client';
 
 import { AlertCircle, CheckCircle2, Loader2, Mail } from 'lucide-react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { verifyEmail } from '@/api/auth';
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { Link } from '@/i18n/routing';
+import { FormStatusAlert } from './form-status-alert';
 
 type VerificationStatus = 'idle' | 'verifying' | 'success' | 'error';
 
 export function VerifyEmail() {
     const t = useTranslations('auth.verifyEmail');
     const searchParams = useSearchParams();
-    const _router = useRouter();
     const [status, setStatus] = useState<VerificationStatus>('verifying');
     const [error, setError] = useState<string | null>(null);
     const [_isResending, _setIsResending] = useState(false);
@@ -42,10 +42,10 @@ export function VerifyEmail() {
     // 验证中状态
     if (status === 'verifying') {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 dark:bg-slate-950">
-                <Card className="w-full max-w-md">
-                    <CardHeader className="text-center">
-                        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/20">
+            <div className="flex min-h-screen animate-fade-in items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 px-4 dark:from-slate-950 dark:to-slate-900">
+                <Card className="w-full max-w-md transition-shadow duration-300 hover:shadow-lg">
+                    <CardHeader className="space-y-2 text-center">
+                        <div className="mx-auto mb-4 flex h-16 w-16 animate-scale-in items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/20">
                             <Loader2 className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400" />
                         </div>
                         <CardTitle className="text-2xl">{t('verifying')}</CardTitle>
@@ -63,18 +63,16 @@ export function VerifyEmail() {
     // 成功状态
     if (status === 'success') {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 dark:bg-slate-950">
-                <Card className="w-full max-w-md">
-                    <CardHeader className="text-center">
+            <div className="flex min-h-screen animate-fade-in items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 px-4 dark:from-slate-950 dark:to-slate-900">
+                <Card className="w-full max-w-md animate-scale-in transition-shadow duration-300 hover:shadow-lg">
+                    <CardHeader className="space-y-2 text-center">
                         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/20">
                             <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
                         </div>
                         <CardTitle className="text-2xl">{t('success')}</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-center text-green-600 text-sm dark:border-green-800 dark:bg-green-950 dark:text-green-400">
-                            <p className="font-medium">{t('successDescription')}</p>
-                        </div>
+                        <FormStatusAlert type="success" message={t('successDescription')} />
                         <Link href="/login">
                             <Button className="w-full" size="lg">
                                 {t('gotoLogin')}
@@ -91,9 +89,9 @@ export function VerifyEmail() {
         const isExpired = error === t('tokenExpired');
 
         return (
-            <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 dark:bg-slate-950">
-                <Card className="w-full max-w-md">
-                    <CardHeader className="text-center">
+            <div className="flex min-h-screen animate-fade-in items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 px-4 dark:from-slate-950 dark:to-slate-900">
+                <Card className="w-full max-w-md transition-shadow duration-300 hover:shadow-lg">
+                    <CardHeader className="space-y-2 text-center">
                         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/20">
                             <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
                         </div>
@@ -102,12 +100,7 @@ export function VerifyEmail() {
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center text-red-600 text-sm dark:border-red-800 dark:bg-red-950 dark:text-red-400">
-                            <p className="font-medium">{error}</p>
-                            {isExpired && (
-                                <p className="mt-2 text-xs">{t('tokenExpiredDescription')}</p>
-                            )}
-                        </div>
+                        <FormStatusAlert type="error" message={error || ''} />
 
                         {isExpired && (
                             <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-center text-blue-600 text-sm dark:border-blue-800 dark:bg-blue-950 dark:text-blue-400">

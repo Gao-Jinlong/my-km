@@ -1,20 +1,25 @@
 /**
  * 表单验证模式（使用 Zod）
+ *
+ * 设计说明：
+ * Schema 只定义验证规则和翻译键，不负责翻译本身
+ * 翻译在组件层通过 zodResolver 的 map 参数完成
+ * 这样保持了 schema 的纯粹性，不依赖 React 上下文
  */
 import { z } from 'zod';
 
 // 密码强度验证：至少 8 个字符，包含大小写字母、数字
 export const passwordSchema = z
     .string()
-    .min(8, { message: 'validation.passwordMinLength' })
-    .regex(/[a-z]/, { message: 'validation.passwordLowercase' })
-    .regex(/[A-Z]/, { message: 'validation.passwordUppercase' })
-    .regex(/[0-9]/, { message: 'validation.passwordNumber' });
+    .min(8, { message: 'passwordMinLength' })
+    .regex(/[a-z]/, { message: 'passwordLowercase' })
+    .regex(/[A-Z]/, { message: 'passwordUppercase' })
+    .regex(/[0-9]/, { message: 'passwordNumber' });
 
 // 登录表单验证
 export const loginSchema = z.object({
-    email: z.string().email('validation.email'),
-    password: z.string().min(1, { message: 'validation.passwordRequired' }),
+    email: z.string().email({ message: 'email' }),
+    password: z.string().min(1, { message: 'passwordRequired' }),
     rememberMe: z.boolean().optional(),
 });
 
@@ -23,12 +28,12 @@ export type LoginFormValues = z.infer<typeof loginSchema>;
 // 注册表单验证
 export const registerSchema = z
     .object({
-        email: z.string().email({ message: 'validation.email' }),
+        email: z.string().email({ message: 'email' }),
         password: passwordSchema,
         confirmPassword: z.string(),
     })
     .refine(data => data.password === data.confirmPassword, {
-        message: 'validation.passwordMismatch',
+        message: 'passwordMismatch',
         path: ['confirmPassword'],
     });
 
@@ -36,7 +41,7 @@ export type RegisterFormValues = z.infer<typeof registerSchema>;
 
 // 忘记密码表单验证
 export const forgotPasswordSchema = z.object({
-    email: z.string().email({ message: 'validation.email' }),
+    email: z.string().email({ message: 'email' }),
 });
 
 export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
@@ -44,12 +49,12 @@ export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 // 重置密码表单验证
 export const resetPasswordSchema = z
     .object({
-        token: z.string().min(1, { message: 'validation.passwordRequired' }),
+        token: z.string().min(1, { message: 'passwordRequired' }),
         password: passwordSchema,
         confirmPassword: z.string(),
     })
     .refine(data => data.password === data.confirmPassword, {
-        message: 'validation.passwordMismatch',
+        message: 'passwordMismatch',
         path: ['confirmPassword'],
     });
 
@@ -59,11 +64,11 @@ export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 export const updateProfileSchema = z.object({
     username: z
         .string()
-        .min(3, { message: 'validation.usernameMinLength' })
-        .max(20, { message: 'validation.usernameMaxLength' })
-        .regex(/^[a-zA-Z0-9_-]*$/, { message: 'validation.usernamePattern' })
+        .min(3, { message: 'usernameMinLength' })
+        .max(20, { message: 'usernameMaxLength' })
+        .regex(/^[a-zA-Z0-9_-]*$/, { message: 'usernamePattern' })
         .optional(),
-    bio: z.string().max(500, { message: 'validation.bioMaxLength' }).optional(),
+    bio: z.string().max(500, { message: 'bioMaxLength' }).optional(),
 });
 
 export type UpdateProfileFormValues = z.infer<typeof updateProfileSchema>;
@@ -71,12 +76,12 @@ export type UpdateProfileFormValues = z.infer<typeof updateProfileSchema>;
 // 修改密码表单验证
 export const changePasswordSchema = z
     .object({
-        oldPassword: z.string().min(1, { message: 'validation.passwordRequired' }),
+        oldPassword: z.string().min(1, { message: 'passwordRequired' }),
         newPassword: passwordSchema,
         confirmPassword: z.string(),
     })
     .refine(data => data.newPassword === data.confirmPassword, {
-        message: 'validation.passwordMismatch',
+        message: 'passwordMismatch',
         path: ['confirmPassword'],
     });
 

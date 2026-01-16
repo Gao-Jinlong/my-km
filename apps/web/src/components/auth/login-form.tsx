@@ -3,11 +3,10 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { CheckboxField, EmailField, PasswordField } from '@/components/form-fields';
 import {
-    Button,
     Card,
     CardContent,
     CardDescription,
@@ -16,12 +15,16 @@ import {
     CardTitle,
     Form,
 } from '@/components/ui';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { useAuth } from '@/hooks/use-auth';
 import { Link } from '@/i18n/routing';
+import { getLastEmail, saveLastEmail } from '@/utils/email-storage';
 import { type LoginFormValues, loginSchema } from '@/utils/validation';
+import { FormStatusAlert } from './form-status-alert';
 
 export function LoginForm() {
     const t = useTranslations('auth.login');
+    const _tValidation = useTranslations('validation');
     const tErrors = useTranslations('errors');
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -37,10 +40,21 @@ export function LoginForm() {
         },
     });
 
+    // Load last used email on mount
+    useEffect(() => {
+        const lastEmail = getLastEmail();
+        if (lastEmail) {
+            form.setValue('email', lastEmail);
+        }
+    }, [form]);
+
     const onSubmit = async (data: LoginFormValues) => {
         setError(null);
         try {
             await login(data);
+
+            // Save email on successful login
+            saveLastEmail(data.email);
 
             // 检查是否有重定向参数
             const redirectTo = searchParams.get('redirectTo');
@@ -53,38 +67,50 @@ export function LoginForm() {
     };
 
     return (
-        <Card className="w-full max-w-md">
-            <CardHeader>
+        <Card className="w-full max-w-md transition-shadow duration-300 hover:shadow-lg">
+            <CardHeader className="space-y-2">
                 <CardTitle>{t('title')}</CardTitle>
                 <CardDescription>{t('description')}</CardDescription>
             </CardHeader>
             <CardContent>
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
                         {/* 错误提示 */}
                         {error && (
-                            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-red-600 text-sm dark:border-red-800 dark:bg-red-950 dark:text-red-400">
-                                {error}
-                            </div>
+                            <FormStatusAlert
+                                type="error"
+                                message={error}
+                                onDismiss={() => setError(null)}
+                            />
                         )}
 
                         {/* 邮箱字段 */}
-                        <EmailField name="email" label={t('email')} placeholder="your@email.com" />
+                        <EmailField
+                            name="email"
+                            label={t('email')}
+                            placeholder="your@email.com"
+                            autoFocus
+                        />
 
                         {/* 密码字段 */}
                         <PasswordField
                             name="password"
                             label={t('password')}
-                            placeholder="••••••••"
+                            placeholder={t('password')}
                         />
 
                         {/* 记住我 */}
                         <CheckboxField name="rememberMe" label={t('rememberMe')} />
 
                         {/* 提交按钮 */}
-                        <Button type="submit" className="w-full" disabled={isLoading}>
-                            {isLoading ? t('submitting') : t('submit')}
-                        </Button>
+                        <LoadingButton
+                            type="submit"
+                            className="w-full"
+                            loading={isLoading}
+                            loadingText={t('submitting')}
+                        >
+                            {t('submit')}
+                        </LoadingButton>
                     </form>
                 </Form>
             </CardContent>
@@ -92,13 +118,13 @@ export function LoginForm() {
                 <div className="flex justify-between text-slate-600 text-sm dark:text-slate-400">
                     <Link
                         href="/forgot-password"
-                        className="hover:text-slate-900 dark:hover:text-slate-50"
+                        className="transition-colors hover:text-slate-900 dark:hover:text-slate-50"
                     >
                         {t('forgotPassword')}
                     </Link>
                     <Link
                         href="/register"
-                        className="hover:text-slate-900 dark:hover:text-slate-50"
+                        className="transition-colors hover:text-slate-900 dark:hover:text-slate-50"
                     >
                         {t('noAccount')} {t('register')}
                     </Link>

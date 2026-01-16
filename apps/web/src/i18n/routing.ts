@@ -14,3 +14,6 @@ export const routing = defineRouting({
 
 // 创建导航助手
 export const { Link, redirect, usePathname, useRouter } = createNavigation(routing);
+
+// 导出 Locale 类型
+export type Locale = 'zh-CN' | 'en';

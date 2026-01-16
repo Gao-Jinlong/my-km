@@ -11,6 +11,10 @@
         "logout": "退出登录"
     },
     "auth": {
+        "shared": {
+            "showPassword": "显示密码",
+            "hidePassword": "隐藏密码"
+        },
         "login": {
             "title": "登录",
             "description": "使用您的账户登录 My-KM",
@@ -117,7 +121,15 @@
         "title": "欢迎使用 My-KM",
         "subtitle": "强大的个人知识管理平台",
         "description": "My-KM 是一个功能强大的知识管理系统，帮助您更好地组织和利用您的知识资产。",
-        "getStarted": "开始使用"
+        "getStarted": "开始使用",
+        "login": "登录",
+        "feature1Title": "智能笔记",
+        "feature1Description": "使用 Markdown 支持捕捉和整理您的想法",
+        "feature2Title": "知识图谱",
+        "feature2Description": "连接想法并可视化您的知识网络",
+        "feature3Title": "AI 驱动",
+        "feature3Description": "从您的知识库中获得智能洞察",
+        "footer": "© 2026 My-KM. 基于 Next.js 16 和 TypeScript 构建。"
     },
     "dashboard": {
         "title": "仪表盘",

@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import {
     Controller,
@@ -122,9 +123,23 @@ const FormMessage = React.forwardRef<
     HTMLParagraphElement,
     React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, children, ...props }, ref) => {
-    const { formMessageId, error } = useFormField();
+    const { error, formMessageId } = useFormField();
+    const tValidation = useTranslations('validation');
 
-    const body = error ? String(error?.message) : children;
+    // 获取错误消息并翻译
+    let body = error ? String(error?.message) : children;
+
+    // 如果消息是验证键，尝试翻译
+    if (body && typeof body === 'string' && !body.includes(' ')) {
+        try {
+            const translated = tValidation(body as never);
+            if (translated !== body) {
+                body = translated;
+            }
+        } catch {
+            // 如果翻译失败，使用原始消息
+        }
+    }
 
     if (!body) {
         return null;

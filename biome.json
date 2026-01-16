@@ -73,6 +73,12 @@
             "unsafeParameterDecoratorsEnabled": true
         }
     },
+    "css": {
+        "parser": {
+            "cssModules": false,
+            "tailwindDirectives": true
+        }
+    },
     "overrides": [
         {
             "includes": ["apps/server/**"],
