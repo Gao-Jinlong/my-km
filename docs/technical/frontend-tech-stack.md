@@ -158,7 +158,7 @@ pnpm add --filter ui class-variance-authority clsx tailwind-merge lucide-react
 apps/web/src/
 ├── app/                    # Next.js App Router
 │   ├── (auth)/             # 认证路由
-│   ├── (dashboard)/        # 受保护路由
+│   ├── (projects)/         # 项目路由（受保护）
 │   ├── layout.tsx          # 根布局
 │   └── page.tsx            # 首页
 │

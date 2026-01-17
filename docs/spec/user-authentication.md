@@ -325,7 +325,7 @@ flowchart TD
     I --> M
     M --> N[生成 JWT Tokens]
     N --> O[创建 Session]
-    O --> P[重定向到 Dashboard]
+    O --> P[重定向到项目页面]
 
     style A fill:#e1f5fe
     style P fill:#c8e6c9

@@ -2,7 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { CheckboxField, EmailField, PasswordField } from '@/components/form-fields';
@@ -28,6 +28,7 @@ export function LoginForm() {
     const tErrors = useTranslations('errors');
     const router = useRouter();
     const searchParams = useSearchParams();
+    const locale = useLocale();
     const { login, isLoading } = useAuth();
     const [error, setError] = useState<string | null>(null);
 
@@ -58,7 +59,7 @@ export function LoginForm() {
 
             // 检查是否有重定向参数
             const redirectTo = searchParams.get('redirectTo');
-            router.push(redirectTo || '/dashboard');
+            router.push(redirectTo || `/${locale}/projects`);
         } catch (err) {
             // 处理错误
             const errorMessage = (err as Error)?.message || tErrors('invalidCredentials');

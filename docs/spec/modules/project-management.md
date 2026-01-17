@@ -3,9 +3,10 @@
 ## 📋 文档信息
 
 - **模块名称**: Project Management
-- **版本**: 1.0.0
+- **版本**: 1.1.0
 - **创建日期**: 2026-01-16
-- **状态**: 需求定义
+- **最后更新**: 2026-01-17
+- **状态**: 🚧 实施中 (初始页面已完成)
 - **作者**: My-KM Team
 
 ---
@@ -44,12 +45,6 @@ graph TB
     ED --> PM
     AIC --> PM
     WS --> PM
-
-    style PM fill:#e1f5e1
-    style FSM fill:#e3f2fd
-    style ED fill:#e3f2fd
-    style AIC fill:#fff3e0
-    style WS fill:#f3e5f5
 ```
 
 **依赖关系**:
@@ -77,10 +72,13 @@ graph TB
 应用打开时,如果当前没有打开的项目,应显示项目选择器界面。该界面提供项目管理的主要入口。
 
 **验收标准**:
-- [ ] 界面包含应用 Logo 和标题
-- [ ] 显示"欢迎使用 My-KM"等欢迎语
-- [ ] 提供清晰的操作指引
-- [ ] 界面设计简洁美观,符合 VSCode 风格
+- [x] 界面包含应用 Logo 和标题
+- [x] 显示"欢迎使用 My-KM"等欢迎语
+- [x] 提供清晰的操作指引
+- [x] 界面设计简洁美观,符合 VSCode 风格
+
+**实施状态**: ✅ 已完成 (2026-01-17)
+**相关文件**: [apps/web/src/app/[locale]/(projects)/page.tsx](apps/web/src/app/[locale]/(projects)/page.tsx)
 
 ---
 
@@ -92,10 +90,13 @@ graph TB
 提供"打开文件夹"按钮,点击后调用 File System API 的 `showDirectoryPicker()` 方法,让用户选择已有的项目文件夹。
 
 **验收标准**:
-- [ ] 按钮位置醒目,文案清晰
-- [ ] 点击后调用 `showDirectoryPicker()` API
-- [ ] 如果用户取消选择,不显示错误提示
-- [ ] 如果浏览器不支持 File System API,显示友好提示
+- [x] 按钮位置醒目,文案清晰
+- [x] 点击后调用 `showDirectoryPicker()` API
+- [x] 如果用户取消选择,不显示错误提示
+- [x] 如果浏览器不支持 File System API,显示友好提示
+
+**实施状态**: ✅ 已完成 (2026-01-17)
+**相关文件**: [apps/web/src/lib/filesystem/api.ts](apps/web/src/lib/filesystem/api.ts)
 
 ---
 
@@ -107,11 +108,14 @@ graph TB
 提供"新建项目"按钮,点击后弹出新建项目对话框,允许用户输入项目名称、描述等信息,并创建新的项目文件夹。
 
 **验收标准**:
-- [ ] 按钮位置醒目,文案清晰
-- [ ] 点击后显示新建项目表单
-- [ ] 表单包含项目名称(必填)、描述(可选)字段
-- [ ] 表单验证规则清晰(名称长度、特殊字符等)
-- [ ] 创建成功后自动打开新项目
+- [x] 按钮位置醒目,文案清晰
+- [x] 点击后显示新建项目表单
+- [x] 表单包含项目名称(必填)、描述(可选)字段
+- [x] 表单验证规则清晰(名称长度、特殊字符等)
+- [ ] 创建成功后自动打开新项目 (待实现工作区视图后完成)
+
+**实施状态**: ✅ 已完成 (2026-01-17)
+**相关文件**: [apps/web/src/components/projects/create-project-dialog.tsx](apps/web/src/components/projects/create-project-dialog.tsx)
 
 ---
 
@@ -123,11 +127,16 @@ graph TB
 在初始页面显示最近打开的项目列表,最多显示 5 个项目。每个项目显示项目名称、最后打开时间等信息。
 
 **验收标准**:
-- [ ] 最多显示 5 个最近项目
-- [ ] 每个项目显示:图标/emoji、项目名称、最后打开时间
-- [ ] 点击项目卡片直接打开该项目
-- [ ] 如果没有最近项目,显示空状态提示
-- [ ] 支持从列表中移除项目(右键菜单或悬停显示删除按钮)
+- [x] 最多显示 5 个最近项目
+- [x] 每个项目显示:图标/emoji、项目名称、最后打开时间
+- [x] 点击项目卡片直接打开该项目
+- [x] 如果没有最近项目,显示空状态提示
+- [x] 支持从列表中移除项目(右键菜单或悬停显示删除按钮)
+
+**实施状态**: ✅ 已完成 (2026-01-17)
+**相关文件**:
+- [apps/web/src/components/projects/project-card.tsx](apps/web/src/components/projects/project-card.tsx)
+- [apps/web/src/lib/storage/project-storage.ts](apps/web/src/lib/storage/project-storage.ts)
 
 ---
 
@@ -144,6 +153,9 @@ graph TB
 - [ ] 支持上下键导航
 - [ ] 支持回车键打开选中项目
 - [ ] 支持 `Esc` 键关闭选择器
+
+**实施状态**: ⏳ 待实现 (优先级: SHOULD)
+**备注**: 此功能将在后续迭代中实现
 
 ---
 
@@ -1611,6 +1623,51 @@ class ProjectErrorBoundary extends React.Component {
 
 ---
 
+## 🚀 实施进度
+
+### 已完成功能 (2026-01-17)
+
+#### ✅ 初始页面 (PM-FR-1 至 PM-FR-4)
+
+**实现文件**:
+- [apps/web/src/app/[locale]/(projects)/page.tsx](apps/web/src/app/[locale]/(projects)/page.tsx) - 主页面
+- [apps/web/src/components/projects/project-card.tsx](apps/web/src/components/projects/project-card.tsx) - 项目卡片
+- [apps/web/src/components/projects/create-project-dialog.tsx](apps/web/src/components/projects/create-project-dialog.tsx) - 创建项目对话框
+- [apps/web/src/lib/types/project.ts](apps/web/src/lib/types/project.ts) - 类型定义
+- [apps/web/src/lib/storage/project-storage.ts](apps/web/src/lib/storage/project-storage.ts) - LocalStorage 存储
+- [apps/web/src/lib/utils/time.ts](apps/web/src/lib/utils/time.ts) - 时间格式化
+- [apps/web/src/lib/filesystem/api.ts](apps/web/src/lib/filesystem/api.ts) - File System API 封装
+- [apps/web/src/types/file-system.d.ts](apps/web/src/types/file-system.d.ts) - File System API 类型定义
+
+**已实现功能**:
+- ✅ 项目选择器界面,包含标题和欢迎语
+- ✅ "打开文件夹"按钮,调用 File System API
+- ✅ "新建项目"按钮,打开创建对话框
+- ✅ 最近项目列表显示(最多 5 个)
+- ✅ 项目卡片显示(图标、名称、描述、最后打开时间)
+- ✅ 项目移除功能
+- ✅ 表单验证(项目名称长度、描述长度)
+- ✅ 浏览器兼容性检测和友好提示
+- ✅ 中英文国际化支持
+- ✅ 响应式设计
+
+**待完成功能**:
+- ⏳ 快捷键 `Cmd/Ctrl + R` 快速打开 (PM-FR-5, 优先级: SHOULD)
+- ⏳ 项目配置文件初始化 (.my-km/project.json)
+- ⏳ 工作区视图集成
+
+### 技术栈
+
+- **框架**: Next.js 16 + React 19
+- **类型**: TypeScript
+- **样式**: Tailwind CSS
+- **表单**: react-hook-form + Zod
+- **国际化**: next-intl
+- **存储**: LocalStorage
+- **文件访问**: File System Access API
+
+---
+
 ## 📚 附录
 
 ### 术语表
@@ -1646,9 +1703,10 @@ class ProjectErrorBoundary extends React.Component {
 
 | 版本 | 日期 | 变更说明 | 作者 |
 |-----|------|---------|-----|
+| 1.1.0 | 2026-01-17 | 实施初始页面 (PM-FR-1 至 PM-FR-4),更新验收标准状态 | My-KM Team |
 | 1.0.0 | 2026-01-16 | 初始版本,完整的项目管理模块需求定义 | My-KM Team |
 
 ---
 
-**文档状态**: ✅ 需求定义完成
-**下一步**: 文件系统模块需求文档
+**文档状态**: ✅ 需求定义完成 | 🚧 实施中 (初始页面已完成)
+**下一步**: 完成项目配置文件初始化 + 工作区视图集成

@@ -18,6 +18,7 @@ function authMiddleware(request: NextRequest) {
     // 定义不需要认证的公开路由（不包含语言前缀）
     const publicRoutes = [
         '/',
+        '/projects',
         '/login',
         '/register',
         '/forgot-password',
@@ -25,7 +26,7 @@ function authMiddleware(request: NextRequest) {
         '/verify-email',
     ];
 
-    // 定义已认证用户访问时应该重定向到仪表盘的路由
+    // 定义已认证用户访问时应该重定向到项目页面的路由
     const authRoutes = ['/login', '/register', '/forgot-password'];
 
     // 移除语言前缀以获取实际路由
@@ -46,12 +47,12 @@ function authMiddleware(request: NextRequest) {
     const isAuthenticated = !!authSession?.value;
 
     // 场景 1: 用户已认证并尝试访问认证路由
-    // 将他们重定向到仪表盘
+    // 将他们重定向到项目页面
     if (isAuthenticated && isAuthRoute) {
         const url = request.nextUrl.clone();
         // 保持当前语言前缀
         const locale = pathname.match(/^\/(zh-CN|en)/)?.[1] || 'zh-CN';
-        url.pathname = `/${locale}/dashboard`;
+        url.pathname = `/${locale}/projects`;
         return NextResponse.redirect(url);
     }
 

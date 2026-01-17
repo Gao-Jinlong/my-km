@@ -5,7 +5,6 @@
     },
     "nav": {
         "home": "Home",
-        "dashboard": "Dashboard",
         "login": "Login",
         "register": "Register",
         "logout": "Logout"
@@ -131,8 +130,52 @@
         "feature3Description": "Get intelligent insights from your knowledge base",
         "footer": "© 2026 My-KM. Built with Next.js 16 and TypeScript."
     },
-    "dashboard": {
-        "title": "Dashboard",
-        "welcome": "Welcome back!"
+    "projects": {
+        "selector": {
+            "title": "Welcome to My-KM",
+            "subtitle": "VSCode-style AI Knowledge Workstation",
+            "openFolder": "Open Folder",
+            "newProject": "New Project",
+            "recentProjects": "Recent Projects",
+            "clearHistory": "Clear All History",
+            "noRecentProjects": "No recent projects",
+            "openFailed": "Failed to open project",
+            "createFailed": "Failed to create project",
+            "unsupportedBrowser": "Your browser does not support local file access. We recommend using Chrome 86+ or Edge 86+."
+        },
+        "create": {
+            "title": "Create New Project",
+            "dialogDescription": "Enter project information and select a local folder",
+            "name": "Project Name",
+            "namePlaceholder": "e.g., Knowledge Base Project",
+            "projectDescription": "Project Description (optional)",
+            "descriptionPlaceholder": "Briefly describe the purpose of this project",
+            "selectFolder": "Select Folder",
+            "folderSelected": "Selected: {{path}}",
+            "creating": "Creating...",
+            "create": "Create Project",
+            "cancel": "Cancel",
+            "validation": {
+                "nameRequired": "Project name is required",
+                "nameMinLength": "Project name must be at least 2 characters",
+                "nameMaxLength": "Project name must be at most 50 characters",
+                "descriptionMaxLength": "Project description must be at most 200 characters",
+                "folderRequired": "Please select a project folder"
+            }
+        },
+        "card": {
+            "lastOpened": "Last opened: {{time}}",
+            "justNow": "just now",
+            "minutesAgo": "{{minutes}} minute(s) ago",
+            "hoursAgo": "{{hours}} hour(s) ago",
+            "daysAgo": "{{days}} day(s) ago",
+            "remove": "Remove",
+            "removeConfirm": "Are you sure you want to remove this project from recent projects list?",
+            "cancel": "Cancel"
+        },
+        "time": {
+            "yesterday": "yesterday",
+            "today": "today"
+        }
     }
 }

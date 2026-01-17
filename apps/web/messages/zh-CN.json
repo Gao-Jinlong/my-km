@@ -5,7 +5,6 @@
     },
     "nav": {
         "home": "首页",
-        "dashboard": "仪表盘",
         "login": "登录",
         "register": "注册",
         "logout": "退出登录"
@@ -131,8 +130,52 @@
         "feature3Description": "从您的知识库中获得智能洞察",
         "footer": "© 2026 My-KM. 基于 Next.js 16 和 TypeScript 构建。"
     },
-    "dashboard": {
-        "title": "仪表盘",
-        "welcome": "欢迎回来！"
+    "projects": {
+        "selector": {
+            "title": "欢迎使用 My-KM",
+            "subtitle": "VSCode 风格的 AI 知识工作站",
+            "openFolder": "打开文件夹",
+            "newProject": "新建项目",
+            "recentProjects": "最近项目",
+            "clearHistory": "清除所有历史",
+            "noRecentProjects": "暂无最近项目",
+            "openFailed": "打开项目失败",
+            "createFailed": "创建项目失败",
+            "unsupportedBrowser": "您的浏览器不支持本地文件访问。建议使用 Chrome 86+ 或 Edge 86+。"
+        },
+        "create": {
+            "title": "创建新项目",
+            "dialogDescription": "输入项目信息并选择本地文件夹",
+            "name": "项目名称",
+            "namePlaceholder": "例如：知识库项目",
+            "projectDescription": "项目描述（可选）",
+            "descriptionPlaceholder": "简要描述这个项目的用途",
+            "selectFolder": "选择文件夹",
+            "folderSelected": "已选择：{{path}}",
+            "creating": "创建中...",
+            "create": "创建项目",
+            "cancel": "取消",
+            "validation": {
+                "nameRequired": "项目名称不能为空",
+                "nameMinLength": "项目名称至少需要 2 个字符",
+                "nameMaxLength": "项目名称最多 50 个字符",
+                "descriptionMaxLength": "项目描述最多 200 个字符",
+                "folderRequired": "请选择项目文件夹"
+            }
+        },
+        "card": {
+            "lastOpened": "最后打开：{{time}}",
+            "justNow": "刚刚",
+            "minutesAgo": "{{minutes}} 分钟前",
+            "hoursAgo": "{{hours}} 小时前",
+            "daysAgo": "{{days}} 天前",
+            "remove": "移除",
+            "removeConfirm": "确定要从最近项目列表中移除此项目吗？",
+            "cancel": "取消"
+        },
+        "time": {
+            "yesterday": "昨天",
+            "today": "今天"
+        }
     }
 }
