@@ -82,22 +82,22 @@ export class SensitiveDataMasker {
 
         // 应用特定的脱敏规则
         if (lowerFieldName.includes('email')) {
-            return this.MASK_PATTERNS.email(value);
+            return SensitiveDataMasker.MASK_PATTERNS.email(value);
         }
         if (lowerFieldName.includes('phone') || lowerFieldName.includes('mobile')) {
-            return this.MASK_PATTERNS.phone(value);
+            return SensitiveDataMasker.MASK_PATTERNS.phone(value);
         }
         if (lowerFieldName.includes('idcard') || lowerFieldName.includes('id-card')) {
-            return this.MASK_PATTERNS.idCard(value);
+            return SensitiveDataMasker.MASK_PATTERNS.idCard(value);
         }
         if (lowerFieldName.includes('token') || lowerFieldName.includes('jwt')) {
-            return this.MASK_PATTERNS.token(value);
+            return SensitiveDataMasker.MASK_PATTERNS.token(value);
         }
         if (lowerFieldName.includes('ip') || lowerFieldName.includes('ipaddress')) {
-            return this.MASK_PATTERNS.ipv4(value);
+            return SensitiveDataMasker.MASK_PATTERNS.ipv4(value);
         }
         if (lowerFieldName.includes('password') || lowerFieldName.includes('passwd')) {
-            return this.MASK_PATTERNS.password();
+            return SensitiveDataMasker.MASK_PATTERNS.password();
         }
         if (
             lowerFieldName.includes('secret') ||
@@ -105,7 +105,7 @@ export class SensitiveDataMasker {
             lowerFieldName.includes('api-key') ||
             lowerFieldName.includes('authorization')
         ) {
-            return this.MASK_PATTERNS.secret(value);
+            return SensitiveDataMasker.MASK_PATTERNS.secret(value);
         }
 
         // 默认不脱敏
@@ -130,12 +130,14 @@ export class SensitiveDataMasker {
 
             if (Array.isArray(value)) {
                 masked[key] = value.map(item =>
-                    typeof item === 'object' && item !== null ? this.maskObject(item) : item,
+                    typeof item === 'object' && item !== null
+                        ? SensitiveDataMasker.maskObject(item)
+                        : item,
                 );
             } else if (typeof value === 'object') {
-                masked[key] = this.maskObject(value);
+                masked[key] = SensitiveDataMasker.maskObject(value);
             } else {
-                masked[key] = this.mask(key, value);
+                masked[key] = SensitiveDataMasker.mask(key, value);
             }
         }
 
@@ -161,7 +163,9 @@ export class SensitiveDataMasker {
                 continue;
             }
             masked[key] =
-                typeof value === 'object' ? this.maskObject(value) : this.mask(key, value);
+                typeof value === 'object'
+                    ? SensitiveDataMasker.maskObject(value)
+                    : SensitiveDataMasker.mask(key, value);
         }
 
         return masked;

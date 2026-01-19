@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import { ErrorCode } from '../../common/constants/error-codes';
+import { BusinessException } from '../../common/exceptions/business.exception';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtTokenService } from './jwt-token.service';
-import { BusinessException } from '../../common/exceptions/business.exception';
-import { ErrorCode } from '../../common/constants/error-codes';
 
 /**
  * Token 会话服务
@@ -67,7 +67,7 @@ export class TokenService {
         ipAddress?: string,
     ): Promise<{ accessToken: string; refreshToken: string }> {
         // 验证旧 Token
-        const payload = await this.jwtTokenService.verifyRefreshToken(oldRefreshToken);
+        const _payload = await this.jwtTokenService.verifyRefreshToken(oldRefreshToken);
 
         // 查找 Session
         const session = await this.prisma.session.findUnique({

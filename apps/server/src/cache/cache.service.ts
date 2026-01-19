@@ -1,5 +1,5 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { Cache } from 'cache-manager';
 import { CacheKeyPrefix, CacheTTL } from './cache.constants';
 

@@ -1,9 +1,5 @@
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
-export default function ProjectsLayout({
-  children,
-}: {
-  children: ReactNode;
-}) {
-  return <div className="min-h-screen">{children}</div>;
+export default function ProjectsLayout({ children }: { children: ReactNode }) {
+    return <div className="min-h-screen">{children}</div>;
 }

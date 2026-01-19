@@ -13,8 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
-import { Public } from '../auth/decorators/current-user.decorator';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { CurrentUser, Public } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { EmailService } from '../email/email.service';
 import { ChangeOwnPasswordDto } from './dto/change-own-password.dto';
@@ -23,8 +22,8 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { QueryUsersDto } from './dto/query-users.dto';
 import { RegisterDto } from './dto/register.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { UsersService } from './users.service';
 
 @ApiTags('Users')

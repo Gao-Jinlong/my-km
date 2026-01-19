@@ -1,9 +1,9 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import { JwtTokenService } from '../services/jwt-token.service';
-import { PrismaService } from '../../prisma/prisma.service';
 import { EnvConfig } from '../../config/env.config';
+import { PrismaService } from '../../prisma/prisma.service';
+import { JwtTokenService } from '../services/jwt-token.service';
 
 /**
  * JWT 认证策略
@@ -12,8 +12,8 @@ import { EnvConfig } from '../../config/env.config';
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
     constructor(
-        private readonly envConfig: EnvConfig,
-        private readonly jwtTokenService: JwtTokenService,
+        readonly envConfig: EnvConfig,
+        readonly _jwtTokenService: JwtTokenService,
         private readonly prisma: PrismaService,
     ) {
         super({
@@ -28,7 +28,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
      * @param payload Token payload
      * @returns 用户信息
      */
-    async validate(payload: any) {
+    async validate(payload: { type: string; sub: string }) {
         // 确保 token 类型是 access
         if (payload.type !== 'access') {
             throw new UnauthorizedException('Invalid token type');

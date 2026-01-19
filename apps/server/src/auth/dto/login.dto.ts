@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsOptional, IsBoolean } from 'class-validator';
+import { IsBoolean, IsEmail, IsNotEmpty, IsOptional } from 'class-validator';
 
 /**
  * 用户登录 DTO

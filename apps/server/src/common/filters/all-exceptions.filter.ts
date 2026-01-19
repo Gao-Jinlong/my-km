@@ -20,8 +20,8 @@ import {
 import { Request, Response } from 'express';
 import { LoggerService } from '../../logger/logger.service';
 import { ERROR_CODE_TO_LOG_LEVEL, ErrorCode } from '../constants/error-codes';
-import { BusinessException } from '../exceptions/business.exception';
 import type { ErrorDetail } from '../exceptions/business.exception';
+import { BusinessException } from '../exceptions/business.exception';
 
 /**
  * 错误响应接口
@@ -80,7 +80,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
             // 处理验证错误的详细信息
             const exceptionResponse = exception.getResponse();
-            if (status === 400 && typeof exceptionResponse === 'object' && exceptionResponse !== null) {
+            if (
+                status === 400 &&
+                typeof exceptionResponse === 'object' &&
+                exceptionResponse !== null
+            ) {
                 const responseBody = exceptionResponse as Record<string, any>;
 
                 // 检查是否为验证错误 (消息数组格式)
@@ -211,7 +215,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
      * @returns 格式化后的错误详情数组
      */
     private formatValidationErrors(messages: string[]): ErrorDetail[] {
-        return messages.map((msg) => {
+        return messages.map(msg => {
             // class-validator 的默认消息格式通常是: "{field} {constraint message}"
             // 例如: "email must be an email"
 
