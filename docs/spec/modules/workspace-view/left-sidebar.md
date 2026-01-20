@@ -1,0 +1,421 @@
+# 工作视图 - 左侧侧边栏模块
+
+## 📋 文档信息
+
+- **所属模块**: Workspace View (工作视图)
+- **子模块**: Left Sidebar (左侧侧边栏)
+- **版本**: 1.0.0
+- **创建日期**: 2026-01-20
+- **状态**: 📝 需求定义阶段
+
+---
+
+## 🎯 模块概述
+
+定义工作视图左侧侧边栏的完整功能,包括 Tab 切换系统、文件夹面板、搜索面板等子功能模块。
+
+### 核心价值
+
+1. **灵活的 Tab 系统**: 支持动态添加/删除面板,拖拽调整顺序
+2. **高效的文件浏览**: 直观的文件树展示,快速定位文件
+3. **强大的搜索能力**: 多种搜索方式,快速找到所需内容
+4. **状态持久化**: 记住用户的自定义配置和状态
+
+### 布局结构
+
+```
+┌─────────────────────────┐
+│  [Files] [Search] [+]  │ ← Tab 切换栏 (可拖拽排序)
+├─────────────────────────┤
+│                         │
+│   子面板内容区域         │ ← 动态切换的面板内容
+│                         │
+│   - Files Panel         │
+│   - Search Panel        │
+│   - ... (可扩展)        │
+│                         │
+├─────────────────────────┤
+│  [⚙️]  [👤]            │ ← 底部用户操作区
+└─────────────────────────┘
+```
+
+---
+
+## 📖 功能需求
+
+### WV-LS-FR-1: 垂直布局结构
+
+**优先级**: MUST
+
+**描述**:
+左侧侧边栏采用垂直布局,从上到下依次为 Tab 切换栏、子面板内容区域、底部用户操作区。
+
+**验收标准**:
+- [ ] 顶部显示 Tab 切换栏,高度 48px
+- [ ] 中间区域显示子面板内容,占据剩余空间
+- [ ] 底部固定显示用户操作区,高度 56px
+- [ ] 子面板内容区域支持垂直滚动
+- [ ] 布局响应式适配不同屏幕尺寸
+
+**实施状态**: ⏳ 待实现
+
+---
+
+### WV-LS-FR-2: Tab 切换系统
+
+**优先级**: MUST
+
+**描述**:
+实现可拖拽排序的 Tab 切换系统,支持动态添加/删除 Tab,并持久化保存用户的自定义配置。
+
+**功能详情**:
+
+1. **默认 Tab**
+   - 文件夹 (Files): 显示项目文件树
+   - 搜索 (Search): 全局搜索界面
+
+2. **拖拽排序**
+   - Tab 可以通过拖拽调整顺序
+   - 拖拽时显示视觉反馈
+   - 释放后更新顺序并保存到 localStorage
+
+3. **动态管理**
+   - 点击 "+" 按钮添加新 Tab
+   - 右键点击 Tab 显示删除选项
+   - 至少保留一个 Tab,不可全部删除
+
+4. **状态保持**
+   - 每个 Tab 独立保持状态
+   - 切换 Tab 时保存当前状态
+   - 返回 Tab 时恢复之前的状态
+
+**验收标准**:
+- [ ] Tab 可以通过拖拽调整顺序
+- [ ] Tab 顺序保存到 localStorage,刷新后恢复
+- [ ] 可以动态添加新的 Tab
+- [ ] 可以删除 Tab (至少保留一个)
+- [ ] 点击 Tab 切换面板,动画流畅
+- [ ] 每个 Tab 的状态独立保持
+- [ ] 激活的 Tab 有视觉高亮
+
+**实施状态**: ⏳ 待实现
+
+---
+
+### WV-LS-FR-3: 底部用户操作区
+
+**优先级**: MUST
+
+**描述**:
+左侧侧边栏底部固定显示设置按钮和用户按钮,点击展开相关菜单。
+
+**功能详情**:
+
+1. **设置按钮**
+   - 图标: 齿轮 (⚙️)
+   - 点击展开设置菜单
+   - 菜单选项:
+     - 项目设置
+     - 全局设置
+     - 键盘快捷键
+
+2. **用户按钮**
+   - 显示用户头像或用户名首字母
+   - 点击展开用户菜单
+   - 菜单选项:
+     - 个人资料
+     - 偏好设置
+     - 退出登录
+
+3. **菜单交互**
+   - 以 Popover 或 Dropdown 形式显示
+   - 点击菜单外部区域自动关闭
+   - 支持 Esc 键关闭
+
+**验收标准**:
+- [ ] 底部固定显示设置按钮和用户按钮
+- [ ] 点击设置按钮展开设置菜单
+- [ ] 点击用户按钮展开用户菜单
+- [ ] 菜单点击外部自动关闭
+- [ ] 菜单样式符合设计规范
+
+**实施状态**: ⏳ 待实现
+
+---
+
+## 💾 数据结构设计
+
+### 左侧侧边栏状态
+
+```typescript
+interface LeftSidebarState {
+  // Tab 配置
+  tabs: Array<{
+    id: string;           // Tab 唯一标识
+    label: string;        // Tab 显示文本
+    icon: string;         // Tab 图标名称 (Lucide React)
+    panelId: string;      // 对应的面板组件 ID
+    order: number;        // 排序顺序
+    isDeletable: boolean; // 是否可删除
+  }>;
+
+  // 当前激活的 Tab ID
+  activeTab: string;
+
+  // Tab 顺序 (用于持久化)
+  tabOrder: string[];
+
+  // 侧边栏折叠状态
+  isCollapsed: boolean;
+
+  // 侧边栏宽度
+  width: number;
+}
+
+// 默认 Tab 配置
+const DEFAULT_TABS = [
+  {
+    id: 'files',
+    label: 'Files',
+    icon: 'Files',
+    panelId: 'files-panel',
+    order: 0,
+    isDeletable: false,
+  },
+  {
+    id: 'search',
+    label: 'Search',
+    icon: 'Search',
+    panelId: 'search-panel',
+    order: 1,
+    isDeletable: false,
+  },
+];
+```
+
+### 子面板状态
+
+```typescript
+// 文件夹面板状态
+interface FilesPanelState {
+  expandedFolders: Set<string>;  // 展开的文件夹路径集合
+  selectedFile: string | null;   // 当前选中的文件路径
+  scrollPosition: number;        // 滚动位置
+}
+
+// 搜索面板状态
+interface SearchPanelState {
+  query: string;                 // 搜索关键词
+  searchType: 'all' | 'filename' | 'content' | 'tags' | 'vector';
+  filters: {
+    fileTypes?: string[];        // 文件类型过滤
+    tags?: string[];             // 标签过滤
+    dateRange?: {
+      start: Date;
+      end: Date;
+    };
+  };
+  results: SearchResult[];       // 搜索结果
+  selectedResult: string | null; // 选中的结果 ID
+}
+```
+
+---
+
+## 🔧 技术实现要点
+
+### 组件结构
+
+```
+components/workspace/sidebar/
+├── left-sidebar.tsx              # 主容器组件
+├── sidebar-tabs.tsx              # Tab 切换栏 (可拖拽)
+├── sidebar-footer.tsx            # 底部用户操作区
+└── panels/
+    ├── files-panel.tsx           # 文件夹面板
+    ├── search-panel.tsx          # 搜索面板
+    └── index.tsx                 # 面板注册表
+```
+
+### 关键技术
+
+1. **拖拽排序**: 使用 `@dnd-kit/sortable`
+   ```typescript
+   import { DndContext, closestCenter } from '@dnd-kit/core';
+   import { SortableContext, useSortable } from '@dnd-kit/sortable';
+   ```
+
+2. **状态管理**: 扩展 `workspace-store.ts`
+   ```typescript
+   import { create } from 'zustand';
+   import { persist } from 'zustand/middleware';
+   ```
+
+3. **面板切换**: 动态组件加载
+   ```typescript
+   const panelComponents = {
+     'files-panel': FilesPanel,
+     'search-panel': SearchPanel,
+   };
+   ```
+
+4. **状态持久化**: localStorage
+   ```typescript
+   const useWorkspaceStore = create<WorkspaceState>()(
+     persist(
+       (set) => ({...}),
+       { name: 'workspace-storage' }
+     )
+   );
+   ```
+
+### 样式规范
+
+- **Tab 高度**: 48px
+- **底部操作区高度**: 56px
+- **侧边栏默认宽度**: 20% (最小 15%, 最大 35%)
+- **过渡动画**: 200ms cubic-bezier(0.4, 0, 0.2, 1)
+
+---
+
+## 🎨 UI/UX 设计要求
+
+### Tab 切换栏
+
+```
+┌─────────────────────────────────────┐
+│ [📁 Files] [🔍 Search] [➕]        │
+│   ↑___________↑                     │
+│   激活状态 (底部边框高亮)            │
+└─────────────────────────────────────┘
+```
+
+**交互状态**:
+- **默认**: 灰色背景,无底部边框
+- **悬停**: 背景色加深
+- **激活**: 底部 2px 蓝色边框
+- **拖拽**: 半透明,显示插入位置指示器
+
+### 底部操作区
+
+```
+┌─────────────────────────────────────┐
+│                                     │
+│         面板内容区域                 │
+│                                     │
+├─────────────────────────────────────┤
+│  [⚙️ Settings                      │
+│  [👤 User]                          │
+└─────────────────────────────────────┘
+```
+
+**样式规范**:
+- 背景色: 比面板内容略深
+- 边框: 顶部 1px 分割线
+- 按钮: 圆形图标按钮,悬停时背景高亮
+
+---
+
+## ✅ 验收标准
+
+### Tab 系统
+
+- [ ] Tab 可以通过拖拽调整顺序
+- [ ] Tab 顺序保存到 localStorage,刷新后恢复
+- [ ] 可以动态添加新的 Tab
+- [ ] 可以删除 Tab (至少保留一个)
+- [ ] 点击 Tab 切换面板,动画流畅
+- [ ] 每个 Tab 的状态独立保持
+- [ ] 激活的 Tab 有视觉高亮
+
+### 布局
+
+- [ ] 垂直布局正确显示
+- [ ] Tab 切换栏固定在顶部
+- [ ] 底部操作区固定在底部
+- [ ] 子面板内容区域可滚动
+- [ ] 布局响应式适配
+
+### 底部操作区
+
+- [ ] 设置按钮点击展开菜单
+- [ ] 用户按钮点击展开菜单
+- [ ] 菜单点击外部自动关闭
+- [ ] 菜单样式符合设计规范
+
+### 可访问性
+
+- [ ] 支持 Tab 键导航
+- [ ] 支持键盘快捷键 (Cmd/Ctrl + B 切换侧边栏)
+- [ ] 正确的 ARIA 标签
+- [ ] 屏幕阅读器友好
+
+---
+
+## 🚀 实施进度
+
+### Phase 1: 基础结构和 Tab 系统
+
+- [ ] 创建 left-sidebar.tsx 主组件
+- [ ] 实现 Tab 切换栏
+- [ ] 集成 @dnd-kit 实现拖拽排序
+- [ ] 实现动态添加/删除 Tab
+- [ ] 实现 Tab 顺序持久化
+- [ ] 扩展 workspace-store.ts 状态管理
+
+**预计工时**: 3-4 天
+
+---
+
+### Phase 2: 底部用户操作区
+
+- [ ] 实现设置按钮和菜单
+- [ ] 实现用户按钮和菜单
+- [ ] 集成 Popover/Dropdown 组件
+- [ ] 实现菜单交互逻辑
+
+**预计工时**: 1-2 天
+
+---
+
+### Phase 3: 集成测试
+
+- [ ] 端到端功能测试
+- [ ] 性能优化
+- [ ] 响应式适配
+- [ ] 无障碍访问测试
+
+**预计工时**: 1-2 天
+
+---
+
+## 📚 相关文档
+
+### 子面板文档
+- [左侧侧边栏 - 文件夹面板](./left-sidebar-files-panel.md)
+- [左侧侧边栏 - 搜索面板](./left-sidebar-search-panel.md)
+
+### 相关模块
+- [工作视图主文档](./workspace-view.md)
+- [工作视图 - 布局结构](./layout.md)
+- [工作视图 - 编辑器管理](./editor.md)
+- [工作视图 - AI 面板](./ai-panel.md)
+- [工作视图 - 交互体验](./interaction.md)
+
+### 技术文档
+- [@dnd-kit 官方文档](https://docs.dndkit.com/)
+- [Zustand 状态管理](https://zustand-demo.pmnd.rs/)
+- [Radix UI Primitives](https://www.radix-ui.com/primitives)
+
+---
+
+## 📝 变更历史
+
+| 版本 | 日期 | 变更说明 | 作者 |
+|-----|------|---------|-----|
+| 1.0.0 | 2026-01-20 | 初始版本,左侧侧边栏需求定义 | My-KM Team |
+
+---
+
+**文档状态**: ✅ 需求定义完成
+**下一步**: 查看子面板详细文档

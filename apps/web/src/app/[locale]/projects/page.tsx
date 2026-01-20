@@ -8,12 +8,7 @@ import { ProjectCard } from '@/components/projects/project-card';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import {
-    hasMyKmFolder,
-    isFileSystemAPISupported,
-    openFolderPicker,
-    readProjectConfig,
-} from '@/lib/filesystem/api';
+import { isFileSystemAPISupported, openFolderPicker } from '@/lib/filesystem/api';
 import {
     addRecentProject,
     clearRecentProjects,
@@ -45,32 +40,28 @@ export default function ProjectsPage() {
                 return;
             }
 
-            // 尝试打开文件夹
+            // 打开文件夹
             const handle = await openFolderPicker();
             if (!handle) return; // 用户取消
 
-            // 验证是否是正确的项目文件夹
-            const hasMyKm = await hasMyKmFolder(handle);
-            if (!hasMyKm) {
-                alert('所选文件夹不是有效的 My-KM 项目');
-                return;
-            }
-
-            // 读取项目配置
-            const config = await readProjectConfig(handle);
-            if (!config) {
-                alert('无法读取项目配置文件');
-                return;
-            }
-
-            // 更新最近项目
-            addRecentProject({
-                ...project,
+            // 直接进入工作空间，不验证 .my-km
+            // 创建基本项目信息
+            const projectInfo: RecentProject = {
+                id: project.id || `project-${Date.now()}`,
+                name: handle.name, // 使用文件夹名称作为项目名
+                description: project.description || '',
+                path: handle.name,
                 lastOpened: new Date().toISOString(),
-            });
+            };
 
-            // 进入工作区视图
-            router.push(`/${locale}/workspace/${project.id}`);
+            // 保存到最近项目
+            addRecentProject(projectInfo);
+
+            // 保存 FileSystemHandle 以便后续使用
+            // TODO: 将 handle 存储到 IndexedDB 或状态管理中
+
+            // 直接进入工作空间
+            router.push(`/${locale}/workspace`);
         } catch (error) {
             console.error('Failed to open project:', error);
             alert(
@@ -89,12 +80,29 @@ export default function ProjectsPage() {
     const handleOpenFolder = async () => {
         try {
             const handle = await openFolderPicker();
-            if (handle) {
-                console.log('文件夹已选择:', handle.name);
-                // TODO: 处理打开文件夹逻辑
-            }
+            if (!handle) return; // 用户取消
+
+            // 创建基本项目信息
+            const projectInfo: RecentProject = {
+                id: `project-${Date.now()}`,
+                name: handle.name,
+                path: handle.name,
+                lastOpened: new Date().toISOString(),
+            };
+
+            // 保存到最近项目
+            addRecentProject(projectInfo);
+
+            // 保存 FileSystemHandle
+            // TODO: 将 handle 存储到 IndexedDB 或状态管理中
+
+            // 进入工作空间
+            router.push(`/${locale}/workspace`);
         } catch (error) {
             console.error('Failed to open folder:', error);
+            alert(
+                `${selectorT('openFailed')}: ${error instanceof Error ? error.message : '未知错误'}`,
+            );
         }
     };
 

@@ -3,9 +3,9 @@
 ## 📋 文档信息
 
 - **模块名称**: Workspace View (工作视图)
-- **版本**: 1.0.0
+- **版本**: 1.1.0
 - **创建日期**: 2026-01-19
-- **最后更新**: 2026-01-19
+- **最后更新**: 2026-01-20
 - **状态**: 📝 需求定义阶段
 - **作者**: My-KM Team
 
@@ -63,7 +63,24 @@ graph TB
 
 ---
 
-### 2. 编辑器管理模块
+### 2. 左侧侧边栏模块
+
+- **文档**: [./left-sidebar.md](./left-sidebar.md)
+- **功能描述**: 左侧侧边栏的完整功能,包括 Tab 系统、文件夹面板、搜索面板等
+
+**核心功能**:
+- Tab 切换系统 (WV-LS-FR-2)
+- 文件夹面板 (详见 [./left-sidebar-files-panel.md](./left-sidebar-files-panel.md))
+- 搜索面板 (详见 [./left-sidebar-search-panel.md](./left-sidebar-search-panel.md))
+- 底部用户操作区 (WV-LS-FR-3)
+
+**子模块**:
+- [左侧侧边栏 - 文件夹面板](./left-sidebar-files-panel.md)
+- [左侧侧边栏 - 搜索面板](./left-sidebar-search-panel.md)
+
+---
+
+### 3. 编辑器管理模块
 
 - **文档**: [./editor.md](./editor.md)
 - **功能描述**: 管理编辑器的 Tab、多窗口拆分、内容显示等功能
@@ -75,7 +92,7 @@ graph TB
 
 ---
 
-### 3. AI 面板集成模块
+### 4. AI 面板集成模块
 
 - **文档**: [./ai-panel.md](./ai-panel.md)
 - **功能描述**: 右侧 AI 对话面板及其上下文感知功能
@@ -87,7 +104,7 @@ graph TB
 
 ---
 
-### 4. 交互体验模块
+### 5. 交互体验模块
 
 - **文档**: [./interaction.md](./interaction.md)
 - **功能描述**: 键盘快捷键、面板折叠展开等交互功能
@@ -259,11 +276,14 @@ interface AIContext {
 
 ### 相关文档
 
-- [项目管理模块](./project-management.md)
 - [工作视图 - 布局结构](./layout.md)
+- [工作视图 - 左侧侧边栏](./left-sidebar.md)
+- [工作视图 - 左侧侧边栏 - 文件夹面板](./left-sidebar-files-panel.md)
+- [工作视图 - 左侧侧边栏 - 搜索面板](./left-sidebar-search-panel.md)
 - [工作视图 - 编辑器管理](./editor.md)
 - [工作视图 - AI 面板](./ai-panel.md)
 - [工作视图 - 交互体验](./interaction.md)
+- [项目管理模块](./project-management.md)
 - [文件系统模块](./file-system.md) ⏳
 - [编辑器模块](./editor.md) ⏳
 - [AI 对话模块](./ai-chat.md) ⏳
@@ -275,6 +295,7 @@ interface AIContext {
 | 版本 | 日期 | 变更说明 | 作者 |
 |-----|------|---------|-----|
 | 1.0.0 | 2026-01-19 | 初始版本,工作视图需求定义 | My-KM Team |
+| 1.1.0 | 2026-01-20 | 新增左侧侧边栏模块详细文档 | My-KM Team |
 
 ---
 

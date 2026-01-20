@@ -4,7 +4,7 @@ export default async function WorkspaceRoute({
     params,
 }: {
     children: React.ReactNode;
-    params: Promise<{ locale: string; projectId: string }>;
+    params: Promise<{ locale: string }>;
 }) {
     await params;
     return <WorkspaceLayout />;
