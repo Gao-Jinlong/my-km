@@ -1,12 +1,12 @@
-# 工作视图 - 左侧侧边栏模块
+# Sidebar 模块概述
 
 ## 📋 文档信息
 
-- **所属模块**: Workspace View (工作视图)
-- **子模块**: Left Sidebar (左侧侧边栏)
-- **版本**: 1.0.0
+- **所属模块**: Sidebar
+- **版本**: 2.0.0
 - **创建日期**: 2026-01-20
-- **状态**: 📝 需求定义阶段
+- **最后更新**: 2026-01-21
+- **状态**: ✅ 需求定义完成
 
 ---
 
@@ -222,62 +222,6 @@ interface SearchPanelState {
 
 ---
 
-## 🔧 技术实现要点
-
-### 组件结构
-
-```
-components/workspace/sidebar/
-├── left-sidebar.tsx              # 主容器组件
-├── sidebar-tabs.tsx              # Tab 切换栏 (可拖拽)
-├── sidebar-footer.tsx            # 底部用户操作区
-└── panels/
-    ├── files-panel.tsx           # 文件夹面板
-    ├── search-panel.tsx          # 搜索面板
-    └── index.tsx                 # 面板注册表
-```
-
-### 关键技术
-
-1. **拖拽排序**: 使用 `@dnd-kit/sortable`
-   ```typescript
-   import { DndContext, closestCenter } from '@dnd-kit/core';
-   import { SortableContext, useSortable } from '@dnd-kit/sortable';
-   ```
-
-2. **状态管理**: 扩展 `workspace-store.ts`
-   ```typescript
-   import { create } from 'zustand';
-   import { persist } from 'zustand/middleware';
-   ```
-
-3. **面板切换**: 动态组件加载
-   ```typescript
-   const panelComponents = {
-     'files-panel': FilesPanel,
-     'search-panel': SearchPanel,
-   };
-   ```
-
-4. **状态持久化**: localStorage
-   ```typescript
-   const useWorkspaceStore = create<WorkspaceState>()(
-     persist(
-       (set) => ({...}),
-       { name: 'workspace-storage' }
-     )
-   );
-   ```
-
-### 样式规范
-
-- **Tab 高度**: 48px
-- **底部操作区高度**: 56px
-- **侧边栏默认宽度**: 20% (最小 15%, 最大 35%)
-- **过渡动画**: 200ms cubic-bezier(0.4, 0, 0.2, 1)
-
----
-
 ## 🎨 UI/UX 设计要求
 
 ### Tab 切换栏
@@ -392,20 +336,18 @@ components/workspace/sidebar/
 ## 📚 相关文档
 
 ### 子面板文档
-- [左侧侧边栏 - 文件夹面板](./left-sidebar-files-panel.md)
-- [左侧侧边栏 - 搜索面板](./left-sidebar-search-panel.md)
+- [文件夹面板](./files-panel.md)
+- [搜索面板](./search-panel.md)
+
+### 架构文档
+- [架构设计](./architecture.md) - Service + View 分离架构
 
 ### 相关模块
-- [工作视图主文档](./workspace-view.md)
-- [工作视图 - 布局结构](./layout.md)
-- [工作视图 - 编辑器管理](./editor.md)
-- [工作视图 - AI 面板](./ai-panel.md)
-- [工作视图 - 交互体验](./interaction.md)
-
-### 技术文档
-- [@dnd-kit 官方文档](https://docs.dndkit.com/)
-- [Zustand 状态管理](https://zustand-demo.pmnd.rs/)
-- [Radix UI Primitives](https://www.radix-ui.com/primitives)
+- [工作视图主文档](../workspace-view/workspace-view.md)
+- [工作视图 - 布局结构](../workspace-view/layout.md)
+- [工作视图 - 编辑器管理](../workspace-view/editor.md)
+- [工作视图 - AI 面板](../workspace-view/ai-panel.md)
+- [工作视图 - 交互体验](../workspace-view/interaction.md)
 
 ---
 
@@ -413,9 +355,10 @@ components/workspace/sidebar/
 
 | 版本 | 日期 | 变更说明 | 作者 |
 |-----|------|---------|-----|
+| 2.0.0 | 2026-01-21 | 架构重构,迁移为独立模块 | My-KM Team |
 | 1.0.0 | 2026-01-20 | 初始版本,左侧侧边栏需求定义 | My-KM Team |
 
 ---
 
 **文档状态**: ✅ 需求定义完成
-**下一步**: 查看子面板详细文档
+**下一步**: 查看架构设计文档

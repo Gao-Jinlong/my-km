@@ -63,20 +63,22 @@ graph TB
 
 ---
 
-### 2. 左侧侧边栏模块
+ ### 2. 左侧侧边栏模块
 
-- **文档**: [./left-sidebar.md](./left-sidebar.md)
-- **功能描述**: 左侧侧边栏的完整功能,包括 Tab 系统、文件夹面板、搜索面板等
+ - **文档**: [../sidebar/overview.md](../sidebar/overview.md)
+ - **功能描述**: 左侧侧边栏的完整功能,包括 Tab 系统、文件夹面板、搜索面板等
 
-**核心功能**:
-- Tab 切换系统 (WV-LS-FR-2)
-- 文件夹面板 (详见 [./left-sidebar-files-panel.md](./left-sidebar-files-panel.md))
-- 搜索面板 (详见 [./left-sidebar-search-panel.md](./left-sidebar-search-panel.md))
-- 底部用户操作区 (WV-LS-FR-3)
+ **核心功能**:
+ - Tab 切换系统 (WV-LS-FR-2)
+ - 文件夹面板 (详见 [../sidebar/files-panel.md](../sidebar/files-panel.md))
+ - 搜索面板 (详见 [../sidebar/search-panel.md](../sidebar/search-panel.md))
+ - 底部用户操作区 (WV-LS-FR-3)
 
-**子模块**:
-- [左侧侧边栏 - 文件夹面板](./left-sidebar-files-panel.md)
-- [左侧侧边栏 - 搜索面板](./left-sidebar-search-panel.md)
+ **子模块**:
+ - [Sidebar 概述](../sidebar/overview.md)
+ - [Sidebar 架构](../sidebar/architecture.md)
+ - [文件夹面板](../sidebar/files-panel.md)
+ - [搜索面板](../sidebar/search-panel.md)
 
 ---
 
@@ -277,9 +279,10 @@ interface AIContext {
 ### 相关文档
 
 - [工作视图 - 布局结构](./layout.md)
-- [工作视图 - 左侧侧边栏](./left-sidebar.md)
-- [工作视图 - 左侧侧边栏 - 文件夹面板](./left-sidebar-files-panel.md)
-- [工作视图 - 左侧侧边栏 - 搜索面板](./left-sidebar-search-panel.md)
+- [Sidebar 模块](../sidebar/overview.md)
+- [Sidebar 架构](../sidebar/architecture.md)
+- [文件夹面板](../sidebar/files-panel.md)
+- [搜索面板](../sidebar/search-panel.md)
 - [工作视图 - 编辑器管理](./editor.md)
 - [工作视图 - AI 面板](./ai-panel.md)
 - [工作视图 - 交互体验](./interaction.md)

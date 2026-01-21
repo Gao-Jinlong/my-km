@@ -1,12 +1,13 @@
-# 工作视图 - 左侧侧边栏 - 搜索面板
+# 搜索面板
 
 ## 📋 文档信息
 
-- **所属模块**: Workspace View (工作视图)
-- **子模块**: Left Sidebar - Search Panel (左侧侧边栏 - 搜索面板)
-- **版本**: 1.0.0
+- **所属模块**: Sidebar
+- **子模块**: Search Panel (搜索面板)
+- **版本**: 2.0.0
 - **创建日期**: 2026-01-20
-- **状态**: 📝 需求定义阶段
+- **最后更新**: 2026-01-21
+- **状态**: ✅ 需求定义完成
 
 ---
 
@@ -706,7 +707,8 @@ components/workspace/sidebar/panels/
 ## 📚 相关文档
 
 ### 相关模块
-- [左侧侧边栏主文档](./left-sidebar.md)
+- [Sidebar 概述](./overview.md)
+- [Sidebar 架构](./architecture.md)
 - [文件系统模块](../../file-system.md) ⏳
 - [向量检索模块](../../vector-search.md) ⏳
 

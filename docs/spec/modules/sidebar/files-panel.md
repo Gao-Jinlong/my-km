@@ -1,12 +1,13 @@
-# 工作视图 - 左侧侧边栏 - 文件夹面板
+# 文件夹面板
 
 ## 📋 文档信息
 
-- **所属模块**: Workspace View (工作视图)
-- **子模块**: Left Sidebar - Files Panel (左侧侧边栏 - 文件夹面板)
-- **版本**: 1.0.0
+- **所属模块**: Sidebar
+- **子模块**: Files Panel (文件夹面板)
+- **版本**: 2.0.0
 - **创建日期**: 2026-01-20
-- **状态**: 📝 需求定义阶段
+- **最后更新**: 2026-01-21
+- **状态**: ✅ 需求定义完成
 
 ---
 
@@ -502,9 +503,10 @@ components/workspace/sidebar/panels/
 ## 📚 相关文档
 
 ### 相关模块
-- [左侧侧边栏主文档](./left-sidebar.md)
+- [Sidebar 概述](./overview.md)
+- [Sidebar 架构](./architecture.md)
 - [文件系统模块](../../file-system.md) ⏳
-- [工作视图 - 布局结构](./layout.md)
+- [工作视图 - 布局结构](../workspace-view/layout.md)
 
 ### 技术文档
 - [react-window 文档](https://github.com/bvaughn/react-window)
