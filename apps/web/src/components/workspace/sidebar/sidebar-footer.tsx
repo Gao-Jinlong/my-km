@@ -1,44 +1,42 @@
 'use client';
 
 import { Settings, User } from 'lucide-react';
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { SIDEBAR_CONSTANTS } from '@/lib/workspace/constants';
 import { SettingsMenu } from './settings-menu';
 import { UserMenu } from './user-menu';
 
 export function SidebarFooter() {
-    const [settingsOpen, setSettingsOpen] = useState(false);
-    const [userMenuOpen, setUserMenuOpen] = useState(false);
-
     return (
-        <div className="border-t p-2" style={{ height: `${SIDEBAR_CONSTANTS.FOOTER_HEIGHT}px` }}>
-            <div className="flex h-full items-center gap-1">
+        <div
+            className="border-ws-border border-t px-4"
+            style={{ height: `${SIDEBAR_CONSTANTS.FOOTER_HEIGHT}px` }}
+        >
+            <div className="flex h-full items-center justify-between gap-2">
                 {/* 设置按钮 */}
-                <SettingsMenu open={settingsOpen} onOpenChange={setSettingsOpen}>
+                <SettingsMenu>
                     <Button
                         variant="ghost"
-                        size="icon"
-                        className="flex-1"
+                        size="sm"
+                        className="gap-2 text-ws-fg-muted hover:text-ws-fg-primary focus-visible:ring-0 focus-visible:ring-offset-0"
                         aria-label="设置菜单"
                         aria-haspopup="true"
-                        aria-expanded={settingsOpen}
                     >
-                        <Settings className="h-5 w-5" />
+                        <Settings className="h-4 w-4" />
+                        <span className="text-xs">设置</span>
                     </Button>
                 </SettingsMenu>
 
                 {/* 用户按钮 */}
-                <UserMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
+                <UserMenu>
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="flex-1"
+                        className="h-8 w-8 text-ws-icon hover:text-ws-fg-primary focus-visible:ring-0 focus-visible:ring-offset-0"
                         aria-label="用户菜单"
                         aria-haspopup="true"
-                        aria-expanded={userMenuOpen}
                     >
-                        <User className="h-5 w-5" />
+                        <User className="h-4 w-4" />
                     </Button>
                 </UserMenu>
             </div>

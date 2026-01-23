@@ -9,24 +9,28 @@ const placeholderTabs = [
 
 export function EditorTabs() {
     return (
-        <div className="flex items-center overflow-x-auto border-b bg-background">
+        <div className="flex h-[36px] items-center bg-ws-bg-tertiary">
             {placeholderTabs.map(tab => (
                 <div
                     key={tab.id}
                     className={cn(
-                        'group flex items-center gap-2 border-r px-4 py-2 text-sm transition-colors hover:bg-muted/50',
+                        'group flex items-center gap-1.5 border-ws-border border-r px-2.5 py-2 text-sm transition-colors',
                         tab.active
-                            ? 'border-b-2 border-b-primary bg-background'
-                            : 'text-muted-foreground',
+                            ? 'bg-ws-bg-secondary text-ws-fg-primary'
+                            : 'text-ws-fg-muted hover:bg-ws-bg-secondary/50',
                     )}
                 >
-                    <span>{tab.name}</span>
+                    {/* 文件图标占位符 */}
+                    <div className="h-3.5 w-3.5 rounded-sm bg-ws-icon/20" />
+
+                    <span className="text-[12px]">{tab.name}</span>
+
                     <button
                         type="button"
-                        className="rounded-sm opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
+                        className="rounded-sm p-0.5 opacity-0 transition-opacity hover:bg-ws-bg-tertiary group-hover:opacity-100"
                         aria-label="Close tab"
                     >
-                        <X className="h-3 w-3" />
+                        <X className="h-3 w-3 text-ws-icon" />
                     </button>
                 </div>
             ))}

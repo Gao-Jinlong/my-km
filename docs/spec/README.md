@@ -29,6 +29,15 @@
 - 里程碑
 - 成功指标
 
+### 4. [模块设计](./modules/)
+- [工作视图模块](./modules/workspace-view/workspace-view.md) - 核心工作区布局
+- [侧边栏模块](./modules/sidebar/README.md) - 文件管理、搜索等
+- [项目管理模块](./modules/project-management.md) - 项目创建与管理
+
+### 5. [服务层设计](./services/)
+- [右键菜单服务](./services/context-menu.md) - 全局右键菜单管理
+- [命令服务](./services/command-service.md) - 命令注册与执行系统
+
 ## 🎯 产品定位
 
 > **AI 原生的个人知识工作室**
@@ -46,5 +55,5 @@
 
 ---
 
-**文档版本**: 2.0.0
-**最后更新**: 2026-01-15
+**文档版本**: 2.1.0
+**最后更新**: 2026-01-23

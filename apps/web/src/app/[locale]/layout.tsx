@@ -6,6 +6,7 @@ import { AuthProvider } from '@/components/auth/auth-provider';
 import type { Locale } from '@/i18n/routing';
 import { routing } from '@/i18n/routing';
 import '@/app/globals.css';
+import { ThemeInitializer } from '@/stores/theme-store';
 
 const geistSans = Geist({
     variable: '--font-geist-sans',
@@ -46,6 +47,7 @@ export default async function LocaleLayout({
     return (
         <html lang={isValidLocale ? locale : routing.defaultLocale}>
             <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+                <ThemeInitializer />
                 <NextIntlClientProvider messages={messages}>
                     <AuthProvider>{children}</AuthProvider>
                 </NextIntlClientProvider>

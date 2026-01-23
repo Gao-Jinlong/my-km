@@ -42,11 +42,27 @@ export type SidebarTab = (typeof SIDEBAR_TABS)[keyof typeof SIDEBAR_TABS];
 
 // Sidebar UI constants
 export const SIDEBAR_CONSTANTS = {
-    TAB_HEIGHT: 48, // px - 标签栏高度
+    ACTIVITY_BAR_WIDTH: 50, // px - Activity Bar 宽度
+    PANEL_HEADER_HEIGHT: 40, // px - 面板标题高度
     FOOTER_HEIGHT: 56, // px - 底部操作区高度
+    TAB_HEIGHT: 48, // px - 标签栏高度 (保留用于向后兼容)
     MIN_WIDTH: 256, // px - 最小宽度 (20% of 1280px)
     MAX_WIDTH: 576, // px - 最大宽度 (40% of 1440px)
     DEFAULT_WIDTH: 320, // px - 默认宽度 (25% of 1280px)
+} as const;
+
+// Editor UI constants
+export const EDITOR_CONSTANTS = {
+    TAB_HEIGHT: 36, // px - Tab 栏高度
+    CONTENT_PADDING: 16, // px - 内容区 padding
+} as const;
+
+// AI Panel UI constants
+export const AI_PANEL_CONSTANTS = {
+    HEADER_HEIGHT: 40, // px - 头部高度
+    INPUT_AREA_HEIGHT: 80, // px - 输入区高度
+    CHAT_AREA_PADDING: 16, // px - 聊天区 padding
+    CHAT_MESSAGE_GAP: 16, // px - 消息间距
 } as const;
 
 // Available tabs configuration

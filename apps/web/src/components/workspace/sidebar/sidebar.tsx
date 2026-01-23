@@ -3,9 +3,8 @@
 import { useCallback } from 'react';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import type { TabPanelState } from '@/types/workspace';
+import { ActivityBar } from './activity-bar';
 import { getPanelComponent, hasPanel } from './panels';
-import { SidebarFooter } from './sidebar-footer';
-import { SidebarTabs } from './sidebar-tabs';
 
 interface SidebarProps {
     collapsed?: boolean;
@@ -32,31 +31,43 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
     const PanelComponent = activeTab?.panelId ? getPanelComponent(activeTab.panelId) : null;
 
     return (
-        <div className="flex h-full flex-col bg-muted">
-            {/* Header / Tabs - 固定高度 48px */}
-            {!collapsed && <SidebarTabs />}
+        <div className="flex h-full border-ws-border border-r bg-ws-bg-primary">
+            {/* Activity Bar - Always visible */}
+            <ActivityBar />
 
-            {/* Content Area - 可伸缩,支持滚动 */}
-            <div className="flex-1 overflow-y-auto">
-                {PanelComponent ? (
-                    <PanelComponent state={currentPanelState} onStateChange={handleStateChange} />
-                ) : activeTab?.panelId && !hasPanel(activeTab.panelId) ? (
-                    // 面板尚未实现
-                    <div className="flex h-full flex-col items-center justify-center p-4 text-center">
-                        <p className="text-muted-foreground text-sm">
-                            {activeTab.label} 面板即将推出
-                        </p>
+            {/* Sidebar Panel Content - Hidden when collapsed */}
+            {!collapsed && (
+                <div className="flex h-full flex-1 flex-col bg-ws-bg-primary">
+                    {/* Header - 面板标题 */}
+                    <div className="flex h-10 shrink-0 items-center px-4">
+                        <h2 className="font-semibold text-[11px] text-ws-fg-muted uppercase">
+                            {activeTab?.label || 'EXPLORER'}
+                        </h2>
                     </div>
-                ) : (
-                    // 没有激活的面板
-                    <div className="flex h-full flex-col items-center justify-center p-4 text-center">
-                        <p className="text-muted-foreground text-sm">请选择一个标签页</p>
-                    </div>
-                )}
-            </div>
 
-            {/* Footer - 固定高度 56px */}
-            {!collapsed && <SidebarFooter />}
+                    {/* Content Area - 可伸缩,支持滚动 */}
+                    <div className="flex-1 overflow-y-auto">
+                        {PanelComponent ? (
+                            <PanelComponent
+                                state={currentPanelState}
+                                onStateChange={handleStateChange}
+                            />
+                        ) : activeTab?.panelId && !hasPanel(activeTab.panelId) ? (
+                            // 面板尚未实现
+                            <div className="flex h-full flex-col items-center justify-center p-4 text-center">
+                                <p className="text-sm text-ws-fg-muted">
+                                    {activeTab.label} 面板即将推出
+                                </p>
+                            </div>
+                        ) : (
+                            // 没有激活的面板
+                            <div className="flex h-full flex-col items-center justify-center p-4 text-center">
+                                <p className="text-sm text-ws-fg-muted">请选择一个标签页</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -3,6 +3,7 @@
         "biomejs.biome",
         "dbaeumer.vscode-eslint",
         "bradlc.vscode-tailwindcss",
-        "ms-vscode.vscode-typescript-next"
+        "ms-vscode.vscode-typescript-next",
+        "highagency.pencildev"
     ]
 }

@@ -81,7 +81,6 @@ export function SidebarTabs() {
                                 <DropdownMenuContent side="bottom" align="center">
                                     <TabContextMenuContent
                                         tabId={tab.id}
-                                        tabLabel={tab.label}
                                         canDelete={tab.isDeletable}
                                         onDelete={handleDeleteTab}
                                     />
