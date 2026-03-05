@@ -39,8 +39,8 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
             {!collapsed && (
                 <div className="flex h-full flex-1 flex-col bg-ws-bg-primary">
                     {/* Header - 面板标题 */}
-                    <div className="flex h-10 shrink-0 items-center px-4">
-                        <h2 className="font-semibold text-[11px] text-ws-fg-muted uppercase">
+                    <div className="flex h-[40px] shrink-0 items-center px-4">
+                        <h2 className="font-semibold text-[11px] text-ws-fg-muted uppercase tracking-wide">
                             {activeTab?.label || 'EXPLORER'}
                         </h2>
                     </div>

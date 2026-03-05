@@ -14,9 +14,9 @@ export function TopNav() {
             <div className="flex items-center gap-2">
                 <div className="flex items-center gap-2">
                     <BookOpen className="h-5 w-5 text-ws-accent" />
-                    <span className="font-semibold text-sm text-ws-fg-primary">智能知识库</span>
+                    <span className="font-semibold text-[13px] text-ws-fg-primary">智能知识库</span>
                 </div>
-                <span className="text-sm text-ws-fg-muted">my-km-project</span>
+                <span className="text-[13px] text-ws-fg-muted">my-km-project</span>
             </div>
 
             {/* Right Section: Navigation Actions */}

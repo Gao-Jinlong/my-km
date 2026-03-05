@@ -68,7 +68,7 @@ function FileTreeItem({
             <button
                 type="button"
                 className={cn(
-                    'flex h-6 w-full items-center gap-2 rounded px-2 py-1.5',
+                    'flex h-6 w-full items-center gap-1.5 rounded px-2',
                     'cursor-pointer font-normal text-[13px] text-ws-fg-primary',
                     'transition-colors duration-150',
                     'hover:bg-ws-bg-tertiary',
@@ -103,7 +103,7 @@ function FileTreeItem({
 
             {/* 子节点 (仅文件夹且展开时显示) */}
             {isFolder && isExpanded && node.children && (
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-0.5">
                     {node.children.map(child => (
                         <FileTreeItem
                             key={child.id}

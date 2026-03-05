@@ -20,7 +20,7 @@ export function ActivityBar({ className }: { className?: string }) {
     return (
         <div
             className={cn(
-                'flex h-full w-[50px] flex-col items-center border-ws-border border-r bg-ws-bg-primary py-4',
+                'flex h-full w-14 flex-col items-center border-ws-border border-r bg-ws-bg-primary py-3',
                 className,
             )}
         >
@@ -36,16 +36,15 @@ export function ActivityBar({ className }: { className?: string }) {
                             type="button"
                             onClick={() => setSidebarActiveTab(item.id)}
                             className={cn(
-                                'flex h-6 w-6 items-center justify-center outline-none',
-                                'transition-colors',
-                                'hover:bg-ws-bg-tertiary',
-                                isActive && 'text-ws-accent',
-                                !isActive && 'text-ws-icon',
+                                'flex h-10 w-10 items-center justify-center rounded-lg outline-none',
+                                'transition-colors duration-150',
+                                isActive && 'bg-ws-accent text-white',
+                                !isActive && 'text-ws-icon hover:bg-ws-bg-tertiary',
                             )}
                             aria-label={item.label}
                             title={item.label}
                         >
-                            <Icon className="h-6 w-6" />
+                            <Icon className="h-5 w-5" />
                         </button>
                     );
                 })}
@@ -57,30 +56,30 @@ export function ActivityBar({ className }: { className?: string }) {
                     <button
                         type="button"
                         className={cn(
-                            'flex h-6 w-6 items-center justify-center outline-none',
+                            'flex h-10 w-10 items-center justify-center rounded-lg outline-none',
                             'text-ws-icon',
-                            'transition-colors',
+                            'transition-colors duration-150',
                             'hover:bg-ws-bg-tertiary hover:text-ws-fg-primary',
                         )}
                         aria-label="Settings"
                         title="Settings"
                     >
-                        <Settings className="h-6 w-6" />
+                        <Settings className="h-5 w-5" />
                     </button>
                 </SettingsMenu>
 
                 <button
                     type="button"
                     className={cn(
-                        'flex h-6 w-6 items-center justify-center outline-none',
+                        'flex h-10 w-10 items-center justify-center rounded-lg outline-none',
                         'text-ws-icon',
-                        'transition-colors',
+                        'transition-colors duration-150',
                         'hover:bg-ws-bg-tertiary hover:text-ws-fg-primary',
                     )}
                     aria-label="Account"
                     title="Account"
                 >
-                    <User className="h-6 w-6" />
+                    <User className="h-5 w-5" />
                 </button>
             </div>
         </div>

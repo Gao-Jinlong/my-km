@@ -1,4 +1,4 @@
-import { X } from 'lucide-react';
+import { FileText, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Placeholder tabs for now
@@ -20,8 +20,7 @@ export function EditorTabs() {
                             : 'text-ws-fg-muted hover:bg-ws-bg-secondary/50',
                     )}
                 >
-                    {/* 文件图标占位符 */}
-                    <div className="h-3.5 w-3.5 rounded-sm bg-ws-icon/20" />
+                    <FileText className="h-3.5 w-3.5 text-ws-icon" />
 
                     <span className="text-[12px]">{tab.name}</span>
 
