@@ -3,12 +3,16 @@
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
+import { isFileSystemAPISupported, openFolderPicker } from '@/base/bo';
+
+re;
+('swore/api');
+
 import { CreateProjectDialog } from '@/components/projects/create-project-dialog';
 import { ProjectCard } from '@/components/projects/project-card';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { isFileSystemAPISupported, openFolderPicker } from '@/lib/filesystem/api';
 import {
     addRecentProject,
     clearRecentProjects,

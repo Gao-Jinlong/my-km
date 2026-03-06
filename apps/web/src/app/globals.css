@@ -92,14 +92,14 @@
     --sidebar-ring: oklch(0.708 0 0);
 
     /* Workspace Design System Colors (Light Theme) */
-    --ws-bg-primary: #FFFFFF;
-    --ws-bg-secondary: #F6F8FA;
-    --ws-bg-tertiary: #EBEEF1;
-    --ws-border: #D0D7DE;
-    --ws-fg-primary: #1F2328;
-    --ws-fg-muted: #636C76;
-    --ws-accent: #0969DA;
-    --ws-icon: #636C76;
+    --ws-bg-primary: #ffffff;
+    --ws-bg-secondary: #f6f8fa;
+    --ws-bg-tertiary: #ebeef1;
+    --ws-border: #d0d7de;
+    --ws-fg-primary: #1f2328;
+    --ws-fg-muted: #636c76;
+    --ws-accent: #0969da;
+    --ws-icon: #636c76;
 }
 
 .dark {
@@ -137,12 +137,12 @@
 
     /* Workspace Design System Colors (Dark Theme) */
     --ws-bg-primary: #181818;
-    --ws-bg-secondary: #1E1E1E;
+    --ws-bg-secondary: #1e1e1e;
     --ws-bg-tertiary: #252525;
     --ws-border: #333333;
-    --ws-fg-primary: #CCCCCC;
+    --ws-fg-primary: #cccccc;
     --ws-fg-muted: #999999;
-    --ws-accent: #58A6FF;
+    --ws-accent: #58a6ff;
     --ws-icon: #999999;
 }
 
