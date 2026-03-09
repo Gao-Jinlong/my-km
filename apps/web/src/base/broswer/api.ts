@@ -14,16 +14,18 @@ export function isFileSystemAPISupported(): boolean {
 /**
  * 打开文件夹选择器
  */
-export async function openFolderPicker(): Promise<FileSystemDirectoryHandle | null> {
+export async function openFolderPicker(
+    options?: FileSystemPickerOptions,
+): Promise<FileSystemDirectoryHandle | null> {
     if (!isFileSystemAPISupported()) {
         throw new Error('File System API is not supported');
     }
 
     try {
-        const handle = await window.showDirectoryPicker?.();
+        const handle = await window.showDirectoryPicker(options);
         return handle ?? null;
-    } catch (error: any) {
-        if (error.name === 'AbortError') {
+    } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
             // 用户取消
             return null;
         }

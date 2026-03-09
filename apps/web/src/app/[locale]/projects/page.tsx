@@ -3,10 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
-import { isFileSystemAPISupported, openFolderPicker } from '@/base/bo';
-
-re;
-('swore/api');
+import { isFileSystemAPISupported, openFolderPicker } from '@/base/broswer/api';
 
 import { CreateProjectDialog } from '@/components/projects/create-project-dialog';
 import { ProjectCard } from '@/components/projects/project-card';
@@ -45,7 +42,10 @@ export default function ProjectsPage() {
             }
 
             // 打开文件夹
-            const handle = await openFolderPicker();
+            const handle = await openFolderPicker({
+                mode: 'readwrite',
+                id: project.id,
+            });
             if (!handle) return; // 用户取消
 
             // 直接进入工作空间，不验证 .my-km
