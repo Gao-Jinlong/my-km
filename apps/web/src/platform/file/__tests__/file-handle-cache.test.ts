@@ -2,38 +2,38 @@
  * FileHandleCache 单元测试
  */
 
-import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FileHandleCache } from '../cache/file-handle-cache';
 
 // Mock IndexedDB
 const mockIDB = {
-    open: jest.fn(),
-    delete: jest.fn(),
+    open: vi.fn(),
+    delete: vi.fn(),
 };
 
 // Mock store methods
 const mockStore = {
-    get: jest.fn(),
-    put: jest.fn(),
-    delete: jest.fn(),
-    clear: jest.fn(),
-    getAll: jest.fn(),
-    getAllKeys: jest.fn(),
+    get: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+    clear: vi.fn(),
+    getAll: vi.fn(),
+    getAllKeys: vi.fn(),
 };
 
 // Mock transaction
 const mockTransaction = {
-    objectStore: jest.fn(() => mockStore),
+    objectStore: vi.fn(() => mockStore),
     oncomplete: null as (() => void) | null,
 };
 
 // Mock database
 const mockDB = {
-    transaction: jest.fn(() => mockTransaction),
+    transaction: vi.fn(() => mockTransaction),
     objectStoreNames: {
-        contains: jest.fn(),
+        contains: vi.fn(),
     },
-    createObjectStore: jest.fn(),
+    createObjectStore: vi.fn(),
 };
 
 // Mock request
@@ -54,7 +54,7 @@ describe('FileHandleCache', () => {
         mockIDB.open.mockReturnValue(mockRequest as any);
 
         // Reset all mocks
-        jest.clearAllMocks();
+        vi.clearAllMocks();
         mockStore.get.mockReset();
         mockStore.put.mockReset();
         mockStore.delete.mockReset();
@@ -74,7 +74,7 @@ describe('FileHandleCache', () => {
             const mockHandle = {
                 kind: 'file',
                 name: 'test.txt',
-                getFile: jest.fn(),
+                getFile: vi.fn(),
             } as unknown as FileSystemFileHandle;
 
             mockStore.put.mockReturnValue({
@@ -144,7 +144,7 @@ describe('FileHandleCache', () => {
 
     describe('clearProject', () => {
         it('should delete all handles with the project ID prefix', async () => {
-            const keys = ['project1', 'project1:file1', 'project1:dir/file2', 'project2:file3'];
+            const keys = ['project1', 'project1:file1', 'project1:dir/file1', 'project2:file3'];
             mockStore.getAllKeys.mockReturnValue({
                 onsuccess: null,
                 onerror: null,
@@ -164,7 +164,7 @@ describe('FileHandleCache', () => {
             expect(mockStore.delete).toHaveBeenCalledTimes(3);
             expect(mockStore.delete).toHaveBeenCalledWith('project1');
             expect(mockStore.delete).toHaveBeenCalledWith('project1:file1');
-            expect(mockStore.delete).toHaveBeenCalledWith('project1:dir/file2');
+            expect(mockStore.delete).toHaveBeenCalledWith('project1:dir/file1');
         });
     });
 

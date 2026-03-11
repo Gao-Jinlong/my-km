@@ -5,7 +5,7 @@
  * 基于适配器模式实现跨平台支持
  * 使用 DisposableStore 管理依赖服务的生命周期
  */
-import { Disposable } from '../../../common/lifecycle';
+import { Disposable } from '../../../base/common/lifecycle';
 import type { IFileSystemAdapter } from '../adapter/types';
 import { FileHandleCache } from '../cache/file-handle-cache';
 import { FileResourceManager } from '../manager/file-resource-manager';

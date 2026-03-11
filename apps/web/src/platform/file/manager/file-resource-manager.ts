@@ -1,4 +1,4 @@
-import { Disposable, DisposableStore } from '../../../common/lifecycle';
+import { Disposable, DisposableStore } from '../../../base/common/lifecycle';
 import type { FileResource } from '../types';
 
 /**

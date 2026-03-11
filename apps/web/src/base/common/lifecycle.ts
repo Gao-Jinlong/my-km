@@ -98,3 +98,9 @@ export abstract class Disposable implements IDisposable {
         return this._store.add(o);
     }
 }
+
+export function toDisposable(fn: () => void): IDisposable {
+    return {
+        dispose: fn,
+    };
+}

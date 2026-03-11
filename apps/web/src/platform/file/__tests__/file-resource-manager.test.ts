@@ -2,7 +2,7 @@
  * FileResourceManager 测试
  */
 
-import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FileResourceManager } from '../manager/file-resource-manager';
 import type { FileResource } from '../types';
 

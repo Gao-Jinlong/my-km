@@ -5,9 +5,9 @@
  * 是否正确实现 Disposable 模式并释放资源
  */
 
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import type { IDisposable } from '../../../common/lifecycle';
-import { Disposable, DisposableStore } from '../../../common/lifecycle';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { IDisposable } from '../../../base/common/lifecycle';
+import { Disposable, DisposableStore } from '../../../base/common/lifecycle';
 import type {
     DirectoryEntry,
     DirectoryPickerOptions,
@@ -23,71 +23,71 @@ import { FileSystemService } from '../service/file-system-service';
 const createMockAdapter = (): IFileSystemAdapter => {
     return {
         name: 'mock',
-        isSupported: jest.fn<() => Promise<boolean>>().mockResolvedValue(true),
-        openDirectoryPicker: jest
+        isSupported: vi.fn<() => Promise<boolean>>().mockResolvedValue(true),
+        openDirectoryPicker: vi
             .fn<(options?: DirectoryPickerOptions) => Promise<string | null>>()
             .mockResolvedValue('test-project'),
-        readFile: jest.fn<(path: string) => Promise<FileReadResult>>().mockResolvedValue({
+        readFile: vi.fn<(path: string) => Promise<FileReadResult>>().mockResolvedValue({
             content: '',
             fileInfo: { name: '', path: '', kind: 'file' as const },
         }),
-        writeFile: jest
+        writeFile: vi
             .fn<(path: string, content: string | Uint8Array) => Promise<void>>()
             .mockResolvedValue(),
-        listDirectory: jest.fn<(path: string) => Promise<DirectoryEntry[]>>().mockResolvedValue([]),
-        getFileInfo: jest.fn<(path: string) => Promise<FileInfo>>().mockResolvedValue({
+        listDirectory: vi.fn<(path: string) => Promise<DirectoryEntry[]>>().mockResolvedValue([]),
+        getFileInfo: vi.fn<(path: string) => Promise<FileInfo>>().mockResolvedValue({
             name: '',
             path: '',
             kind: 'file' as const,
         }),
-        remove: jest
+        remove: vi
             .fn<(path: string, options?: { recursive?: boolean }) => Promise<void>>()
             .mockResolvedValue(),
-        exists: jest.fn<(path: string) => Promise<boolean>>().mockResolvedValue(false),
-        createDirectory: jest.fn<(path: string) => Promise<void>>().mockResolvedValue(),
+        exists: vi.fn<(path: string) => Promise<boolean>>().mockResolvedValue(false),
+        createDirectory: vi.fn<(path: string) => Promise<void>>().mockResolvedValue(),
     };
 };
 
 describe('Disposable Pattern Verification', () => {
     beforeEach(() => {
-        jest.clearAllMocks();
+        vi.clearAllMocks();
         FileResourceManager.resetInstance();
 
         // Setup minimal IndexedDB mock
         global.indexedDB = {
-            open: jest.fn(
+            open: vi.fn(
                 () =>
                     ({
                         onsuccess: null,
                         onerror: null,
                         result: {
                             transaction: {
-                                objectStore: jest.fn(() => ({
-                                    get: jest.fn(() => ({
+                                objectStore: vi.fn(() => ({
+                                    get: vi.fn(() => ({
                                         onsuccess: null,
                                         onerror: null,
                                         result: null,
                                         error: null,
                                     })),
-                                    put: jest.fn(() => ({
+                                    put: vi.fn(() => ({
                                         onsuccess: null,
                                         onerror: null,
                                         result: undefined,
                                         error: null,
                                     })),
-                                    delete: jest.fn(() => ({
+                                    delete: vi.fn(() => ({
                                         onsuccess: null,
                                         onerror: null,
                                         result: undefined,
                                         error: null,
                                     })),
-                                    clear: jest.fn(() => ({
+                                    clear: vi.fn(() => ({
                                         onsuccess: null,
                                         onerror: null,
                                         result: undefined,
                                         error: null,
                                     })),
-                                    getAllKeys: jest.fn(() => ({
+                                    getAllKeys: vi.fn(() => ({
                                         onsuccess: null,
                                         onerror: null,
                                         result: [],
@@ -95,8 +95,8 @@ describe('Disposable Pattern Verification', () => {
                                     })),
                                 })),
                             },
-                            objectStoreNames: { contains: jest.fn() },
-                            createObjectStore: jest.fn(),
+                            objectStoreNames: { contains: vi.fn() },
+                            createObjectStore: vi.fn(),
                         },
                         error: null,
                     }) as any,
@@ -169,7 +169,7 @@ describe('Disposable Pattern Verification', () => {
         });
 
         it('should warn when adding to disposed store', () => {
-            const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+            const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
             const store = new DisposableStore();
             store.dispose();
 
@@ -228,7 +228,7 @@ describe('Disposable Pattern Verification', () => {
     describe('FileSystemService Disposable', () => {
         it('should dispose all dependencies and close project', async () => {
             const mockAdapter = createMockAdapter();
-            jest.spyOn(mockAdapter, 'openDirectoryPicker').mockResolvedValue('test-project');
+            vi.spyOn(mockAdapter, 'openDirectoryPicker').mockResolvedValue('test-project');
 
             const fileSystem = new FileSystemService(mockAdapter);
             await fileSystem.openProject();

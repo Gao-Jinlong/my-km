@@ -1,4 +1,4 @@
-import { Disposable } from '../../../common/lifecycle';
+import { Disposable } from '../../../base/common/lifecycle';
 import { dbClear, dbDelete, dbGet, dbGetAllKeys, dbHas, dbSet } from '../db/idb';
 import type { FileHandleKey, FileSystemHandle } from '../types';
 

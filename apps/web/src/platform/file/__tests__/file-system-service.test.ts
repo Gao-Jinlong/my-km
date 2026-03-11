@@ -2,7 +2,7 @@
  * FileSystemService 集成测试
  */
 
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
     DirectoryEntry,
     DirectoryPickerOptions,
@@ -16,14 +16,14 @@ import { FileNotFoundError, ProjectNotOpenError } from '../types';
 
 // Mock FileResourceManager
 const mockResourceManager = {
-    register: jest.fn(),
-    unregister: jest.fn(),
-    dispose: jest.fn(),
-    getInstance: jest.fn(() => mockResourceManager),
+    register: vi.fn(),
+    unregister: vi.fn(),
+    dispose: vi.fn(),
+    getInstance: vi.fn(() => mockResourceManager),
 };
 
 // Mock FileHandleCache.clearProject
-const mockCacheClearProject = jest
+const mockCacheClearProject = vi
     .fn<(projectId: string) => Promise<void>>()
     .mockResolvedValue(undefined);
 
@@ -31,28 +31,28 @@ const mockCacheClearProject = jest
 const createMockAdapter = (): IFileSystemAdapter => {
     return {
         name: 'mock',
-        isSupported: jest.fn<() => Promise<boolean>>().mockResolvedValue(true),
-        openDirectoryPicker: jest
+        isSupported: vi.fn<() => Promise<boolean>>().mockResolvedValue(true),
+        openDirectoryPicker: vi
             .fn<(options?: DirectoryPickerOptions) => Promise<string | null>>()
             .mockResolvedValue('test-project'),
-        readFile: jest.fn<(path: string) => Promise<FileReadResult>>().mockResolvedValue({
+        readFile: vi.fn<(path: string) => Promise<FileReadResult>>().mockResolvedValue({
             content: '',
             fileInfo: { name: '', path: '', kind: 'file' as const },
         }),
-        writeFile: jest
+        writeFile: vi
             .fn<(path: string, content: string | Uint8Array) => Promise<void>>()
             .mockResolvedValue(),
-        listDirectory: jest.fn<(path: string) => Promise<DirectoryEntry[]>>().mockResolvedValue([]),
-        getFileInfo: jest.fn<(path: string) => Promise<FileInfo>>().mockResolvedValue({
+        listDirectory: vi.fn<(path: string) => Promise<DirectoryEntry[]>>().mockResolvedValue([]),
+        getFileInfo: vi.fn<(path: string) => Promise<FileInfo>>().mockResolvedValue({
             name: '',
             path: '',
             kind: 'file' as const,
         }),
-        remove: jest
+        remove: vi
             .fn<(path: string, options?: { recursive?: boolean }) => Promise<void>>()
             .mockResolvedValue(),
-        exists: jest.fn<(path: string) => Promise<boolean>>().mockResolvedValue(false),
-        createDirectory: jest.fn<(path: string) => Promise<void>>().mockResolvedValue(),
+        exists: vi.fn<(path: string) => Promise<boolean>>().mockResolvedValue(false),
+        createDirectory: vi.fn<(path: string) => Promise<void>>().mockResolvedValue(),
     };
 };
 
@@ -61,19 +61,19 @@ describe('FileSystemService', () => {
     let mockAdapter: IFileSystemAdapter;
 
     beforeEach(() => {
-        jest.clearAllMocks();
+        vi.clearAllMocks();
         mockCacheClearProject.mockClear();
 
         // Setup global mocks for IndexedDB
         global.indexedDB = {
-            open: jest.fn(
+            open: vi.fn(
                 () =>
                     ({
                         onsuccess: null,
                         onerror: null,
                         result: {
                             transaction: {
-                                objectStore: jest.fn(),
+                                objectStore: vi.fn(),
                             },
                         },
                         error: null,
@@ -85,7 +85,7 @@ describe('FileSystemService', () => {
         fileSystem = new FileSystemService(mockAdapter);
 
         // Mock FileHandleCache.clearProject
-        jest.spyOn(FileHandleCache.prototype, 'clearProject').mockImplementation(
+        vi.spyOn(FileHandleCache.prototype, 'clearProject').mockImplementation(
             mockCacheClearProject,
         );
     });
@@ -96,7 +96,7 @@ describe('FileSystemService', () => {
 
     describe('openProject', () => {
         it('should open a project directory and cache the handle', async () => {
-            const mockAdapterOpen = jest.spyOn(mockAdapter, 'openDirectoryPicker');
+            const mockAdapterOpen = vi.spyOn(mockAdapter, 'openDirectoryPicker');
             mockAdapterOpen.mockResolvedValue('test-project');
 
             const project = await fileSystem.openProject();
@@ -108,7 +108,7 @@ describe('FileSystemService', () => {
         });
 
         it('should throw PermissionDeniedError when user cancels', async () => {
-            jest.spyOn(mockAdapter, 'openDirectoryPicker').mockResolvedValue(null);
+            vi.spyOn(mockAdapter, 'openDirectoryPicker').mockResolvedValue(null);
 
             await expect(fileSystem.openProject()).rejects.toThrow('Permission denied');
         });
@@ -116,7 +116,7 @@ describe('FileSystemService', () => {
 
     describe('closeProject', () => {
         it('should clear project handles and reset current project', async () => {
-            jest.spyOn(mockAdapter, 'openDirectoryPicker').mockResolvedValue('test-project');
+            vi.spyOn(mockAdapter, 'openDirectoryPicker').mockResolvedValue('test-project');
             mockCacheClearProject.mockResolvedValue(undefined);
 
             await fileSystem.openProject();
@@ -139,11 +139,11 @@ describe('FileSystemService', () => {
 
         it('should read file content and return file info', async () => {
             // Setup: open project
-            jest.spyOn(mockAdapter, 'openDirectoryPicker').mockResolvedValue('test-project');
+            vi.spyOn(mockAdapter, 'openDirectoryPicker').mockResolvedValue('test-project');
             await fileSystem.openProject();
 
             // Mock adapter readFile
-            jest.spyOn(mockAdapter, 'readFile').mockResolvedValue({
+            vi.spyOn(mockAdapter, 'readFile').mockResolvedValue({
                 content: 'file content',
                 fileInfo: {
                     name: 'test.txt',
@@ -162,10 +162,10 @@ describe('FileSystemService', () => {
         });
 
         it('should throw FileNotFoundError for non-existent file', async () => {
-            jest.spyOn(mockAdapter, 'openDirectoryPicker').mockResolvedValue('test-project');
+            vi.spyOn(mockAdapter, 'openDirectoryPicker').mockResolvedValue('test-project');
             await fileSystem.openProject();
 
-            jest.spyOn(mockAdapter, 'readFile').mockRejectedValue({ code: 'ENOENT' });
+            vi.spyOn(mockAdapter, 'readFile').mockRejectedValue({ code: 'ENOENT' });
 
             await expect(fileSystem.readFile('nonexistent.txt')).rejects.toThrow(FileNotFoundError);
         });
@@ -179,10 +179,10 @@ describe('FileSystemService', () => {
         });
 
         it('should write file content', async () => {
-            jest.spyOn(mockAdapter, 'openDirectoryPicker').mockResolvedValue('test-project');
+            vi.spyOn(mockAdapter, 'openDirectoryPicker').mockResolvedValue('test-project');
             await fileSystem.openProject();
 
-            const mockWrite = jest.spyOn(mockAdapter, 'writeFile').mockResolvedValue();
+            const mockWrite = vi.spyOn(mockAdapter, 'writeFile').mockResolvedValue();
 
             await fileSystem.writeFile('test.txt', 'content');
 
@@ -196,10 +196,10 @@ describe('FileSystemService', () => {
         });
 
         it('should list directory contents', async () => {
-            jest.spyOn(mockAdapter, 'openDirectoryPicker').mockResolvedValue('test-project');
+            vi.spyOn(mockAdapter, 'openDirectoryPicker').mockResolvedValue('test-project');
             await fileSystem.openProject();
 
-            jest.spyOn(mockAdapter, 'listDirectory').mockResolvedValue([
+            vi.spyOn(mockAdapter, 'listDirectory').mockResolvedValue([
                 { name: 'file1.txt', kind: 'file', path: 'file1.txt' },
                 { name: 'dir1', kind: 'directory', path: 'dir1' },
             ]);
@@ -218,10 +218,10 @@ describe('FileSystemService', () => {
         });
 
         it('should throw FileNotFoundError for non-existent file', async () => {
-            jest.spyOn(mockAdapter, 'openDirectoryPicker').mockResolvedValue('test-project');
+            vi.spyOn(mockAdapter, 'openDirectoryPicker').mockResolvedValue('test-project');
             await fileSystem.openProject();
 
-            jest.spyOn(mockAdapter, 'getFileInfo').mockRejectedValue(new Error('Not found'));
+            vi.spyOn(mockAdapter, 'getFileInfo').mockRejectedValue(new Error('Not found'));
 
             await expect(fileSystem.getFileInfo('nonexistent.txt')).rejects.toThrow(
                 FileNotFoundError,
@@ -229,10 +229,10 @@ describe('FileSystemService', () => {
         });
 
         it('should return file info', async () => {
-            jest.spyOn(mockAdapter, 'openDirectoryPicker').mockResolvedValue('test-project');
+            vi.spyOn(mockAdapter, 'openDirectoryPicker').mockResolvedValue('test-project');
             await fileSystem.openProject();
 
-            jest.spyOn(mockAdapter, 'getFileInfo').mockResolvedValue({
+            vi.spyOn(mockAdapter, 'getFileInfo').mockResolvedValue({
                 name: 'test.txt',
                 path: 'test.txt',
                 kind: 'file',
@@ -249,7 +249,7 @@ describe('FileSystemService', () => {
 
     describe('dispose', () => {
         it('should close project and dispose resources', async () => {
-            jest.spyOn(mockAdapter, 'openDirectoryPicker').mockResolvedValue('test-project');
+            vi.spyOn(mockAdapter, 'openDirectoryPicker').mockResolvedValue('test-project');
             mockCacheClearProject.mockResolvedValue(undefined);
 
             await fileSystem.openProject();
