@@ -1,0 +1,10 @@
+{
+    "permissions": {
+        "allow": [
+            "Bash(openspec list:*)",
+            "Bash(openspec status:*)",
+            "Bash(mkdir -p openspec/changes/archive)",
+            "Bash(mv openspec/changes/event-emitter openspec/changes/archive/2026-03-18-event-emitter)"
+        ]
+    }
+}
