@@ -4,8 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { CharCode } from './charCode.js';
-import { MarshalledId } from './marshallingIds.js';
-import * as paths from './path.js';
+import paths from './path.js';
 import { isWindows } from './platform.js';
 
 const _schemePattern = /^\w[\w\d+.-]*$/;
@@ -53,17 +52,6 @@ function _validateUri(ret: URI, _strict?: boolean): void {
             }
         }
     }
-}
-
-// for a while we allowed uris *without* schemes and this is the migration
-// for them, e.g. an uri without scheme and without strict-mode warns and falls
-// back to the file-scheme. that should cause the least carnage and still be a
-// clear warning
-function _schemeFix(scheme: string, _strict: boolean): string {
-    if (!scheme && !_strict) {
-        return 'file';
-    }
-    return scheme;
 }
 
 // implements a bit of https://tools.ietf.org/html/rfc3986#section-5
@@ -191,7 +179,7 @@ export class URI implements UriComponents {
             // that creates uri components.
             // _validateUri(this);
         } else {
-            this.scheme = _schemeFix(schemeOrData, _strict);
+            this.scheme = schemeOrData;
             this.authority = authority || _empty;
             this.path = _referenceResolution(this.scheme, path || _empty);
             this.query = query || _empty;
@@ -387,12 +375,12 @@ export class URI implements UriComponents {
         if (!uri.path) {
             throw new Error(`[UriError]: cannot call joinPath on URI without path`);
         }
-        let newPath: string;
-        if (isWindows && uri.scheme === 'file') {
-            newPath = URI.file(paths.win32.join(uriToFsPath(uri, true), ...pathFragment)).path;
-        } else {
-            newPath = paths.posix.join(uri.path, ...pathFragment);
-        }
+        // let newPath: string;
+        // if (isWindows && uri.scheme === 'file') {
+        //     // newPath = URI.file(paths.win32.join(uriToFsPath(uri, true), ...pathFragment)).path;
+        // } else {
+        const newPath = paths.join(uri.path, ...pathFragment);
+        // }
         return uri.with({ path: newPath });
     }
 
@@ -476,7 +464,7 @@ export function isUriComponents(thing: unknown): thing is UriComponents {
 }
 
 interface UriState extends UriComponents {
-    $mid: MarshalledId.Uri;
+    // $mid: MarshalledId.Uri;
     external?: string;
     fsPath?: string;
     _sep?: 1;
@@ -511,7 +499,7 @@ class Uri extends URI {
     override toJSON(): UriComponents {
         // eslint-disable-next-line local/code-no-dangerous-type-assertions
         const res = <UriState>{
-            $mid: MarshalledId.Uri,
+            // $mid: MarshalledId.Uri,
         };
         // cached state
         if (this._fsPath) {

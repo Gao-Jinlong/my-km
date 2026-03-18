@@ -1,3 +1,5 @@
+import type { URI } from '@/base/common/uri';
+
 export enum FileSystemProviderCapabilities {
     /**
      * 不支持任何文件操作
@@ -23,6 +25,9 @@ export interface IFileSystemProvider {
     capabilities: FileSystemProviderCapabilities;
 }
 
+export interface IFileWriteOptions {
+    create?: boolean; // 是否创建新文件，如果文件不存在
+}
 export interface IFileSystemProviderWithFileReadWriteCapability extends IFileSystemProvider {
     readFile(resource: URI): Promise<Uint8Array>;
     writeFile(resource: URI, content: Uint8Array, opts: IFileWriteOptions): Promise<void>;
