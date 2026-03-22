@@ -1,3 +1,6 @@
 {
-    "language": "zh-CN"
+  "language": "zh-CN",
+  "permissions": {
+    "defaultMode": "bypassPermissions"
+  }
 }

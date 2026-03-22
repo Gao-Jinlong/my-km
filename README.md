@@ -1,4 +1,6 @@
-# 个人知识库系统
+# 个人知识库系统 (my-km)
+
+> AI 原生的个人知识工作室
 
 一个智能的个人知识管理工具，支持文章管理、智能搜索和 AI 辅助功能。
 
@@ -13,10 +15,6 @@
 ### 安装
 
 ```bash
-# 克隆仓库
-git clone <repository-url>
-cd my-km
-
 # 安装依赖
 pnpm install
 
@@ -24,10 +22,7 @@ pnpm install
 docker-compose up -d postgres
 
 # 运行数据库迁移
-cd apps/server
-pnpm prisma:generate
-pnpm prisma:migrate
-cd ../..
+cd apps/server && pnpm prisma:generate && pnpm prisma:migrate && cd ../..
 
 # 启动开发服务器
 pnpm dev
@@ -37,55 +32,37 @@ pnpm dev
 
 - **前端**: http://localhost:4000
 - **后端 API**: http://localhost:3001
-- **Swagger 文档**: http://localhost:3001/api
-
-## 📚 文档
-
-详细文档请查看 [docs/](./docs/README.md)
-
-- [产品规划](./docs/spec/roadmap.md)
-- [技术规格文档](./docs/technical/technical-specification.md)
-- [基础设施 TODO](./docs/technical/infrastructure-todo.md)
 
 ## 🛠️ 技术栈
 
-- **前端**: Next.js 16 + React 19 + Tailwind CSS 4
-- **后端**: NestJS 11 + Prisma
-- **数据库**: PostgreSQL + pgvector
-- **代码质量**: Biome + Husky
+| 领域 | 技术 |
+|------|------|
+| **前端** | Next.js 16 + React 19 + Tailwind CSS 4 + shadcn/ui |
+| **后端** | NestJS 11 + Prisma |
+| **数据库** | PostgreSQL + pgvector |
+| **缓存** | Redis + cache-manager |
 
-## 📝 开发指南
-
-### 可用脚本
+## 📝 常用命令
 
 ```bash
-# 启动所有服务
-pnpm dev
-
-# 启动 Web 开发服务器
-pnpm dev:web
-
-# 启动 Server 开发服务器
-pnpm dev:server
-
-# 代码检查
-pnpm lint
-
-# 代码格式化
-pnpm format
-
-# 运行测试
-pnpm test
-
-# 构建所有包
-pnpm build
+pnpm dev        # 启动开发服务器
+pnpm lint       # 代码检查
+pnpm test       # 运行测试
+pnpm build      # 构建项目
 ```
 
-### 相关文档
+## 📚 文档
 
-- [技术规格文档](./docs/technical/technical-specification.md)
-- [环境变量配置](./.env.example)
-- [Git 提交规范](./docs/technical/git-commit-convention.md)
+- [产品文档](docs/01-product/README.md) - 产品愿景、需求、路线图
+- [架构文档](docs/02-architecture/README.md) - 系统架构、设计模式
+- [前端文档](docs/03-frontend/README.md) - 技术栈、组件、模块
+- [后端文档](docs/04-backend/README.md) - API、数据库、规范
+
+## 🎯 核心特性
+
+- 🗂️ **项目化管理**: 系统化组织知识，而非碎片化笔记
+- 🤖 **AI 深度对话**: 从零开始，AI 帮助搭建知识框架
+- 🔗 **智能引用网络**: 构建知识图谱，发现隐秘关联
 
 ## 📄 许可证
 
