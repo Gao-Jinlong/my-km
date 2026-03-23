@@ -1,12 +1,12 @@
-import { IFileSystemProvider } from '../provider';
-import { FileStat, FileContent, FileSystemCapability } from '../types';
+import { Disposable } from '../../../base/common/lifecycle';
 import {
-    FileNotFoundError,
     DirectoryNotFoundError,
+    FileNotFoundError,
     ReadFailedError,
     WriteFailedError,
 } from '../errors';
-import { Disposable } from '../../../base/common/lifecycle';
+import type { IFileSystemProvider } from '../provider';
+import { type FileContent, type FileStat, FileSystemCapability } from '../types';
 
 /**
  * IndexedDB 请求超时时间（毫秒）
@@ -75,7 +75,7 @@ export class IndexedDBProvider extends Disposable implements IFileSystemProvider
                 resolve(request.result);
             };
 
-            request.onupgradeneeded = (event) => {
+            request.onupgradeneeded = event => {
                 const db = (event.target as IDBOpenDBRequest).result;
 
                 // 创建存储对象
@@ -124,7 +124,7 @@ export class IndexedDBProvider extends Disposable implements IFileSystemProvider
             const results: FileStat[] = [];
             const request = index.openCursor();
 
-            request.onsuccess = (event) => {
+            request.onsuccess = event => {
                 const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
                 if (cursor) {
                     const entry = cursor.value as HandleEntry;
@@ -170,7 +170,7 @@ export class IndexedDBProvider extends Disposable implements IFileSystemProvider
             const keysToDelete: string[] = [];
 
             const request = index.openCursor();
-            request.onsuccess = (event) => {
+            request.onsuccess = event => {
                 const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
                 if (cursor) {
                     const entry = cursor.value as HandleEntry;
@@ -202,7 +202,7 @@ export class IndexedDBProvider extends Disposable implements IFileSystemProvider
      * 读取文件内容
      */
     async readFile(path: string): Promise<FileContent> {
-        const handle = await this.getFileHandle(path, 'read') as FileSystemFileHandle;
+        const handle = (await this.getFileHandle(path, 'read')) as FileSystemFileHandle;
 
         try {
             const file = await handle.getFile();
@@ -216,7 +216,7 @@ export class IndexedDBProvider extends Disposable implements IFileSystemProvider
      * 写入文件内容
      */
     async writeFile(path: string, content: FileContent): Promise<void> {
-        const handle = await this.getFileHandle(path, 'readwrite') as FileSystemFileHandle;
+        const handle = (await this.getFileHandle(path, 'readwrite')) as FileSystemFileHandle;
 
         try {
             const writable = await handle.createWritable();
@@ -247,7 +247,10 @@ export class IndexedDBProvider extends Disposable implements IFileSystemProvider
     /**
      * 获取文件句柄
      */
-    async getFileHandle(path: string, _mode: 'read' | 'readwrite'): Promise<FileSystemFileHandle | FileSystemDirectoryHandle> {
+    async getFileHandle(
+        path: string,
+        _mode: 'read' | 'readwrite',
+    ): Promise<FileSystemFileHandle | FileSystemDirectoryHandle> {
         const db = await this.initDB();
         const key = this.makeKey(path);
 

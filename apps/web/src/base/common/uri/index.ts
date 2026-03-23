@@ -1,2 +1,2 @@
-export { URI } from './uri';
 export type { UriJson } from './types';
+export { URI } from './uri';

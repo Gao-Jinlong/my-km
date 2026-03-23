@@ -1,13 +1,13 @@
-import { IFileSystemProvider } from '../provider';
-import { FileStat, FileContent, FileSystemCapability } from '../types';
-import {
-    FileNotFoundError,
-    DirectoryNotFoundError,
-    ReadFailedError,
-    WriteFailedError,
-    UserDeniedPermissionError,
-} from '../errors';
 import { Disposable } from '../../../base/common/lifecycle';
+import {
+    DirectoryNotFoundError,
+    FileNotFoundError,
+    ReadFailedError,
+    UserDeniedPermissionError,
+    WriteFailedError,
+} from '../errors';
+import type { IFileSystemProvider } from '../provider';
+import { type FileContent, type FileStat, FileSystemCapability } from '../types';
 
 /**
  * File System Access API Provider - 浏览器原生文件访问
@@ -147,7 +147,10 @@ export class FileSystemAccessAPIProvider extends Disposable implements IFileSyst
     /**
      * 获取文件句柄
      */
-    async getFileHandle(path: string, mode: 'read' | 'readwrite'): Promise<FileSystemFileHandle | FileSystemDirectoryHandle> {
+    async getFileHandle(
+        path: string,
+        mode: 'read' | 'readwrite',
+    ): Promise<FileSystemFileHandle | FileSystemDirectoryHandle> {
         if (!this.directoryHandle) {
             throw new Error('请先打开目录');
         }

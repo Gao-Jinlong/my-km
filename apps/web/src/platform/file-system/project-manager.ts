@@ -1,7 +1,7 @@
 import { Disposable } from '../../base/common/lifecycle';
-import { fileSystemService } from './service';
-import { FileSystemAccessAPIProvider } from './providers/fs-access-provider';
 import type { ProjectInfo } from './project-types';
+import { FileSystemAccessAPIProvider } from './providers/fs-access-provider';
+import { fileSystemService } from './service';
 
 const PROJECT_STORAGE_KEY = 'my-km-current-project';
 

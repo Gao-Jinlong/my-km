@@ -31,11 +31,7 @@ export class FileSystemError extends Error {
     /** 原始错误原因 */
     public readonly cause?: Error;
 
-    constructor(
-        code: FileSystemErrorCode,
-        message?: string,
-        options?: { cause?: Error },
-    ) {
+    constructor(code: FileSystemErrorCode, message?: string, options?: { cause?: Error }) {
         const defaultMessage = FileSystemError.getDefaultMessage(code);
         super(message ?? defaultMessage);
         this.name = 'FileSystemError';
@@ -80,10 +76,7 @@ export class FileSystemError extends Error {
  */
 export class ProviderNotFoundError extends FileSystemError {
     constructor(scheme: string) {
-        super(
-            FileSystemErrorCode.ProviderNotFound,
-            `未找到处理 "${scheme}://" 的 Provider`,
-        );
+        super(FileSystemErrorCode.ProviderNotFound, `未找到处理 "${scheme}://" 的 Provider`);
         this.name = 'ProviderNotFoundError';
         Object.setPrototypeOf(this, ProviderNotFoundError.prototype);
     }
@@ -94,10 +87,7 @@ export class ProviderNotFoundError extends FileSystemError {
  */
 export class PermissionDeniedError extends FileSystemError {
     constructor(operation: string, capability: string) {
-        super(
-            FileSystemErrorCode.PermissionDenied,
-            `执行 "${operation}" 需要 ${capability} 能力`,
-        );
+        super(FileSystemErrorCode.PermissionDenied, `执行 "${operation}" 需要 ${capability} 能力`);
         this.name = 'PermissionDeniedError';
         Object.setPrototypeOf(this, PermissionDeniedError.prototype);
     }
@@ -141,10 +131,7 @@ export class FileAlreadyExistsError extends FileSystemError {
  */
 export class InvalidPathError extends FileSystemError {
     constructor(path: string, reason: string) {
-        super(
-            FileSystemErrorCode.InvalidPath,
-            `无效的路径 "${path}": ${reason}`,
-        );
+        super(FileSystemErrorCode.InvalidPath, `无效的路径 "${path}": ${reason}`);
         this.name = 'InvalidPathError';
         Object.setPrototypeOf(this, InvalidPathError.prototype);
     }
@@ -155,11 +142,7 @@ export class InvalidPathError extends FileSystemError {
  */
 export class ReadFailedError extends FileSystemError {
     constructor(path: string, cause?: Error) {
-        super(
-            FileSystemErrorCode.ReadFailed,
-            `读取文件失败：${path}`,
-            { cause },
-        );
+        super(FileSystemErrorCode.ReadFailed, `读取文件失败：${path}`, { cause });
         this.name = 'ReadFailedError';
         Object.setPrototypeOf(this, ReadFailedError.prototype);
     }
@@ -170,11 +153,7 @@ export class ReadFailedError extends FileSystemError {
  */
 export class WriteFailedError extends FileSystemError {
     constructor(path: string, cause?: Error) {
-        super(
-            FileSystemErrorCode.WriteFailed,
-            `写入文件失败：${path}`,
-            { cause },
-        );
+        super(FileSystemErrorCode.WriteFailed, `写入文件失败：${path}`, { cause });
         this.name = 'WriteFailedError';
         Object.setPrototypeOf(this, WriteFailedError.prototype);
     }
@@ -185,10 +164,7 @@ export class WriteFailedError extends FileSystemError {
  */
 export class UserDeniedPermissionError extends FileSystemError {
     constructor(operation: string) {
-        super(
-            FileSystemErrorCode.UserDeniedPermission,
-            `用户拒绝授权执行：${operation}`,
-        );
+        super(FileSystemErrorCode.UserDeniedPermission, `用户拒绝授权执行：${operation}`);
         this.name = 'UserDeniedPermissionError';
         Object.setPrototypeOf(this, UserDeniedPermissionError.prototype);
     }

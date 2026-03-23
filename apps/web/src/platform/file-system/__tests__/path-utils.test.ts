@@ -1,16 +1,16 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import { InvalidPathError } from '../errors';
 import {
-    parsePath,
-    normalize,
-    join,
-    dirname,
     basename,
+    dirname,
     extname,
     isAbsolute,
     isRelative,
+    join,
+    normalize,
+    parsePath,
     relative,
 } from '../utils/path';
-import { InvalidPathError } from '../errors';
 
 describe('path utils', () => {
     describe('parsePath', () => {

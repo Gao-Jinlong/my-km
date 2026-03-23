@@ -4,10 +4,10 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import './config/load-env';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { I18nMiddleware } from './i18n';
 import { LoggerService } from './logger/logger.service';
-import 'dotenv/config';
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule, {

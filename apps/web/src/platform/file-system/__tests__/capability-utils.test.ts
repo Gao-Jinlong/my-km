@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { FileSystemCapability } from '../types';
 
 describe('capability utils', () => {
@@ -8,11 +8,15 @@ describe('capability utils', () => {
         });
 
         it('应该检查组合能力 - FullAccess 包含 Read', () => {
-            expect(hasCapability(FileSystemCapability.FullAccess, FileSystemCapability.Read)).toBe(true);
+            expect(hasCapability(FileSystemCapability.FullAccess, FileSystemCapability.Read)).toBe(
+                true,
+            );
         });
 
         it('应该检查不足的能力 - Read 不包含 Write', () => {
-            expect(hasCapability(FileSystemCapability.Read, FileSystemCapability.Write)).toBe(false);
+            expect(hasCapability(FileSystemCapability.Read, FileSystemCapability.Write)).toBe(
+                false,
+            );
         });
 
         it('应该检查组合能力 - ReadWrite 包含 Read 和 Write', () => {
@@ -28,16 +32,20 @@ describe('capability utils', () => {
 
     describe('combineCapabilities', () => {
         it('应该组合两个能力', () => {
-            expect(combineCapabilities(FileSystemCapability.Read, FileSystemCapability.Write)).toBe(3);
+            expect(combineCapabilities(FileSystemCapability.Read, FileSystemCapability.Write)).toBe(
+                3,
+            );
         });
 
         it('应该组合多个能力', () => {
-            expect(combineCapabilities(
-                FileSystemCapability.Read,
-                FileSystemCapability.Write,
-                FileSystemCapability.List,
-                FileSystemCapability.Metadata,
-            )).toBe(15);
+            expect(
+                combineCapabilities(
+                    FileSystemCapability.Read,
+                    FileSystemCapability.Write,
+                    FileSystemCapability.List,
+                    FileSystemCapability.Metadata,
+                ),
+            ).toBe(15);
         });
 
         it('应该处理零个能力', () => {
@@ -55,7 +63,9 @@ describe('capability utils', () => {
         });
 
         it('应该移除多个能力', () => {
-            expect(removeCapability(15, FileSystemCapability.Read | FileSystemCapability.Write)).toBe(12);
+            expect(
+                removeCapability(15, FileSystemCapability.Read | FileSystemCapability.Write),
+            ).toBe(12);
         });
 
         it('应该处理移除不存在的能力', () => {
@@ -80,7 +90,9 @@ describe('capability utils', () => {
         });
 
         it('应该获取组合能力名称', () => {
-            const names = getCapabilityNames(FileSystemCapability.Read | FileSystemCapability.Metadata);
+            const names = getCapabilityNames(
+                FileSystemCapability.Read | FileSystemCapability.Metadata,
+            );
             expect(names).toEqual(['Read', 'Metadata']);
         });
     });

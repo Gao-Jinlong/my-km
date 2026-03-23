@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { AVAILABLE_TABS } from '@/lib/workspace/constants';
-import type { SidebarTabConfig, TabPanelState } from '@/types/workspace';
 import type { ProjectInfo } from '@/platform/file-system/project-types';
+import type { SidebarTabConfig, TabPanelState } from '@/types/workspace';
 
 /**
  * 项目状态接口

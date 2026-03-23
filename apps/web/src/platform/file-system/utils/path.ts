@@ -1,5 +1,5 @@
-import { ParsedPath } from '../types';
 import { InvalidPathError } from '../errors';
+import type { ParsedPath } from '../types';
 
 /**
  * 解析 URI 路径为结构化对象

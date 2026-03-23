@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProjectPicker } from '../project-picker';
 
 describe('ProjectPicker', () => {
@@ -25,9 +25,7 @@ describe('ProjectPicker', () => {
     });
 
     it('当 open 为 false 时应该返回 null', () => {
-        const { container } = render(
-            <ProjectPicker {...defaultProps} open={false} />,
-        );
+        const { container } = render(<ProjectPicker {...defaultProps} open={false} />);
         expect(container.firstChild).toBeNull();
     });
 
@@ -67,7 +65,7 @@ describe('ProjectPicker', () => {
 
         // 文本被 <br/> 分隔，使用函数匹配
         expect(
-            screen.getByText((content) => content.includes('您的浏览器不支持')),
+            screen.getByText(content => content.includes('您的浏览器不支持')),
         ).toBeInTheDocument();
     });
 
@@ -114,7 +112,9 @@ describe('ProjectPicker', () => {
     it('在加载状态下禁用按钮', async () => {
         vi.stubGlobal(
             'showDirectoryPicker',
-            vi.fn().mockImplementation(() => new Promise(() => {})), // 永不 resolved，保持加载状态
+            vi
+                .fn()
+                .mockImplementation(() => new Promise(() => {})), // 永不 resolved，保持加载状态
         );
 
         render(<ProjectPicker {...defaultProps} />);

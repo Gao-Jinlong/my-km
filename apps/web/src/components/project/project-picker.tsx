@@ -33,7 +33,7 @@ export function ProjectPicker({ open, onClose, onProjectSelected }: ProjectPicke
         setError(null);
 
         try {
-            // @ts-ignore - showDirectoryPicker 类型在某些环境中可能不存在
+            // @ts-expect-error - showDirectoryPicker 类型在某些环境中可能不存在
             const handle = await window.showDirectoryPicker({
                 mode: 'readwrite',
             });
@@ -54,7 +54,7 @@ export function ProjectPicker({ open, onClose, onProjectSelected }: ProjectPicke
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
             <div className="w-full max-w-md rounded-lg bg-ws-bg-primary p-6 shadow-xl">
-                <h2 className="mb-4 text-xl font-semibold text-ws-foreground">选择项目目录</h2>
+                <h2 className="mb-4 font-semibold text-ws-foreground text-xl">选择项目目录</h2>
 
                 {!supportsFileSystemAccess() ? (
                     <div className="mb-4 rounded-md bg-yellow-50 p-4">
@@ -66,13 +66,11 @@ export function ProjectPicker({ open, onClose, onProjectSelected }: ProjectPicke
                     </div>
                 ) : (
                     <>
-                        <p className="mb-6 text-ws-text-muted">
-                            选择一个文件夹作为您的项目目录
-                        </p>
+                        <p className="mb-6 text-ws-text-muted">选择一个文件夹作为您的项目目录</p>
 
                         {error && (
                             <div className="mb-4 rounded-md bg-red-50 p-4">
-                                <p className="text-sm text-red-800">{error}</p>
+                                <p className="text-red-800 text-sm">{error}</p>
                             </div>
                         )}
 

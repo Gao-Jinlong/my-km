@@ -96,6 +96,9 @@ export function getCapabilityMode(mode: keyof typeof FileSystemCapabilityMode): 
  * @param mode - 预设模式
  * @returns 是否匹配
  */
-export function isCapabilityMode(capabilities: number, mode: keyof typeof FileSystemCapabilityMode): boolean {
+export function isCapabilityMode(
+    capabilities: number,
+    mode: keyof typeof FileSystemCapabilityMode,
+): boolean {
     return capabilities === FileSystemCapabilityMode[mode];
 }

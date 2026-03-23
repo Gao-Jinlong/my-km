@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Welcome, ProjectPicker } from '@/components/project';
+import { ProjectPicker, Welcome } from '@/components/project';
 import { WorkspaceContent } from '@/components/workspace/workspace-content';
 import { projectManager } from '@/platform/file-system/project-manager';
 import { useWorkspaceStore } from '@/stores/workspace-store';

@@ -25,9 +25,14 @@ export const FileSystemCapabilityMode = {
     /** 只读模式：Read + Metadata */
     ReadOnly: FileSystemCapability.Read | FileSystemCapability.Metadata, // 9
     /** 读写模式：Read + Write + Metadata */
-    ReadWrite: FileSystemCapability.Read | FileSystemCapability.Write | FileSystemCapability.Metadata, // 11
+    ReadWrite:
+        FileSystemCapability.Read | FileSystemCapability.Write | FileSystemCapability.Metadata, // 11
     /** 完全访问：Read + Write + List + Metadata */
-    FullAccess: FileSystemCapability.Read | FileSystemCapability.Write | FileSystemCapability.List | FileSystemCapability.Metadata, // 15
+    FullAccess:
+        FileSystemCapability.Read |
+        FileSystemCapability.Write |
+        FileSystemCapability.List |
+        FileSystemCapability.Metadata, // 15
 } as const;
 
 /**

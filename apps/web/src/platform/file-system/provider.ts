@@ -1,4 +1,4 @@
-import { FileStat, FileContent } from './types';
+import type { FileContent, FileStat } from './types';
 
 /**
  * 文件系统 Provider 接口
@@ -90,7 +90,10 @@ export interface IFileSystemProvider {
      * @param mode - 访问模式
      * @returns 文件句柄
      */
-    getFileHandle(path: string, mode: 'read' | 'readwrite'): Promise<FileSystemFileHandle | FileSystemDirectoryHandle>;
+    getFileHandle(
+        path: string,
+        mode: 'read' | 'readwrite',
+    ): Promise<FileSystemFileHandle | FileSystemDirectoryHandle>;
 
     /**
      * 获取文件统计信息

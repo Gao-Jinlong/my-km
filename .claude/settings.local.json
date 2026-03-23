@@ -1,15 +1,15 @@
 {
-  "permissions": {
-    "allow": [
-      "Bash(openspec list:*)",
-      "Bash(openspec status:*)",
-      "Bash(mkdir -p openspec/changes/archive)",
-      "Bash(mv openspec/changes/event-emitter openspec/changes/archive/2026-03-18-event-emitter)",
-      "Bash(cp:*)",
-      "Bash(find docs:*)",
-      "Bash(# 删除过于细致的子目录，将文档扁平化\n# 01-product/specs 扁平化\nmv docs/01-product/specs/*.md docs/01-product/ 2>/dev/null || true\nrmdir docs/01-product/specs 2>/dev/null || true\n\n# 02-architecture/services 扁平化\nmv docs/02-architecture/services/*.md docs/02-architecture/ 2>/dev/null || true\nrmdir docs/02-architecture/services 2>/dev/null || true\n\n# 03-frontend/modules 扁平化\nmv docs/03-frontend/modules/*.md docs/03-frontend/ 2>/dev/null || true\nrmdir docs/03-frontend/modules 2>/dev/null || true\n\n# 02-architecture/patterns/dispose-pattern 扁平化\nmv docs/02-architecture/patterns/dispose-pattern/*.md docs/02-architecture/patterns/ 2>/dev/null || true\nrmdir docs/02-architecture/patterns/dispose-pattern 2>/dev/null || true\n\n# 删除空的目录\nfind docs -type d -empty -delete\n\n# 查看最终结构\necho \"=== 最终目录结构 ===\"\nfind docs -type f -name \"*.md\" | sort)",
-      "Bash(ls:*)",
-      "Bash(git show:*)"
-    ]
-  }
+    "permissions": {
+        "allow": [
+            "Bash(openspec list:*)",
+            "Bash(openspec status:*)",
+            "Bash(mkdir -p openspec/changes/archive)",
+            "Bash(mv openspec/changes/event-emitter openspec/changes/archive/2026-03-18-event-emitter)",
+            "Bash(cp:*)",
+            "Bash(find docs:*)",
+            "Bash(# 删除过于细致的子目录，将文档扁平化\n# 01-product/specs 扁平化\nmv docs/01-product/specs/*.md docs/01-product/ 2>/dev/null || true\nrmdir docs/01-product/specs 2>/dev/null || true\n\n# 02-architecture/services 扁平化\nmv docs/02-architecture/services/*.md docs/02-architecture/ 2>/dev/null || true\nrmdir docs/02-architecture/services 2>/dev/null || true\n\n# 03-frontend/modules 扁平化\nmv docs/03-frontend/modules/*.md docs/03-frontend/ 2>/dev/null || true\nrmdir docs/03-frontend/modules 2>/dev/null || true\n\n# 02-architecture/patterns/dispose-pattern 扁平化\nmv docs/02-architecture/patterns/dispose-pattern/*.md docs/02-architecture/patterns/ 2>/dev/null || true\nrmdir docs/02-architecture/patterns/dispose-pattern 2>/dev/null || true\n\n# 删除空的目录\nfind docs -type d -empty -delete\n\n# 查看最终结构\necho \"=== 最终目录结构 ===\"\nfind docs -type f -name \"*.md\" | sort)",
+            "Bash(ls:*)",
+            "Bash(git show:*)"
+        ]
+    }
 }
