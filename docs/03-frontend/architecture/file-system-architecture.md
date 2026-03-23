@@ -2,17 +2,21 @@
 
 ## 1. 概述
 
-文件系统位于前端系统的**服务层**和**平台层**，采用三层架构设计：
+文件系统位于前端系统的**平台层**，采用 Provider 模式设计：
 
 - **应用层**: UI 组件（Projects Page, Files Panel, Editor Area）
-- **服务层**: FileSystemService（统一文件操作 API、能力检查、路由分发）
-- **适配层**: IFileSystemProvider + 多个 Provider 实现
+- **平台层**: FileSystemService + IFileSystemProvider 接口 + 多个 Provider 实现
+- **基础设施层**: Lifecycle（Disposable 模式）、Event、工具函数
+
+**代码目录**: `apps/web/src/platform/file-system/`
 
 详细的前端分层设计请参考 [前端系统架构](./frontend-architecture.md)。
 
 ---
 
 ## 2. 整体架构
+
+### 2.1 架构图
 
 ```mermaid
 graph TB
@@ -42,6 +46,18 @@ graph TB
     P1 & FP & EA --> FSS
     FSS --> Router --> Checker --> Dispatcher --> IFace
     IFace --> MP & IDBP & FSAP
+```
+
+### 2.2 代码目录结构
+
+```
+apps/web/src/platform/file-system/
+├── index.ts           # 模块入口，统一导出
+├── types.ts           # 类型定义
+├── errors.ts          # 错误定义
+├── provider/          # Provider 实现
+├── service/           # 服务主逻辑
+└── utils/             # 工具函数
 ```
 
 ---

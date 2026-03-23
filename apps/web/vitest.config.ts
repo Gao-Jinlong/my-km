@@ -8,6 +8,7 @@ export default defineConfig({
             '@/components': path.resolve(__dirname, './src/components'),
             '@/lib': path.resolve(__dirname, './src/lib'),
             '@workspace/shared': path.resolve(__dirname, '../packages/shared/src'),
+            '@my-km/file-system': path.resolve(__dirname, './src/platform/file-system'),
         },
     },
     test: {

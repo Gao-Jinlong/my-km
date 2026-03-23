@@ -97,7 +97,7 @@ graph TB
 
 平台层由多个服务模块组成，每个服务模块内部包含自己的 Provider/Adapter 实现，用于适配不同的底层基础设施。
 
-### 4.1 服务模块
+**代码目录**: `apps/web/src/platform/`
 
 | 服务 | 职责 |
 |------|------|
@@ -112,12 +112,13 @@ graph TB
 
 ## 5. 基础设施层
 
-对应代码目录：`base/`
+**代码目录**: `apps/web/src/base/`
 
 | 模块 | 职责 |
 |------|------|
 | Event | 事件发射器、事件监听 |
-| Lifecycle | 生命周期管理 |
+| Lifecycle | 生命周期管理（Disposable 模式） |
+| URI | 资源路径解析与序列化 |
 | Utils | 通用工具函数 |
 
 ---
