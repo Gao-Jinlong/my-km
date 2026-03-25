@@ -102,4 +102,13 @@ export interface IFileSystemProvider {
      * @returns 文件统计信息
      */
     stat(path: string): Promise<FileStat>;
+
+    /**
+     * 重命名文件/目录
+     *
+     * @param oldPath - 原路径
+     * @param newName - 新名称（不包含完整路径）
+     * @returns Promise
+     */
+    rename?(oldPath: string, newName: string): Promise<void>;
 }

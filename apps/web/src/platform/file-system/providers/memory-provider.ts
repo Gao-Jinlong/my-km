@@ -206,6 +206,46 @@ export class MemoryProvider implements IFileSystemProvider {
     }
 
     /**
+     * 重命名文件/目录
+     */
+    async rename(path: string, newName: string): Promise<void> {
+        const entry = await this.getEntry(path);
+
+        if (!entry) {
+            throw new FileNotFoundError(path);
+        }
+
+        const normalized = this.normalizePath(path);
+        const parts = normalized.split('/').filter(p => p !== '');
+        const parentParts = parts.slice(0, parts.length - 1);
+
+        // 获取父目录
+        let parentMap = this.storage;
+        for (const part of parentParts) {
+            const dir = parentMap.get(part);
+            if (!dir || dir.type !== 'directory' || !dir.children) {
+                throw new DirectoryNotFoundError(
+                    parts.slice(0, parentParts.indexOf(part) + 1).join('/'),
+                );
+            }
+            parentMap = dir.children;
+        }
+
+        // 检查新名称是否已存在
+        if (parentMap.has(newName)) {
+            throw new FileAlreadyExistsError(newName);
+        }
+
+        // 更新名称
+        entry.name = newName;
+        entry.mtime = Date.now();
+
+        // 在父目录中重新注册
+        parentMap.set(newName, entry);
+        parentMap.delete(parts[parts.length - 1]);
+    }
+
+    /**
      * 获取路径的最后一部分（文件名或目录名）
      */
     private getBasename(path: string): string {

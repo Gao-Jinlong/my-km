@@ -1,12 +1,15 @@
 'use client';
 
 import { Settings, User } from 'lucide-react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { SIDEBAR_CONSTANTS } from '@/lib/workspace/constants';
 import { SettingsMenu } from './settings-menu';
 import { UserMenu } from './user-menu';
 
 export function SidebarFooter() {
+    const [userMenuOpen, setUserMenuOpen] = useState(false);
+
     return (
         <div
             className="border-ws-border border-t px-4"
@@ -28,7 +31,7 @@ export function SidebarFooter() {
                 </SettingsMenu>
 
                 {/* 用户按钮 */}
-                <UserMenu>
+                <UserMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
                     <Button
                         variant="ghost"
                         size="icon"

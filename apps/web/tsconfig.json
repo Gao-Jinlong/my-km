@@ -24,7 +24,9 @@
             "@/lib/*": ["./src/lib/*"],
             "@workspace/shared": ["../../packages/shared/src"]
         },
-        "allowArbitraryExtensions": true
+        "allowArbitraryExtensions": true,
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true
     },
     "include": [
         "next-env.d.ts",

@@ -1,4 +1,9 @@
-import { Disposable, type IDisposable, toDisposable } from './lifecycle';
+import type { IDisposable } from './lifecycle';
+import { Disposable, toDisposable } from './lifecycle';
+
+// 重新导出 IDisposable 和 toDisposable
+export { toDisposable };
+export type { IDisposable };
 
 // TODO: 增加事件交付队列，用于解决两个关键问题：
 // 重入问题（Reentrancy） - 监听器中再次触发同一个 emitter

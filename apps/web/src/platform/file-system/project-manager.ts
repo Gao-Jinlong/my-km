@@ -1,9 +1,13 @@
 import { Disposable } from '../../base/common/lifecycle';
+import { container } from '../bootstrap';
 import type { ProjectInfo } from './project-types';
 import { FileSystemAccessAPIProvider } from './providers/fs-access-provider';
-import { fileSystemService } from './service';
+import { FileSystemService } from './service';
 
 const PROJECT_STORAGE_KEY = 'my-km-current-project';
+
+// 获取 FileSystemService 实例
+const fileSystemService = container.get<FileSystemService>(FileSystemService);
 
 /**
  * 项目管理器

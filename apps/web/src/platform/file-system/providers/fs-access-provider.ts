@@ -40,7 +40,13 @@ export class FileSystemAccessAPIProvider extends Disposable implements IFileSyst
         }
 
         try {
-            this.directoryHandle = await window.showDirectoryPicker({
+            this.directoryHandle = await (
+                window as unknown as {
+                    showDirectoryPicker: (options?: {
+                        mode?: 'readwrite' | 'read';
+                    }) => Promise<FileSystemDirectoryHandle>;
+                }
+            ).showDirectoryPicker({
                 mode: 'readwrite',
             });
             return Promise.resolve();
@@ -59,7 +65,9 @@ export class FileSystemAccessAPIProvider extends Disposable implements IFileSyst
         const dirHandle = await this.getDirectoryHandle(path);
         const results: FileStat[] = [];
 
-        for await (const entry of dirHandle.values()) {
+        for await (const entry of (
+            dirHandle as unknown as { values(): IterableIterator<FileSystemHandle> }
+        ).values()) {
             const stat = await this.getStat(entry, `${path}/${entry.name}`);
             results.push(stat);
         }
@@ -103,7 +111,7 @@ export class FileSystemAccessAPIProvider extends Disposable implements IFileSyst
      * 读取文件内容
      */
     async readFile(path: string): Promise<FileContent> {
-        const fileHandle = await this.getFileHandle(path, 'read');
+        const fileHandle = (await this.getFileHandle(path, 'read')) as FileSystemFileHandle;
 
         try {
             const file = await fileHandle.getFile();

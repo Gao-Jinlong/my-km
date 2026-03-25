@@ -1,7 +1,7 @@
-import { cn } from '@/lib/utils';
-import { LexicalEditor } from './lexical-editor';
-import { useEditorUIStore } from '@/stores/editor-ui-store';
 import type { Document } from '@/features/editor/types';
+import { cn } from '@/lib/utils';
+import { useEditorUIStore } from '@/stores/editor-ui-store';
+import { LexicalEditor } from './lexical-editor';
 
 interface ContentAreaProps {
     documentId: string;
@@ -18,14 +18,14 @@ export function ContentArea({ documentId, className }: ContentAreaProps) {
     const { openDocuments } = useEditorUIStore();
     const openDoc = openDocuments.find(d => d.id === documentId);
 
-    // 构造文档对象（MVP 简化版本）
+    // 构造文档对象
     const document: Document | null = openDoc
         ? {
               id: openDoc.id,
               path: openDoc.path,
               title: openDoc.title,
               type: openDoc.type,
-              content: [], // MVP 阶段先使用空内容
+              content: openDoc.content ? JSON.parse(openDoc.content) || [] : [], // 尝试解析 JSON 内容
               version: 1,
               createdAt: openDoc.openedAt,
               updatedAt: openDoc.openedAt,

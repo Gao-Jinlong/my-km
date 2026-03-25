@@ -27,6 +27,8 @@ export interface OpenDocument {
     isDirty?: boolean;
     /** 打开时间 */
     openedAt: string;
+    /** 文件内容（可选，用于存储读取的文件内容） */
+    content?: string;
 }
 
 /**
@@ -132,7 +134,7 @@ export const useEditorUIStore = create<EditorUIStoreApi>()(
                 const { openDocuments } = get();
 
                 const updatedDocs = openDocuments.map(d =>
-                    d.id === documentId ? { ...d, ...updates } : d
+                    d.id === documentId ? { ...d, ...updates } : d,
                 );
 
                 set({ openDocuments: updatedDocs });

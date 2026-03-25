@@ -1,4 +1,5 @@
-import { Disposable, DisposableStore } from '../../base/common/lifecycle';
+import { ServiceBase } from '@/platform/base/service-base';
+import { Service } from '@/platform/di';
 import { PermissionDeniedError, ProviderNotFoundError } from './errors';
 import type { IFileSystemProvider } from './provider';
 import { type FileContent, type FileStat, FileSystemCapability, type ParsedPath } from './types';
@@ -14,12 +15,10 @@ import { parsePath } from './utils/path';
  * - 能力检查
  * - 方法分发
  */
-export class FileSystemService extends Disposable {
+@Service({ singleton: true })
+export class FileSystemService extends ServiceBase {
     /** 已注册的 Provider 映射表 */
     private providers: Map<string, IFileSystemProvider> = new Map();
-
-    /** 资源管理器 */
-    protected readonly _store = new DisposableStore();
 
     /**
      * 注册 Provider
@@ -30,8 +29,8 @@ export class FileSystemService extends Disposable {
         this.providers.set(provider.scheme, provider);
 
         // 如果 Provider 是 Disposable，加入资源管理
-        if (provider instanceof Disposable || 'dispose' in provider) {
-            this._store.add(provider as any);
+        if ('dispose' in provider) {
+            this._store.add(provider as unknown as IDisposable);
         }
     }
 
@@ -202,6 +201,42 @@ export class FileSystemService extends Disposable {
     }
 
     /**
+     * 重命名文件
+     *
+     * @param path - 文件路径（包含 scheme）
+     * @param newName - 新名称
+     */
+    async renameFile(path: string, newName: string): Promise<void> {
+        const { provider } = this.resolvePath(path);
+        this.checkCapability(provider, 'renameFile', FileSystemCapability.Write);
+
+        if (!provider.rename) {
+            throw new Error(`Provider "${provider.name}" does not support rename operation`);
+        }
+
+        const cleanPath = this.cleanPath(path, provider.scheme);
+        await provider.rename(cleanPath, newName);
+    }
+
+    /**
+     * 重命名目录
+     *
+     * @param path - 目录路径（包含 scheme）
+     * @param newName - 新名称
+     */
+    async renameDirectory(path: string, newName: string): Promise<void> {
+        const { provider } = this.resolvePath(path);
+        this.checkCapability(provider, 'renameDirectory', FileSystemCapability.Write);
+
+        if (!provider.rename) {
+            throw new Error(`Provider "${provider.name}" does not support rename operation`);
+        }
+
+        const cleanPath = this.cleanPath(path, provider.scheme);
+        await provider.rename(cleanPath, newName);
+    }
+
+    /**
      * 获取文件句柄
      *
      * @param path - 文件路径（包含 scheme）
@@ -245,13 +280,7 @@ export class FileSystemService extends Disposable {
     }
 
     override dispose(): void {
-        this._store.dispose();
         this.providers.clear();
         super.dispose();
     }
 }
-
-/**
- * 文件系统服务单例
- */
-export const fileSystemService = new FileSystemService();

@@ -26,10 +26,7 @@ export { IndexedDBProvider } from './providers/indexed-db-provider';
 // Provider 实现
 export { MemoryProvider } from './providers/memory-provider';
 // 服务
-export {
-    FileSystemService,
-    fileSystemService,
-} from './service';
+export { FileSystemService } from './service';
 // 类型导出
 export type {
     FileContent,

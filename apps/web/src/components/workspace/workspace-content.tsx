@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { Group, type ImperativePanelHandle, Panel, Separator } from 'react-resizable-panels';
+import { useEffect } from 'react';
+import { Group, Panel, Separator } from 'react-resizable-panels';
 import { PANEL_SIZES } from '@/lib/workspace/constants';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import { AIPanel } from './ai-panel/ai-panel';
@@ -14,11 +14,7 @@ const LAYOUT_VERSION = '1.0.0';
 const VERSION_KEY = 'workspace-layout-version';
 
 export function WorkspaceContent() {
-    const sidebarRef = useRef<ImperativePanelHandle>(null);
-    const aiPanelRef = useRef<ImperativePanelHandle>(null);
-
-    const { sidebarCollapsed, aiPanelCollapsed, setSidebarCollapsed, setAIPanelCollapsed } =
-        useWorkspaceStore();
+    const { sidebarCollapsed } = useWorkspaceStore();
 
     // 一次性清理：如果版本不匹配，清除旧的 panel 布局数据
     useEffect(() => {
@@ -44,29 +40,6 @@ export function WorkspaceContent() {
         }
     }, []);
 
-    // Sync store state to panel
-    useEffect(() => {
-        const panel = sidebarRef.current;
-        if (panel) {
-            if (sidebarCollapsed) {
-                panel.collapse();
-            } else {
-                panel.expand();
-            }
-        }
-    }, [sidebarCollapsed]);
-
-    useEffect(() => {
-        const panel = aiPanelRef.current;
-        if (panel) {
-            if (aiPanelCollapsed) {
-                panel.collapse();
-            } else {
-                panel.expand();
-            }
-        }
-    }, [aiPanelCollapsed]);
-
     return (
         <div className="flex h-screen w-full flex-col bg-ws-bg-primary">
             <TopNav />
@@ -75,20 +48,17 @@ export function WorkspaceContent() {
                 <Group orientation="horizontal">
                     {/* Left Sidebar */}
                     <Panel
-                        ref={sidebarRef}
                         id="sidebar-panel"
                         defaultSize={PANEL_SIZES.SIDEBAR.DEFAULT}
                         minSize={PANEL_SIZES.SIDEBAR.MIN}
                         maxSize={PANEL_SIZES.SIDEBAR.MAX}
                         collapsible={true}
                         collapsedSize={PANEL_SIZES.SIDEBAR.COLLAPSED}
-                        onCollapse={() => setSidebarCollapsed(true)}
-                        onExpand={() => setSidebarCollapsed(false)}
                     >
                         <Sidebar collapsed={sidebarCollapsed} />
                     </Panel>
 
-                    <Separator className="w-[1px] bg-ws-border transition-colors hover:bg-ws-accent/50" />
+                    <Separator className="w-px bg-ws-border transition-colors hover:bg-ws-accent/50" />
 
                     {/* Editor Area */}
                     <Panel
@@ -99,19 +69,16 @@ export function WorkspaceContent() {
                         <EditorArea />
                     </Panel>
 
-                    <Separator className="w-[1px] bg-ws-border transition-colors hover:bg-ws-accent/50" />
+                    <Separator className="w-px bg-ws-border transition-colors hover:bg-ws-accent/50" />
 
                     {/* Right AI Panel */}
                     <Panel
-                        ref={aiPanelRef}
                         id="ai-panel"
                         defaultSize={PANEL_SIZES.AI_PANEL.DEFAULT}
                         minSize={PANEL_SIZES.AI_PANEL.MIN}
                         maxSize={PANEL_SIZES.AI_PANEL.MAX}
                         collapsible={true}
                         collapsedSize={PANEL_SIZES.AI_PANEL.COLLAPSED}
-                        onCollapse={() => setAIPanelCollapsed(true)}
-                        onExpand={() => setAIPanelCollapsed(false)}
                     >
                         <AIPanel />
                     </Panel>

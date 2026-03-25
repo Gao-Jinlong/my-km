@@ -6,7 +6,7 @@
 // 注意：必须使用字符串格式，数字会被 react-resizable-panels 解释为像素值
 export const PANEL_SIZES = {
     SIDEBAR: {
-        DEFAULT: '25', // 25% (~320px on 1920px screen)
+        DEFAULT: '100', // 100% - 撑满面板，方便右键空白处交互
         MIN: '20', // 20% (~256px)
         MAX: '40', // 40% (~576px)
         COLLAPSED: '4', // 4% (~48px)
