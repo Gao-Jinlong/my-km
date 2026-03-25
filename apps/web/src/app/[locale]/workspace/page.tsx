@@ -20,25 +20,13 @@ export default function WorkspacePage() {
     useEffect(() => {
         if (!isClient) return;
 
-        const restoreProject = async () => {
-            try {
-                const stored = project.currentProject;
-                if (stored) {
-                    // 注意：句柄无法从持久化存储恢复，需要用户重新选择
-                    // 这里只恢复元数据，实际使用时需要检查句柄是否有效
-                    if (!project.isOpen) {
-                        // 如果有存储的项目信息但未打开，提示用户重新选择
-                        console.log('检测到未保存的项目，请重新选择目录');
-                    }
-                }
-            } catch (error) {
-                console.error('恢复项目状态失败:', error);
-                clearProject();
-            }
-        };
-
-        restoreProject();
-    }, [isClient, clearProject, project.currentProject, project.isOpen]);
+        const stored = project.currentProject;
+        // 句柄无法从持久化存储恢复，如果 rootHandle 为 null 则清除项目状态
+        if (stored && !stored.rootHandle) {
+            console.log('检测到项目句柄失效，请重新选择目录');
+            clearProject();
+        }
+    }, [isClient, clearProject, project.currentProject]);
 
     // 页面卸载时自动清理项目资源
     useEffect(() => {
@@ -77,7 +65,8 @@ export default function WorkspacePage() {
     }
 
     // 根据项目状态决定显示欢迎页还是工作区
-    if (!project.isOpen || !project.currentProject) {
+    // 注意：rootHandle 无法持久化，刷新后为 null，需要重新选择
+    if (!project.isOpen || !project.currentProject || !project.currentProject.rootHandle) {
         return (
             <>
                 <Welcome onOpenProject={handleOpenProject} />
