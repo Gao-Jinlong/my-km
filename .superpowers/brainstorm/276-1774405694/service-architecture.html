@@ -1,0 +1,219 @@
+<h2>服务架构模式对比</h2>
+<p class="subtitle">单例模式 vs 其他方案的权衡分析</p>
+
+<div class="section">
+<h3>🔴 问题：单例模式的隐患</h3>
+
+<div class="mockup" style="background: #fff1f0; border: 1px solid #ffccc7; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+  <div style="font-size: 12px; font-weight: bold; color: #cf1322; margin-bottom: 12px;">单例模式常见问题</div>
+
+  <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+    <div style="background: #fff; padding: 12px; border-radius: 4px;">
+      <div style="font-size: 12px; font-weight: bold; margin-bottom: 4px;">🔗 循环依赖风险</div>
+      <div style="font-size: 11px; color: #666;">EditorService → CommandService → EditorService<br/>难以察觉，调试困难</div>
+    </div>
+
+    <div style="background: #fff; padding: 12px; border-radius: 4px;">
+      <div style="font-size: 12px; font-weight: bold; margin-bottom: 4px;">🧪 测试困难</div>
+      <div style="font-size: 11px; color: #666;">全局状态污染测试环境<br/>每个测试需要清理/重置</div>
+    </div>
+
+    <div style="background: #fff; padding: 12px; border-radius: 4px;">
+      <div style="font-size: 12px; font-weight: bold; margin-bottom: 4px;">📦 隐式依赖</div>
+      <div style="font-size: 11px; color: #666;">调用方不知道依赖的存在<br/>代码难以理解</div>
+    </div>
+
+    <div style="background: #fff; padding: 12px; border-radius: 4px;">
+      <div style="font-size: 12px; font-weight: bold; margin-bottom: 4px;">🔄 生命周期模糊</div>
+      <div style="font-size: 11px; color: #666;">何时创建？何时销毁？<br/>多编辑器实例时问题放大</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h3>📊 方案对比</h3>
+
+<div class="mockup" style="border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
+  <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+    <thead style="background: #f5f5f5;">
+      <tr>
+        <th style="padding: 12px; border-bottom: 2px solid #ddd; text-align: left;">方案</th>
+        <th style="padding: 12px; border-bottom: 2px solid #ddd; text-align: left;">优点</th>
+        <th style="padding: 12px; border-bottom: 2px solid #ddd; text-align: left;">缺点</th>
+        <th style="padding: 12px; border-bottom: 2px solid #ddd; text-align: left;">适用场景</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="padding: 12px; border-bottom: 1px solid #ddd;"><strong>全局单例</strong></td>
+        <td style="padding: 12px; border-bottom: 1px solid #ddd;">简单直接，调用方便</td>
+        <td style="padding: 12px; border-bottom: 1px solid #ddd;">循环依赖、测试困难、状态污染</td>
+        <td style="padding: 12px; border-bottom: 1px solid #ddd;">无状态工具类</td>
+      </tr>
+      <tr>
+        <td style="padding: 12px; border-bottom: 1px solid #ddd;"><strong>React Context</strong></td>
+        <td style="padding: 12px; border-bottom: 1px solid #ddd;">显式依赖，生命周期清晰</td>
+        <td style="padding: 12px; border-bottom: 1px solid #ddd;">只能在组件内使用，性能开销</td>
+        <td style="padding: 12px; border-bottom: 1px solid #ddd;">UI 状态共享</td>
+      </tr>
+      <tr>
+        <td style="padding: 12px; border-bottom: 1px solid #ddd;"><strong>依赖注入容器</strong></td>
+        <td style="padding: 12px; border-bottom: 1px solid #ddd;">解耦、可测试、可替换</td>
+        <td style="padding: 12px; border-bottom: 1px solid #ddd;">需要额外基础设施</td>
+        <td style="padding: 12px; border-bottom: 1px solid #ddd;">复杂服务依赖</td>
+      </tr>
+      <tr>
+        <td style="padding: 12px; border-bottom: 1px solid #ddd;"><strong>Zustand Store</strong></td>
+        <td style="padding: 12px; border-bottom: 1px solid #ddd;">项目已有、响应式、可测试</td>
+        <td style="padding: 12px; border-bottom: 1px solid #ddd;">学习曲线</td>
+        <td style="padding: 12px; border-bottom: 1px solid #ddd;">编辑器状态管理</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+</div>
+
+<div class="section">
+<h3>✅ 推荐架构：分层管理</h3>
+
+<div class="mockup" style="border: 1px solid #ddd; border-radius: 8px; padding: 16px;">
+  <div style="display: grid; gap: 12px;">
+
+    <!-- Layer 1 -->
+    <div style="background: #e6f7ff; padding: 12px; border-radius: 8px; border-left: 4px solid #1890ff;">
+      <div style="font-size: 12px; font-weight: bold; color: #0050b3; margin-bottom: 8px;">📦 无状态服务层 (Utility Services) → 单例</div>
+      <div style="font-size: 11px; color: #666; margin-bottom: 8px;">特点：无状态、纯函数、可复用</div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <span style="background: #fff; padding: 4px 8px; border-radius: 4px; font-size: 11px;">BlockRegistry</span>
+        <span style="background: #fff; padding: 4px 8px; border-radius: 4px; font-size: 11px;">CommandRegistry</span>
+        <span style="background: #fff; padding: 4px 8px; border-radius: 4px; font-size: 11px;">NodeViewRegistry</span>
+      </div>
+      <div style="font-size: 11px; color: #999; margin-top: 4px;">✅ 适合单例：无状态、全局共享</div>
+    </div>
+
+    <!-- Layer 2 -->
+    <div style="background: #f6ffed; padding: 12px; border-radius: 8px; border-left: 4px solid #52c41a;">
+      <div style="font-size: 12px; font-weight: bold; color: #237804; margin-bottom: 8px;">🔄 状态管理 (State Stores) → Zustand</div>
+      <div style="font-size: 11px; color: #666; margin-bottom: 8px;">特点：响应式、组件订阅、可测试</div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <span style="background: #fff; padding: 4px 8px; border-radius: 4px; font-size: 11px;">EditorStore</span>
+        <span style="background: #fff; padding: 4px 8px; border-radius: 4px; font-size: 11px;">DocumentStore</span>
+        <span style="background: #fff; padding: 4px 8px; border-radius: 4px; font-size: 11px;">SelectionStore</span>
+      </div>
+      <div style="font-size: 11px; color: #999; margin-top: 4px;">✅ 使用 Zustand：项目已有、支持多实例</div>
+    </div>
+
+    <!-- Layer 3 -->
+    <div style="background: #fff7e6; padding: 12px; border-radius: 8px; border-left: 4px solid #faad14;">
+      <div style="font-size: 12px; font-weight: bold; color: #ad6800; margin-bottom: 8px;">⚙️ 业务服务 (Business Services) → 工厂创建</div>
+      <div style="font-size: 11px; color: #666; margin-bottom: 8px;">特点：有状态、生命周期、依赖注入</div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <span style="background: #fff; padding: 4px 8px; border-radius: 4px; font-size: 11px;">EditorService</span>
+        <span style="background: #fff; padding: 4px 8px; border-radius: 4px; font-size: 11px;">AutoSaveService</span>
+        <span style="background: #fff; padding: 4px 8px; border-radius: 4px; font-size: 11px;">AIContextService</span>
+      </div>
+      <div style="font-size: 11px; color: #999; margin-top: 4px;">✅ 工厂模式：支持多编辑器实例、生命周期清晰</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h3>📁 推荐的代码组织</h3>
+
+<div class="mockup" style="border: 1px solid #ddd; border-radius: 8px; padding: 16px;">
+  <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 11px; overflow-x: auto; line-height: 1.6;">
+apps/web/src/
+├── platform/
+│   └── editor/
+│       ├── registries/           # 单例层 (无状态)
+│       │   ├── block-registry.ts
+│       │   ├── command-registry.ts
+│       │   └── node-view-registry.ts
+│       │
+│       ├── stores/               # Zustand 状态层
+│       │   ├── editor-store.ts
+│       │   ├── document-store.ts
+│       │   └── selection-store.ts
+│       │
+│       ├── services/             # 业务服务层 (工厂创建)
+│       │   ├── editor-service.ts
+│       │   ├── autosave-service.ts
+│       │   └── ai-context-service.ts
+│       │
+│       ├── container/            # 依赖注入容器
+│       │   └── editor-container.ts
+│       │
+│       └── index.ts              # 统一导出
+  </pre>
+</div>
+</div>
+
+<div class="section">
+<h3>🔧 依赖注入容器示例</h3>
+
+<div class="mockup" style="border: 1px solid #ddd; border-radius: 8px; padding: 16px;">
+  <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 11px; overflow-x: auto; line-height: 1.6;">
+<span style="color: #999;">// container/editor-container.ts</span>
+<span style="color: #0050b3;">class</span> <span style="color: #722ed1;">EditorContainer</span> {
+  <span style="color: #0050b3;">private</span> services: Map&lt;string, any&gt; = <span style="color: #0050b3;">new</span> Map();
+
+  <span style="color: #999;">// 注册服务（单例）</span>
+  register&lt;T&gt;(key: string, factory: () =&gt; T): <span style="color: #722ed1;">void</span> {
+    <span style="color: #0050b3;">if</span> (!this.services.has(key)) {
+      this.services.set(key, factory());
+    }
+  }
+
+  <span style="color: #999;">// 获取服务</span>
+  get&lt;T&gt;(key: string): T {
+    <span style="color: #0050b3;">const</span> service = this.services.get(key);
+    <span style="color: #0050b3;">if</span> (!service) {
+      <span style="color: #ff4d4f;">throw new Error</span>(<span style="color: #52c41a;">`Service ${key} not found`</span>);
+    }
+    <span style="color: #0050b3;">return</span> service;
+  }
+
+  <span style="color: #999;">// 创建编辑器实例</span>
+  createEditorInstance(documentId: string): EditorService {
+    <span style="color: #0050b3;">const</span> store = createEditorStore();        <span style="color: #999;">// 新 Zustand store</span>
+    <span style="color: #0050b3;">const</span> autosave = <span style="color: #0050b3;">new</span> AutoSaveService(store);
+    <span style="color: #0050b3;">const</span> aiContext = <span style="color: #0050b3;">new</span> AIContextService(store);
+
+    <span style="color: #0050b3;">return new</span> EditorService(store, autosave, aiContext);
+  }
+
+  <span style="color: #999;">// 清理实例</span>
+  disposeEditorInstance(documentId: string): <span style="color: #722ed1;">void</span> {
+    <span style="color: #999;">// 清理对应服务</span>
+  }
+}
+
+<span style="color: #999;">// 全局容器实例</span>
+<span style="color: #0050b3;">export const</span> editorContainer = <span style="color: #0050b3;">new</span> EditorContainer();
+
+<span style="color: #999;">// 初始化时注册无状态服务</span>
+editorContainer.register(<span style="color: #52c41a;">'blockRegistry'</span>, () =&gt; <span style="color: #0050b3;">new</span> BlockRegistry());
+editorContainer.register(<span style="color: #52c41a;">'commandRegistry'</span>, () =&gt; <span style="color: #0050b3;">new</span> CommandRegistry());
+  </pre>
+</div>
+</div>
+
+<div class="section">
+<h3>✅ 设计原则总结</h3>
+
+<div style="padding: 12px; background: #f6ffed; border: 1px solid #b7eb8f; border-radius: 8px;">
+  <ol style="margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.8;">
+    <li><strong>无状态服务 → 单例</strong>（Registry 类）</li>
+    <li><strong>状态管理 → Zustand Store</strong>（响应式、可测试）</li>
+    <li><strong>业务服务 → 工厂创建</strong>（支持多实例、生命周期清晰）</li>
+    <li><strong>依赖注入容器</strong> 管理服务创建和获取</li>
+    <li><strong>显式依赖</strong> 通过构造函数注入，避免循环依赖</li>
+  </ol>
+</div>
+</div>
+
+<p style="margin-top: 16px; padding: 12px; background: #fff7e6; border: 1px solid #ffd591; border-radius: 4px; font-size: 13px;">
+  <strong>关键问题：</strong> 这套分层架构是否符合你的预期？是否需要调整？
+</p>

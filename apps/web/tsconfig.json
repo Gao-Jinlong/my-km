@@ -24,8 +24,7 @@
             "@/lib/*": ["./src/lib/*"],
             "@workspace/shared": ["../../packages/shared/src"]
         },
-        "allowArbitraryExtensions": true,
-        "typeRoots": ["./node_modules/@types", "./src"]
+        "allowArbitraryExtensions": true
     },
     "include": [
         "next-env.d.ts",

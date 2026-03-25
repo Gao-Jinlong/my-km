@@ -1,0 +1,136 @@
+<h2>富文本编辑器 - 完整系统清单</h2>
+<p class="subtitle">基于产品需求推导的 12 个核心系统</p>
+
+<div class="section">
+<h3>✅ P0 核心系统（优先建设）</h3>
+
+<div class="cards" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+  <div class="card">
+    <div class="card-body">
+      <h4>1. DocumentModel</h4>
+      <p>文档/块的领域模型，定义 Document、Block、BlockType 等核心抽象</p>
+      <div class="label">依赖</div>
+      <div style="font-size: 12px;">无 ← 这是基础层</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>2. BlockRegistry</h4>
+      <p>块类型注册中心，管理 BlockType ↔ Lexical Node 映射</p>
+      <div class="label">依赖</div>
+      <div style="font-size: 12px;">DocumentModel</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>3. EditorService</h4>
+      <p>编辑器实例管理、状态追踪、选区/光标同步</p>
+      <div class="label">依赖</div>
+      <div style="font-size: 12px;">BlockRegistry, Lexical</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>4. CommandService</h4>
+      <p>命令注册、执行、快捷键绑定、工具栏状态同步</p>
+      <div class="label">依赖</div>
+      <div style="font-size: 12px;">EditorService, BlockRegistry</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>5. AutoSaveService</h4>
+      <p>防抖保存、版本管理、冲突解决</p>
+      <div class="label">依赖</div>
+      <div style="font-size: 12px;">DocumentModel, FileSystemService</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>6. AIContextService</h4>
+      <p>AI 上下文协议、按需请求、响应处理</p>
+      <div class="label">依赖</div>
+      <div style="font-size: 12px;">EditorService</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h3>✅ P1 支持系统</h3>
+
+<div class="cards" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+  <div class="card">
+    <div class="card-body">
+      <h4>7. HistoryService</h4>
+      <p>撤销/重做栈管理，与自动保存协同</p>
+      <div class="label">依赖</div>
+      <div style="font-size: 12px;">Lexical History</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>8. InputRuleService</h4>
+      <p>Markdown 快捷输入规则引擎</p>
+      <div class="label">依赖</div>
+      <div style="font-size: 12px;">BlockRegistry, CommandService</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>9. NodeViewRegistry</h4>
+      <p>Lexical Node → React 组件映射</p>
+      <div class="label">依赖</div>
+      <div style="font-size: 12px;">BlockRegistry</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h3>✅ P2 增强系统</h3>
+
+<div class="cards" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+  <div class="card">
+    <div class="card-body">
+      <h4>10. ClipboardService</h4>
+      <p>复制/粘贴/剪切，富文本、图片、跨文档拖拽</p>
+      <div class="label">依赖</div>
+      <div style="font-size: 12px;">BlockRegistry, NodeViewRegistry</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>11. PerformanceOptimization</h4>
+      <p>大文档虚拟滚动、懒加载、更新批处理</p>
+      <div class="label">依赖</div>
+      <div style="font-size: 12px;">NodeViewRegistry</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h3>✅ P3 未来系统</h3>
+
+<div class="card">
+  <div class="card-body">
+    <h4>12. CollaborationEngine</h4>
+    <p>未来多人协作的 CRDT/OT 基础，操作转换</p>
+    <div class="label">依赖</div>
+    <div style="font-size: 12px;">所有 P0/P1 系统</div>
+  </div>
+</div>
+</div>
+
+<p style="margin-top: 24px; padding: 16px; background: #f6ffed; border: 1px solid #b7eb8f; border-radius: 8px;">
+  <strong>下一步：</strong> 开始详细设计每个系统，包括接口定义、数据结构、流程图、文件组织。
+</p>

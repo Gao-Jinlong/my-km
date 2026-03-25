@@ -1,0 +1,301 @@
+<h2>EditorService 详细设计</h2>
+<p class="subtitle">编辑器服务 - 核心业务逻辑层</p>
+
+<div class="section">
+<h3>1. 服务分层回顾</h3>
+
+<div class="mockup" style="border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+  <div style="display: flex; align-items: center; gap: 16px;">
+    <div style="flex: 1; background: #e6f7ff; padding: 12px; border-radius: 8px;">
+      <div style="font-size: 11px; font-weight: bold; color: #0050b3;">📦 Registry (单例)</div>
+      <div style="font-size: 10px; margin-top: 4px;">BlockRegistry<br/>CommandRegistry<br/>NodeViewRegistry</div>
+    </div>
+    <div style="font-size: 18px;">↓ 依赖</div>
+    <div style="flex: 1; background: #f6ffed; padding: 12px; border-radius: 8px;">
+      <div style="font-size: 11px; font-weight: bold; color: #237804;">🔄 Store (Zustand)</div>
+      <div style="font-size: 10px; margin-top: 4px;">EditorStore<br/>DocumentStore<br/>SelectionStore</div>
+    </div>
+    <div style="font-size: 18px;">↓ 依赖</div>
+    <div style="flex: 1; background: #fff7e6; padding: 12px; border-radius: 8px;">
+      <div style="font-size: 11px; font-weight: bold; color: #ad6800;">⚙️ Service (工厂)</div>
+      <div style="font-size: 10px; margin-top: 4px; font-weight: bold;">EditorService ← 本层设计</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h3>2. EditorService 职责</h3>
+
+<div class="cards" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+  <div class="card">
+    <div class="card-body">
+      <h4>📝 编辑器生命周期</h4>
+      <p style="font-size: 12px;">创建、初始化、销毁 Lexical Editor 实例</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>🔄 文档操作</h4>
+      <p style="font-size: 12px;">加载文档、保存文档、内容同步</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>✂️ 选区管理</h4>
+      <p style="font-size: 12px;">追踪选区、光标位置、格式状态</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>📢 事件分发</h4>
+      <p style="font-size: 12px;">向外部（AI 面板、文件树）发送事件</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>🔗 外部集成</h4>
+      <p style="font-size: 12px;">与 AutoSave、AIContext 服务协作</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>⌨️ 命令执行</h4>
+      <p style="font-size: 12px;">响应用户输入、执行编辑命令</p>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h3>3. 接口定义</h3>
+
+<div class="mockup" style="border: 1px solid #ddd; border-radius: 8px; padding: 16px;">
+  <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 10px; overflow-x: auto; line-height: 1.6;">
+<span style="color: #0050b3;">interface</span> <span style="color: #722ed1;">IEditorService</span> {
+  <span style="color: #999;">// === 生命周期 ===</span>
+
+  <span style="color: #1890ff;">/** 创建编辑器实例 */</span>
+  create(container: HTMLElement, options: EditorOptions): <span style="color: #722ed1;">Promise</span>&lt;void&gt;;
+
+  <span style="color: #1890ff;">/** 销毁编辑器实例 */</span>
+  destroy(): <span style="color: #722ed1;">void</span>;
+
+  <span style="color: #999;">// === 文档操作 ===</span>
+
+  <span style="color: #1890ff;">/** 加载文档 */</span>
+  loadDocument(doc: DocumentModel): <span style="color: #722ed1;">Promise</span>&lt;void&gt;;
+
+  <span style="color: #1890ff;">/** 保存文档 */</span>
+  saveDocument(): <span style="color: #722ed1;">Promise</span>&lt;SaveResult&gt;;
+
+  <span style="color: #1890ff;">/** 获取当前文档 */</span>
+  getCurrentDocument(): DocumentModel | <span style="color: #722ed1;">null</span>;
+
+  <span style="color: #999;">// === 选区与状态 ===</span>
+
+  <span style="color: #1890ff;">/** 获取选区内容 */</span>
+  getSelection(): SelectionState | <span style="color: #722ed1;">null</span>;
+
+  <span style="color: #1890ff;">/** 获取当前格式状态 */</span>
+  getFormatState(): FormatState;
+
+  <span style="color: #1890ff;">/** 是否可执行某命令 */</span>
+  canExecute(command: string): <span style="color: #722ed1;">boolean</span>;
+
+  <span style="color: #999;">// === 命令执行 ===</span>
+
+  <span style="color: #1890ff;">/** 执行编辑命令 */</span>
+  execute(command: string, payload?: any): <span style="color: #722ed1;">boolean</span>;
+
+  <span style="color: #999;">// === 事件订阅 ===</span>
+
+  <span style="color: #1890ff;">/** 订阅事件 */</span>
+  on&lt;K extends keyof EditorEvents&gt;(
+    event: K,
+    callback: EditorEvents[K]
+  ): <span style="color: #722ed1;">Disposable</span>;
+
+  <span style="color: #999;">// === 外部集成 ===</span>
+
+  <span style="color: #1890ff;">/** 获取 AI 上下文 */</span>
+  getAIContext(): AIContext;
+
+  <span style="color: #1890ff;">/** 插入 AI 生成内容 */</span>
+  insertAIContent(content: string, options: InsertOptions): <span style="color: #722ed1;">void</span>;
+}
+  </pre>
+</div>
+</div>
+
+<div class="section">
+<h3>4. EditorContainer 设计</h3>
+
+<div class="mockup" style="border: 1px solid #ddd; border-radius: 8px; padding: 16px;">
+  <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 10px; overflow-x: auto; line-height: 1.6;">
+<span style="color: #999;">// container/editor-container.ts</span>
+<span style="color: #0050b3;">class</span> <span style="color: #722ed1;">EditorContainer</span> {
+  <span style="color: #999;">// === 单例 Registry ===</span>
+  <span style="color: #0050b3;">private</span> blockRegistry: BlockRegistry;
+  <span style="color: #0050b3;">private</span> commandRegistry: CommandRegistry;
+
+  <span style="color: #999;">// === 多实例管理 ===</span>
+  <span style="color: #0050b3;">private</span> editorServices: Map&lt;string, EditorService&gt; = <span style="color: #0050b3;">new</span> Map();
+  <span style="color: #0050b3;">private</span> stores: Map&lt;string, EditorStoreApi&gt; = <span style="color: #0050b3;">new</span> Map();
+
+  <span style="color: #0050b3;">constructor</span>() {
+    <span style="color: #999;">// 初始化单例 Registry</span>
+    this.blockRegistry = <span style="color: #0050b3;">new</span> BlockRegistry();
+    this.commandRegistry = <span style="color: #0050b3;">new</span> CommandRegistry();
+
+    <span style="color: #999;">// 注册内置块类型</span>
+    this.registerBuiltinBlocks();
+  }
+
+  <span style="color: #999;">// === 工厂方法：创建编辑器实例 ===</span>
+  createInstance(documentId: string): EditorService {
+    <span style="color: #999;">// 1. 创建 Zustand Store</span>
+    const store = createEditorStore(documentId);
+
+    <span style="color: #999;">// 2. 创建依赖服务</span>
+    const autoSave = <span style="color: #0050b3;">new</span> AutoSaveService(
+      store,
+      this.blockRegistry
+    );
+
+    const aiContext = <span style="color: #0050b3;">new</span> AIContextService(
+      store,
+      this.blockRegistry
+    );
+
+    <span style="color: #999;">// 3. 创建 EditorService</span>
+    const editorService = <span style="color: #0050b3;">new</span> EditorService(
+      documentId,
+      store,
+      autoSave,
+      aiContext,
+      this.blockRegistry,
+      this.commandRegistry
+    );
+
+    <span style="color: #999;">// 4. 保存实例引用</span>
+    this.editorServices.set(documentId, editorService);
+    this.stores.set(documentId, store);
+
+    <span style="color: #0050b3;">return</span> editorService;
+  }
+
+  <span style="color: #999;">// === 获取实例 ===</span>
+  getInstance(documentId: string): EditorService | <span style="color: #722ed1;">null</span> {
+    <span style="color: #0050b3;">return</span> this.editorServices.get(documentId) || <span style="color: #722ed1;">null</span>;
+  }
+
+  <span style="color: #999;">// === 销毁实例 ===</span>
+  disposeInstance(documentId: string): <span style="color: #722ed1;">void</span> {
+    const service = this.editorServices.get(documentId);
+    <span style="color: #0050b3;">if</span> (service) {
+      service.destroy(); <span style="color: #999;">// 清理 Lexical Editor</span>
+      this.editorServices.delete(documentId);
+      this.stores.delete(documentId);
+    }
+  }
+
+  <span style="color: #999;">// === 获取 Store（用于 React 组件订阅）===</span>
+  getStore(documentId: string): EditorStoreApi | <span style="color: #722ed1;">null</span> {
+    <span style="color: #0050b3;">return</span> this.stores.get(documentId) || <span style="color: #722ed1;">null</span>;
+  }
+
+  <span style="color: #999;">// === 内部方法：注册内置块类型 ===</span>
+  <span style="color: #0050b3;">private</span> registerBuiltinBlocks(): <span style="color: #722ed1;">void</span> {
+    <span style="color: #999;">// 注册所有内置块类型</span>
+    this.blockRegistry.register(textBlockConfig);
+    this.blockRegistry.register(headingBlockConfig);
+    this.blockRegistry.register(codeBlockConfig);
+    this.blockRegistry.register(tableBlockConfig);
+    this.blockRegistry.register(imageBlockConfig);
+    this.blockRegistry.register(equationBlockConfig);
+    this.blockRegistry.register(listBlockConfig);
+  }
+}
+
+<span style="color: #999;">// 全局容器实例</span>
+<span style="color: #0050b3;">export const</span> editorContainer = <span style="color: #0050b3;">new</span> EditorContainer();
+  </pre>
+</div>
+</div>
+
+<div class="section">
+<h3>5. 编辑器创建流程</h3>
+
+<div class="mockup" style="border: 1px solid #ddd; border-radius: 8px; padding: 16px;">
+  <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 10px; overflow-x: auto; line-height: 1.6;">
+<span style="color: #999;">// === 时序图 ===</span>
+
+用户点击文件      EditorContainer    EditorService    Lexical
+    │                  │                  │              │
+    │──打开文件───────>│                  │              │
+    │                  │                  │              │
+    │                  │──createInstance─>│              │
+    │                  │                  │              │
+    │                  │                  │ 创建 Store    │
+    │                  │                  │ 创建 AutoSave │
+    │                  │                  │ 创建 AIContext│
+    │                  │                  │              │
+    │                  │<── 返回服务──────│              │
+    │                  │                  │              │
+    │──mount(dom)─────>│                  │              │
+    │                  │                  │              │
+    │                  │──createEditor───>│              │
+    │                  │                  │              │
+    │                  │                  │──new Editor─>│
+    │                  │                  │              │
+    │                  │                  │<── Editor ──│
+    │                  │                  │              │
+    │                  │                  │ 注册事件监听  │
+    │                  │<── 完成 ─────────│              │
+    │<── 完成 ──────────│                  │              │
+    │                  │                  │              │
+  </pre>
+</div>
+</div>
+
+<div class="section">
+<h3>6. 事件定义</h3>
+
+<div class="mockup" style="border: 1px solid #ddd; border-radius: 8px; padding: 16px;">
+  <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 10px; overflow-x: auto; line-height: 1.6;">
+<span style="color: #0050b3;">interface</span> <span style="color: #722ed1;">EditorEvents</span> {
+  <span style="color: #999;">// === 文档事件 ===</span>
+  <span style="color: #52c41a;">'document:loaded'</span>: (doc: DocumentModel) => <span style="color: #722ed1;">void</span>;
+  <span style="color: #52c41a;">'document:saved'</span>: (result: SaveResult) => <span style="color: #722ed1;">void</span>;
+  <span style="color: #52c41a;">'document:closed'</span>: () => <span style="color: #722ed1;">void</span>;
+
+  <span style="color: #999;">// === 选区事件 ===</span>
+  <span style="color: #52c41a;">'selection:changed'</span>: (selection: SelectionState) => <span style="color: #722ed1;">void</span>;
+  <span style="color: #52c41a;">'format:changed'</span>: (format: FormatState) => <span style="color: #722ed1;">void</span>;
+
+  <span style="color: #999;">// === 内容事件 ===</span>
+  <span style="color: #52c41a;">'content:changed'</span>: (content: string) => <span style="color: #722ed1;">void</span>;
+  <span style="color: #52c41a;">'content:dirty'</span>: () => <span style="color: #722ed1;">void</span>;
+  <span style="color: #52c41a;">'content:clean'</span>: () => <span style="color: #722ed1;">void</span>;
+
+  <span style="color: #999;">// === AI 事件 ===</span>
+  <span style="color: #52c41a;">'ai:request'</span>: (context: AIContext) => <span style="color: #722ed1;">void</span>;
+  <span style="color: #52c41a;">'ai:response'</span>: (response: AIResponse) => <span style="color: #722ed1;">void</span>;
+  <span style="color: #52c41a;">'ai:insert'</span>: (content: string) => <span style="color: #722ed1;">void</span>;
+
+  <span style="color: #999;">// === 错误事件 ===</span>
+  <span style="color: #52c41a;">'error'</span>: (error: EditorError) => <span style="color: #722ed1;">void</span>;
+}
+  </pre>
+</div>
+</div>
+
+<p style="margin-top: 16px; padding: 12px; background: #fff7e6; border: 1px solid #ffd591; border-radius: 4px; font-size: 13px;">
+  <strong>下一步：</strong> 确认 EditorService 设计后，继续设计剩余的 P0 系统（CommandService、AutoSaveService、AIContextService），然后生成完整的设计文档。
+</p>

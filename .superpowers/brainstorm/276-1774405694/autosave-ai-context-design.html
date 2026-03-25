@@ -1,0 +1,334 @@
+<h2>AutoSaveService & AIContextService 详细设计</h2>
+<p class="subtitle">自动保存服务 + AI 上下文服务</p>
+
+<div class="section">
+<h3>1. AutoSaveService - 核心职责</h3>
+
+<div class="cards" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+  <div class="card">
+    <div class="card-body">
+      <h4>⏱️ 防抖保存</h4>
+      <p style="font-size: 12px;">内容变化后延迟保存，避免频繁 IO</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>📝 版本管理</h4>
+      <p style="font-size: 12px;">每次保存递增版本号</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>⚠️ 冲突检测</h4>
+      <p style="font-size: 12px;">检测文件被外部修改</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>💾 错误恢复</h4>
+      <p style="font-size: 12px;">保存失败后重试机制</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>📢 状态通知</h4>
+      <p style="font-size: 12px;">保存状态同步到 UI</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>🗑️ 本地缓存</h4>
+      <p style="font-size: 12px;">崩溃恢复的本地快照</p>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h3>2. AutoSaveService - 接口定义</h3>
+
+<div class="mockup" style="border: 1px solid #ddd; border-radius: 8px; padding: 16px;">
+  <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 10px; overflow-x: auto; line-height: 1.6;">
+<span style="color: #0050b3;">enum</span> <span style="color: #722ed1;">SaveState</span> {
+  IDLE = <span style="color: #52c41a;">'idle'</span>,        <span style="color: #999;">// 空闲</span>
+  PENDING = <span style="color: #52c41a;">'pending'</span>,    <span style="color: #999;">// 等待保存（防抖中）</span>
+  SAVING = <span style="color: #52c41a;">'saving'</span>,     <span style="color: #999;">// 保存中</span>
+  SAVED = <span style="color: #52c41a;">'saved'</span>,       <span style="color: #999;">// 已保存</span>
+  ERROR = <span style="color: #52c41a;">'error'</span>        <span style="color: #999;">// 保存失败</span>
+}
+
+<span style="color: #0050b3;">interface</span> <span style="color: #722ed1;">SaveResult</span> {
+  success: <span style="color: #722ed1;">boolean</span>;
+  version?: number;
+  error?: Error;
+  timestamp: string;
+}
+
+<span style="color: #0050b3;">class</span> <span style="color: #722ed1;">AutoSaveService</span> {
+  <span style="color: #0050b3;">private</span> debounceMs: number = <span style="color: #722ed1;">1000</span>;
+  <span style="color: #0050b3;">private</span> pendingTimer: Map&lt;string, NodeJS.Timeout&gt;;
+  <span style="color: #0050b3;">private</span> saveStates: Map&lt;string, SaveState&gt;;
+
+  <span style="color: #0050b3;">constructor</span>(
+    <span style="color: #0050b3;">private</span> store: EditorStoreApi,
+    <span style="color: #0050b3;">private</span> fileSystemService: FileSystemService,
+    <span style="color: #0050b3;">private</span> blockRegistry: BlockRegistry
+  );
+
+  <span style="color: #1890ff;">/** 启用自动保存 */</span>
+  enable(documentId: string): <span style="color: #722ed1;">void</span>;
+
+  <span style="color: #1890ff;">/** 禁用自动保存 */</span>
+  disable(documentId: string): <span style="color: #722ed1;">void</span>;
+
+  <span style="color: #1890ff;">/** 内容变化时调用（触发防抖）*/</span>
+  onContentChange(documentId: string): <span style="color: #722ed1;">void</span>;
+
+  <span style="color: #1890ff;">/** 手动保存 */</span>
+  save(documentId: string): <span style="color: #722ed1;">Promise</span>&lt;SaveResult&gt;;
+
+  <span style="color: #1890ff;">/** 获取保存状态 */</span>
+  getSaveState(documentId: string): SaveState;
+
+  <span style="color: #1890ff;">/** 订阅保存状态变化 */</span>
+  subscribe(callback: (state: SaveState) => <span style="color: #722ed1;">void</span>): <span style="color: #722ed1;">Disposable</span>;
+
+  <span style="color: #1890ff;">/** 获取本地缓存（崩溃恢复用）*/</span>
+  getLocalCache(documentId: string): <span style="color: #722ed1;">Promise</span>&lt;DocumentModel | <span style="color: #722ed1;">null</span>&gt;;
+
+  <span style="color: #1890ff;">/** 清除本地缓存 */</span>
+  clearCache(documentId: string): <span style="color: #722ed1;">void</span>;
+}
+  </pre>
+</div>
+</div>
+
+<div class="section">
+<h3>3. AutoSaveService - 保存流程</h3>
+
+<div class="mockup" style="border: 1px solid #ddd; border-radius: 8px; padding: 16px;">
+  <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 10px; overflow-x: auto; line-height: 1.6;">
+<span style="color: #999;">// === 内容变化 → 自动保存流程 ===</span>
+
+用户输入      EditorService   AutoSaveService   FileSystemService
+   │               │                 │                 │
+   │──输入内容────>│                 │                 │
+   │               │                 │                 │
+   │               │──onContentChange─>│                 │
+   │               │                 │                 │
+   │               │                 │ 取消旧的 timer   │
+   │               │                 │ 设置 PENDING     │
+   │               │                 │ 启动新的 timer   │
+   │               │                 │                 │
+   │               │                 │  (1 秒后)         │
+   │               │                 │                 │
+   │               │                 │──save()────────>│
+   │               │                 │                 │
+   │               │                 │  序列化文档       │
+   │               │                 │  写入文件         │
+   │               │                 │                 │
+   │               │                 │<────────────────│
+   │               │                 │  success: true   │
+   │               │                 │                 │
+   │               │                 │ 设置 SAVED       │
+   │               │                 │ 清除缓存         │
+   │               │                 │                 │
+   │               │<── saved 事件──│                 │
+   │               │                 │                 │
+   │<── UI 更新 ───│                 │                 │
+   │  保存指示灯熄灭 │                 │                 │
+   │               │                 │                 │
+
+
+<span style="color: #999;">// === 冲突检测逻辑 ===</span>
+<span style="color: #0050b3;">async function</span> checkConflict(documentId: string): <span style="color: #722ed1;">Promise</span>&lt;<span style="color: #722ed1;">boolean</span>&gt; {
+  <span style="color: #0050b3;">const</span> remoteDoc = <span style="color: #0050b3;">await</span> fileSystemService.read(documentId);
+  <span style="color: #0050b3;">const</span> localVersion = store.getVersion(documentId);
+
+  <span style="color: #999;">// 如果远程版本 > 本地版本，说明文件被外部修改</span>
+  <span style="color: #0050b3;">return</span> remoteDoc.version > localVersion;
+}
+  </pre>
+</div>
+</div>
+
+<div class="section">
+<h3>4. AIContextService - 核心职责</h3>
+
+<div class="cards" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+  <div class="card">
+    <div class="card-body">
+      <h4>📦 上下文收集</h4>
+      <p style="font-size: 12px;">文档信息、选区内容、全文</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>🔌 按需请求</h4>
+      <p style="font-size: 12px;">AI 面板主动请求时才传递</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>📤 事件推送</h4>
+      <p style="font-size: 12px;">选区变化时推送（可选）</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>📥 响应处理</h4>
+      <p style="font-size: 12px;">解析 AI 响应、插入内容</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>🔄 内容替换</h4>
+      <p style="font-size: 12px;">替换选区、追加、插入</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>📝 模式管理</h4>
+      <p style="font-size: 12px;">润色/扩写/翻译/总结</p>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h3>5. AIContextService - 接口定义</h3>
+
+<div class="mockup" style="border: 1px solid #ddd; border-radius: 8px; padding: 16px;">
+  <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 10px; overflow-x: auto; line-height: 1.6;">
+<span style="color: #0050b3;">interface</span> <span style="color: #722ed1;">AIContext</span> {
+  <span style="color: #999;">// 文档信息</span>
+  document: {
+    id: string;
+    path: string;
+    title: string;
+    type: string;
+  };
+
+  <span style="color: #999;">// 选区信息</span>
+  selection: {
+    text: string;
+    from: Position;
+    to: Position;
+    length: number;
+  } | <span style="color: #722ed1;">null</span>;
+
+  <span style="color: #999;">// 全文内容（按需）</span>
+  fullContent: string | <span style="color: #722ed1;">null</span>;
+
+  <span style="color: #999;">// 光标位置</span>
+  cursorPosition: Position | <span style="color: #722ed1;">null</span>;
+
+  <span style="color: #999;">// 当前格式状态</span>
+  formatState: FormatState | <span style="color: #722ed1;">null</span>;
+}
+
+<span style="color: #0050b3;">type</span> <span style="color: #722ed1;">AIMode</span> = <span style="color: #52c41a;">'chat'</span> | <span style="color: #52c41a;">'edit'</span> | <span style="color: #52c41a;">'expand'</span> | <span style="color: #52c41a;">'summarize'</span> | <span style="color: #52c41a;">'translate'</span>;
+
+<span style="color: #0050b3;">interface</span> <span style="color: #722ed1;">AIRequest</span> {
+  prompt: string;
+  context: AIContext;
+  mode: AIMode;
+  options?: {
+    language?: string;       <span style="color: #999;">// 翻译目标语言</span>
+    tone?: <span style="color: #52c41a;">'formal'</span> | <span style="color: #52c41a;">'casual'</span>;
+    maxLength?: number;
+  };
+}
+
+<span style="color: #0050b3;">interface</span> <span style="color: #722ed1;">AIResponse</span> {
+  id: string;
+  content: string;
+  type: <span style="color: #52c41a;">'text'</span> | <span style="color: #52c41a;">'code'</span> | <span style="color: #52c41a;">'markdown'</span>;
+  timestamp: string;
+  metadata?: {
+    model?: string;
+    tokens?: number;
+  };
+}
+
+<span style="color: #0050b3;">type</span> <span style="color: #722ed1;">InsertMode</span> = <span style="color: #52c41a;">'replace'</span> | <span style="color: #52c41a;">'append'</span> | <span style="color: #52c41a;">'prepend'</span> | <span style="color: #52c41a;">'new-block'</span>;
+
+<span style="color: #0050b3;">class</span> <span style="color: #722ed1;">AIContextService</span> {
+  <span style="color: #0050b3;">constructor</span>(
+    <span style="color: #0050b3;">private</span> store: EditorStoreApi,
+    <span style="color: #0050b3;">private</span> blockRegistry: BlockRegistry
+  );
+
+  <span style="color: #1890ff;">/** 获取 AI 上下文（按需）*/</span>
+  getContext(options?: { includeFullContent?: <span style="color: #722ed1;">boolean</span> }): AIContext;
+
+  <span style="color: #1890ff;">/** 订阅上下文变化 */</span>
+  subscribe(callback: (context: AIContext) => <span style="color: #722ed1;">void</span>): <span style="color: #722ed1;">Disposable</span>;
+
+  <span style="color: #1890ff;">/** 请求 AI（调用外部 API）*/</span>
+  requestAI(request: AIRequest): <span style="color: #722ed1;">Promise</span>&lt;AIResponse&gt;;
+
+  <span style="color: #1890ff;">/** 插入 AI 内容 */</span>
+  insertContent(content: string, mode: InsertMode): <span style="color: #722ed1;">void</span>;
+
+  <span style="color: #1890ff;">/** 替换选区内容 */</span>
+  replaceSelection(content: string): <span style="color: #722ed1;">void</span>;
+}
+  </pre>
+</div>
+</div>
+
+<div class="section">
+<h3>6. AI 交互流程</h3>
+
+<div class="mockup" style="border: 1px solid #ddd; border-radius: 8px; padding: 16px;">
+  <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 10px; overflow-x: auto; line-height: 1.6;">
+<span style="color: #999;">// === AI 润色流程 ===</span>
+
+用户        EditorService   AIContextService   AIPanel   AI Backend
+ │              │                 │               │           │
+ │──选中文本────>│                 │               │           │
+ │              │                 │               │           │
+ │              │──selection:changed─>│           │           │
+ │              │                 │               │           │
+ │              │                 │ (推送事件)    │           │
+ │              │                 │──────────────>│           │
+ │              │                 │               │           │
+ │              │                 │               │ 显示上下文 │
+ │              │                 │               │           │
+ │──输入 prompt─>│                 │               │           │
+ │  "润色这段文字"│                 │               │           │
+ │              │                 │               │           │
+ │              │                 │<──────────────│           │
+ │              │                 │  getContext() │           │
+ │              │                 │               │           │
+ │              │                 │───请求───────>│           │
+ │              │                 │               │           │
+ │              │                 │               │──request─>│
+ │              │                 │               │           │
+ │              │                 │               │           │
+ │              │                 │               │<─response─│
+ │              │                 │               │           │
+ │              │                 │<──────────────│           │
+ │              │                 │ AIResponse    │           │
+ │              │                 │               │           │
+ │              │                 │──insertContent─>          │
+ │              │                 │               │           │
+ │              │<────────────────│               │           │
+ │              │  更新编辑器内容  │               │           │
+ │<─────────────│                 │               │           │
+ │  显示润色结果  │                 │               │           │
+ │              │                 │               │           │
+  </pre>
+</div>
+</div>

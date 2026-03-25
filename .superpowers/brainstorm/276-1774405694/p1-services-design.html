@@ -1,0 +1,243 @@
+<h2>P1 系统设计：HistoryService + InputRuleService</h2>
+<p class="subtitle">撤销/重做管理器 + Markdown 快捷输入规则</p>
+
+<div class="section">
+<h3>1. HistoryService - 撤销/重做管理器</h3>
+
+<div class="cards" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+  <div class="card">
+    <div class="card-body">
+      <h4>📚 操作历史栈</h4>
+      <p style="font-size: 12px;">维护 undo/redo 两个栈</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>⏮️ 撤销操作</h4>
+      <p style="font-size: 12px;">撤销到上一步状态</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>⏭️ 重做操作</h4>
+      <p style="font-size: 12px;">重做已撤销的操作</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>📦 批量操作</h4>
+      <p style="font-size: 12px;">将多个操作打包为一组</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>🗑️ 历史清理</h4>
+      <p style="font-size: 12px;">限制历史栈大小</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>💾 与自动保存协同</h4>
+      <p style="font-size: 12px;">保存后不清空历史栈</p>
+    </div>
+  </div>
+</div>
+
+<div class="mockup" style="border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-top: 16px;">
+  <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 10px; overflow-x: auto; line-height: 1.6;">
+<span style="color: #0050b3;">interface</span> <span style="color: #722ed1;">Operation</span> {
+  id: string;
+  type: <span style="color: #52c41a;">'insert'</span> | <span style="color: #52c41a;">'delete'</span> | <span style="color: #52c41a;">'update'</span> | <span style="color: #52c41a;">'transform'</span>;
+  blockId: string;
+  data: any;
+  timestamp: number;
+  batchId?: string;  <span style="color: #999;">// 批量操作 ID</span>
+}
+
+<span style="color: #0050b3;">class</span> <span style="color: #722ed1;">HistoryService</span> {
+  <span style="color: #0050b3;">private</span> undoStack: Operation[] = [];
+  <span style="color: #0050b3;">private</span> redoStack: Operation[] = [];
+  <span style="color: #0050b3;">private</span> maxStackSize: number = <span style="color: #722ed1;">100</span>;
+  <span style="color: #0050b3;">private</span> currentBatchId: string | <span style="color: #722ed1;">null</span> = <span style="color: #722ed1;">null</span>;
+
+  <span style="color: #0050b3;">constructor</span>(<span style="color: #0050b3;">private</span> editor: LexicalEditor);
+
+  <span style="color: #1890ff;">/** 记录操作 */</span>
+  record(operation: Operation): <span style="color: #722ed1;">void</span>;
+
+  <span style="color: #1890ff;">/** 开始批量操作 */</span>
+  startBatch(): string;
+
+  <span style="color: #1890ff;">/** 结束批量操作 */</span>
+  endBatch(): <span style="color: #722ed1;">void</span>;
+
+  <span style="color: #1890ff;">/** 撤销 */</span>
+  undo(): <span style="color: #722ed1;">boolean</span>;
+
+  <span style="color: #1890ff;">/** 重做 */</span>
+  redo(): <span style="color: #722ed1;">boolean</span>;
+
+  <span style="color: #1890ff;">/** 清空历史 */</span>
+  clear(): <span style="color: #722ed1;">void</span>;
+
+  <span style="color: #1890ff;">/** 是否可撤销 */</span>
+  canUndo(): <span style="color: #722ed1;">boolean</span>;
+
+  <span style="color: #1890ff;">/** 是否可重做 */</span>
+  canRedo(): <span style="color: #722ed1;">boolean</span>;
+}
+  </pre>
+</div>
+</div>
+
+<div class="section">
+<h3>2. InputRuleService - Markdown 快捷输入规则</h3>
+
+<div class="cards" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+  <div class="card">
+    <div class="card-body">
+      <h4>⌨️ 文本触发</h4>
+      <p style="font-size: 12px;">检测用户输入的触发文本</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>🔄 自动转换</h4>
+      <p style="font-size: 12px;">将 Markdown 语法转换为块</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>📝 规则注册</h4>
+      <p style="font-size: 12px;">支持自定义规则</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>🔢 行内格式</h4>
+      <p style="font-size: 12px;">**加粗** *斜体* 等</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>📦 块转换</h4>
+      <p style="font-size: 12px;"># 标题 → HeadingBlock</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>⚡ 优先级管理</h4>
+      <p style="font-size: 12px;">规则匹配优先级</p>
+    </div>
+  </div>
+</div>
+
+<div class="mockup" style="border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-top: 16px;">
+  <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 10px; overflow-x: auto; line-height: 1.6;">
+<span style="color: #0050b3;">interface</span> <span style="color: #722ed1;">InputRule</span> {
+  <span style="color: #999;">// 规则名称</span>
+  name: string;
+
+  <span style="color: #999;">// 触发文本（支持多个）</span>
+  triggers: string[];
+
+  <span style="color: #999;">// 规则类型</span>
+  type: <span style="color: #52c41a;">'inline'</span> | <span style="color: #52c41a;">'block'</span>;
+
+  <span style="color: #999;">// 正则匹配（可选）</span>
+  pattern?: RegExp;
+
+  <span style="color: #999;">// 转换函数</span>
+  transform: (match: RegExpMatchArray, text: string) => <span style="color: #722ed1;">void</span>;
+
+  <span style="color: #999;">// 优先级（数字越大优先级越高）</span>
+  priority?: number;
+}
+
+<span style="color: #0050b3;">class</span> <span style="color: #722ed1;">InputRuleService</span> {
+  <span style="color: #0050b3;">private</span> rules: InputRule[] = [];
+
+  <span style="color: #1890ff;">/** 注册规则 */</span>
+  register(rule: InputRule): <span style="color: #722ed1;">void</span>;
+
+  <span style="color: #1890ff;">/** 处理输入 */</span>
+  handleInput(text: string, position: number): <span style="color: #722ed1;">boolean</span>;
+
+  <span style="color: #1890ff;">/** 清空规则 */</span>
+  clear(): <span style="color: #722ed1;">void</span>;
+}
+
+<span style="color: #999;">// === 内置规则示例 ===</span>
+<span style="color: #0050b3;">const</span> headingRule: InputRule = {
+  name: <span style="color: #52c41a;">'heading'</span>,
+  triggers: [<span style="color: #52c41a;">'# '</span>],
+  type: <span style="color: #52c41a;">'block'</span>,
+  pattern: <span style="color: #52c41a;">/^(#{1,6})\s(.*)$/</span>,
+  transform: (match, text) => {
+    <span style="color: #0050b3;">const</span> level = match[1].length;
+    <span style="color: #0050b3;">const</span> content = match[2];
+    <span style="color: #999;">// 将当前段落转换为对应级别的标题</span>
+    editor.transformToHeading(level, content);
+  },
+  priority: <span style="color: #722ed1;">10</span>
+};
+
+<span style="color: #0050b3;">const</span> boldRule: InputRule = {
+  name: <span style="color: #52c41a;">'bold'</span>,
+  triggers: [<span style="color: #52c41a;">'**'</span>, <span style="color: #52c41a;">'__'</span>],
+  type: <span style="color: #52c41a;">'inline'</span>,
+  pattern: <span style="color: #52c41a;">/\*\*(.+?)\*\*/g</span>,
+  transform: (match, text) => {
+    <span style="color: #999;">// 将 **text** 转换为加粗格式</span>
+    editor.applyFormat(<span style="color: #52c41a;">'bold'</span>, match[1]);
+  },
+  priority: <span style="color: #722ed1;">5</span>
+};
+
+<span style="color: #0050b3;">const</span> codeBlockRule: InputRule = {
+  name: <span style="color: #52c41a;">'code-block'</span>,
+  triggers: [<span style="color: #52c41a;">'```'</span>],
+  type: <span style="color: #52c41a;">'block'</span>,
+  transform: (match, text) => {
+    <span style="color: #999;">// 创建代码块</span>
+    editor.insertBlock(<span style="color: #52c41a;">'code'</span>);
+  },
+  priority: <span style="color: #722ed1;">10</span>
+};
+  </pre>
+</div>
+
+<div class="mockup" style="border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-top: 16px;">
+  <div style="font-size: 12px; font-weight: bold; margin-bottom: 8px;">内置 Markdown 规则清单</div>
+  <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+    <thead style="background: #f5f5f5;">
+      <tr>
+        <th style="padding: 8px; border-bottom: 2px solid #ddd;">触发</th>
+        <th style="padding: 8px; border-bottom: 2px solid #ddd;">转换结果</th>
+        <th style="padding: 8px; border-bottom: 2px solid #ddd;">类型</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code># </code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">H1 标题</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">block</td></tr>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>## </code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">H2 标题</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">block</td></tr>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>- </code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">无序列表</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">block</td></tr>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>1. </code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">有序列表</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">block</td></tr>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>> </code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">引用块</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">block</td></tr>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>```</code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">代码块</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">block</td></tr>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>**text**</code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">加粗</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">inline</td></tr>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>*text*</code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">斜体</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">inline</td></tr>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>`code`</code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">行内代码</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">inline</td></tr>
+    </tbody>
+  </table>
+</div>
+</div>

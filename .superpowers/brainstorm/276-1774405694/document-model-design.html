@@ -1,0 +1,197 @@
+<h2>DocumentModel 详细设计</h2>
+<p class="subtitle">文档模型层 - 核心数据结构与接口</p>
+
+<div class="section">
+<h3>1. 核心概念</h3>
+
+<div class="mockup" style="border: 1px solid #ddd; border-radius: 8px; padding: 16px;">
+  <div style="font-size: 13px; font-weight: bold; margin-bottom: 12px;">设计原则：粗粒度块设计</div>
+
+  <div style="display: flex; gap: 16px;">
+    <!-- 左侧：领域模型 -->
+    <div style="flex: 1;">
+      <div style="font-size: 12px; font-weight: bold; color: #0050b3; margin-bottom: 8px;">📦 领域模型 (Domain)</div>
+      <div style="background: #f5f5f5; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; line-height: 1.6;">
+Document {<br/>
+  id: string<br/>
+  title: string<br/>
+  blocks: Block[]<br/>
+  version: number<br/>
+  metadata: DocMetadata<br/>
+}<br/><br/>
+
+Block {<br/>
+  id: string<br/>
+  type: BlockType<br/>
+  content: BlockContent<br/>
+  children?: Block[]<br/>
+  metadata: BlockMeta<br/>
+}
+      </div>
+    </div>
+
+    <!-- 右侧：Lexical 映射 -->
+    <div style="flex: 1;">
+      <div style="font-size: 12px; font-weight: bold; color: #237804; margin-bottom: 8px;">🔌 Lexical 映射 (Platform)</div>
+      <div style="background: #f6ffed; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; line-height: 1.6;">
+Document → EditorState<br/>
+Block → Node[]<br/>
+<br/>
+TextBlock → ParagraphNode + TextNode<br/>
+HeadingBlock → HeadingNode + TextNode<br/>
+CodeBlock → CodeNode + CodeLineNode<br/>
+TableBlock → TableNode + RowNode + CellNode<br/>
+ImageBlock → ImageNode
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h3>2. BlockType 定义</h3>
+<p style="font-size: 13px; color: #666; margin-bottom: 12px;">选择需要支持的块类型（基于之前讨论的 7 种）</p>
+
+<div class="options" data-multiselect>
+  <div class="option" data-choice="text" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h4>TextBlock (文本块)</h4>
+      <p>段落、标题（通过 level 区分）、引用</p>
+      <div style="background: #f5f5f5; padding: 8px; border-radius: 4px; margin-top: 8px; font-size: 11px;">
+        <code>{ type: "text", level?: 1|2|3|4|5|6, style?: "normal"|"quote" }</code>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="list" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h4>ListBlock (列表块)</h4>
+      <p>有序列表、无序列表、待办清单</p>
+      <div style="background: #f5f5f5; padding: 8px; border-radius: 4px; margin-top: 8px; font-size: 11px;">
+        <code>{ type: "list", listType: "ordered"|"unordered"|"task", checked?: boolean }</code>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="code" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h4>CodeBlock (代码块)</h4>
+      <p>带语法高亮的代码块</p>
+      <div style="background: #f5f5f5; padding: 8px; border-radius: 4px; margin-top: 8px; font-size: 11px;">
+        <code>{ type: "code", language: string, content: string }</code>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="table" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h4>TableBlock (表格块)</h4>
+      <p>行列结构的表格</p>
+      <div style="background: #f5f5f5; padding: 8px; border-radius: 4px; margin-top: 8px; font-size: 11px;">
+        <code>{ type: "table", rows: number, cols: number, cells: CellData[] }</code>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="image" onclick="toggleSelect(this)">
+    <div class="letter">E</div>
+    <div class="content">
+      <h4>ImageBlock (图片块)</h4>
+      <p>图片及说明文字</p>
+      <div style="background: #f5f5f5; padding: 8px; border-radius: 4px; margin-top: 8px; font-size: 11px;">
+        <code>{ type: "image", src: string, alt?: string, caption?: string }</code>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="equation" onclick="toggleSelect(this)">
+    <div class="letter">F</div>
+    <div class="content">
+      <h4>EquationBlock (公式块)</h4>
+      <p>LaTeX 数学公式</p>
+      <div style="background: #f5f5f5; padding: 8px; border-radius: 4px; margin-top: 8px; font-size: 11px;">
+        <code>{ type: "equation", latex: string, displayMode: boolean }</code>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h3>3. 序列化格式</h3>
+
+<div class="mockup" style="border: 1px solid #ddd; border-radius: 8px; padding: 16px;">
+  <div style="font-size: 12px; font-weight: bold; margin-bottom: 8px;">JSON 序列化格式示例</div>
+  <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 11px; overflow-x: auto;">
+{
+  "id": "doc-001",
+  "title": "未命名文档",
+  "version": 1,
+  "createdAt": "2026-03-25T10:00:00Z",
+  "updatedAt": "2026-03-25T10:30:00Z",
+  "blocks": [
+    {
+      "id": "block-001",
+      "type": "text",
+      "content": { "text": "这是一个标题", "level": 1 },
+      "metadata": { "collapsed": false }
+    },
+    {
+      "id": "block-002",
+      "type": "text",
+      "content": { "text": "这是正文，支持<strong>加粗</strong>和<em>斜体</em>" },
+      "metadata": {}
+    },
+    {
+      "id": "block-003",
+      "type": "code",
+      "content": { "language": "typescript", "code": "console.log('Hello')" },
+      "metadata": {}
+    }
+  ]
+}
+  </pre>
+</div>
+</div>
+
+<div class="section">
+<h3>4. 需要确认的设计决策</h3>
+
+<p style="font-size: 14px; margin-bottom: 12px;">请确认以下设计是否合理：</p>
+
+<ol style="font-size: 13px; padding-left: 20px;">
+  <li style="margin-bottom: 8px;">
+    <strong>块 ID 生成策略</strong>
+    <ul>
+      <li><code>nanoid()</code> - 短小、安全、唯一</li>
+      <li>前缀区分：<code>block-xxx</code> vs <code>doc-xxx</code></li>
+    </ul>
+  </li>
+
+  <li style="margin-bottom: 8px;">
+    <strong>块内容的存储方式</strong>
+    <ul>
+      <li>方案 A：纯文本 + 标记（轻量，易编辑）</li>
+      <li>方案 B：Lexical EditorState JSON（完整，保真）</li>
+      <li>方案 C：混合（简单文本用方案 A，复杂块用方案 B）</li>
+    </ul>
+  </li>
+
+  <li style="margin-bottom: 8px;">
+    <strong>版本管理策略</strong>
+    <ul>
+      <li>每次保存递增 version</li>
+      <li>同时记录 timestamp</li>
+      <li>未来支持版本历史回溯</li>
+    </ul>
+  </li>
+</ol>
+</div>
+
+<p style="margin-top: 16px; padding: 12px; background: #fff7e6; border: 1px solid #ffd591; border-radius: 4px; font-size: 13px;">
+  <strong>提示：</strong> 请在浏览器中选择块类型（默认全选），然后在终端告诉我你对设计决策的偏好。
+</p>

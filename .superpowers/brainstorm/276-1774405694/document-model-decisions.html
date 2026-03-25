@@ -1,0 +1,89 @@
+<h2>DocumentModel - 设计决策确认</h2>
+<p class="subtitle">已确认的核心设计原则</p>
+
+<div class="section">
+<h3>✅ 已确认的设计决策</h3>
+
+<div class="mockup" style="background: #f6ffed; border: 1px solid #b7eb8f; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+  <div style="display: grid; gap: 12px;">
+    <div style="display: flex; align-items: flex-start; gap: 8px;">
+      <span style="font-size: 16px;">📛</span>
+      <div>
+        <div style="font-weight: bold; font-size: 13px;">ID 生成策略</div>
+        <div style="font-size: 12px; color: #666;"><code>nanoid()</code> + 前缀区分 (<code>block-xxx</code> / <code>doc-xxx</code>)</div>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: flex-start; gap: 8px;">
+      <span style="font-size: 16px;">📦</span>
+      <div>
+        <div style="font-weight: bold; font-size: 13px;">内容存储方式</div>
+        <div style="font-size: 12px; color: #666;">Lexical EditorState JSON - 完整保真，可完全恢复</div>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: flex-start; gap: 8px;">
+      <span style="font-size: 16px;">📈</span>
+      <div>
+        <div style="font-weight: bold; font-size: 13px;">版本管理策略</div>
+        <div style="font-size: 12px; color: #666;">MVP: version 递增 + timestamp → 未来：Operation Log</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h3>版本管理演进路线</h3>
+
+<div class="mockup" style="border: 1px solid #ddd; border-radius: 8px; padding: 16px;">
+  <div style="display: flex; align-items: center; gap: 16px;">
+
+    <!-- Phase 1 -->
+    <div style="flex: 1; background: #e6f7ff; padding: 12px; border-radius: 8px; border: 2px solid #1890ff;">
+      <div style="font-size: 12px; font-weight: bold; color: #0050b3; margin-bottom: 8px;">Phase 1: MVP</div>
+      <pre style="background: #fff; padding: 8px; border-radius: 4px; font-size: 10px; overflow-x: auto;">
+Document {
+  version: number      // 递增版本号
+  updatedAt: string    // ISO 时间戳
+  snapshot: JSON       // 完整快照
+}
+      </pre>
+      <div style="font-size: 11px; color: #666; margin-top: 8px;">✅ 简单可靠 · ❌ 无法回溯历史</div>
+    </div>
+
+    <div style="font-size: 20px; color: #666;">→</div>
+
+    <!-- Phase 2 -->
+    <div style="flex: 1; background: #f6ffed; padding: 12px; border-radius: 8px; border: 2px solid #52c41a; opacity: 0.6;">
+      <div style="font-size: 12px; font-weight: bold; color: #237804; margin-bottom: 8px;">Phase 2: Operation Log</div>
+      <pre style="background: #fff; padding: 8px; border-radius: 4px; font-size: 10px; overflow-x: auto;">
+Document {
+  version: number
+  operations: Op[]   // 操作日志
+  snapshot: JSON     // 基础快照
+}
+
+Operation {
+  id: string
+  type: "insert" | "delete" | "update"
+  blockId: string
+  data: JSON
+  timestamp: string
+}
+      </pre>
+      <div style="font-size: 11px; color: #666; margin-top: 8px;">✅ 支持撤销/历史 · 🟡 实现复杂</div>
+    </div>
+  </div>
+
+  <div style="margin-top: 12px; padding: 8px; background: #fff7e6; border-radius: 4px; font-size: 12px;">
+    <strong>设计约束：</strong> Phase 1 的代码结构必须能平滑升级到 Phase 2，避免重写。
+    <code>Document</code> 预留 <code>operations?: Operation[]</code> 字段。
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h3>下一步：BlockRegistry 设计</h3>
+<p style="font-size: 13px;">BlockRegistry 负责管理所有块类型的注册、查询、创建，以及 Block ↔ Lexical Node 的映射。</p>
+</div>

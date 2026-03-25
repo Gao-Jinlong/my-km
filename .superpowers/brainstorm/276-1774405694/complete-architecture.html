@@ -1,0 +1,154 @@
+<h2>富文本编辑器 - 完整能力图谱</h2>
+<p class="subtitle">基于产品需求推导的完整基础设施设计</p>
+
+<div class="section">
+<h3>✅ 已确认的设计决策</h3>
+
+<div class="mockup" style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+  <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px;">核心系统（优先建设）</div>
+  <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+    <span style="background: #fff; border: 1px solid #1890ff; color: #1890ff; padding: 4px 12px; border-radius: 16px; font-size: 13px;">📋 命令系统</span>
+    <span style="background: #fff; border: 1px solid #1890ff; color: #1890ff; padding: 4px 12px; border-radius: 16px; font-size: 13px;">📐 文档模型</span>
+    <span style="background: #fff; border: 1px solid #1890ff; color: #1890ff; padding: 4px 12px; border-radius: 16px; font-size: 13px;">🔧 块注册中心</span>
+    <span style="background: #fff; border: 1px solid #1890ff; color: #1890ff; padding: 4px 12px; border-radius: 16px; font-size: 13px;">🤖 AI 上下文协议</span>
+    <span style="background: #fff; border: 1px solid #1890ff; color: #1890ff; padding: 4px 12px; border-radius: 16px; font-size: 13px;">💾 自动保存</span>
+  </div>
+
+  <div style="font-size: 14px; font-weight: bold; margin: 16px 0 8px;">设计原则</div>
+  <ul style="margin: 0; padding-left: 20px; font-size: 13px;">
+    <li>粗粒度块设计（Block = 语义单元，非 Lexical Node）</li>
+    <li>AI 上下文：按需请求优先，支持事件扩展</li>
+  </ul>
+</div>
+</div>
+
+<div class="section">
+<h3>完整能力分层架构</h3>
+
+<div class="mockup" style="border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
+  <!-- Layer 1 -->
+  <div style="background: #e6f7ff; padding: 12px 16px; border-bottom: 1px solid #ddd;">
+    <div style="font-size: 12px; font-weight: bold; color: #0050b3; margin-bottom: 8px;">📦 应用层 (Application Layer)</div>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+      <span style="background: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">EditorArea</span>
+      <span style="background: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">EditorTabs</span>
+      <span style="background: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">FloatingToolbar</span>
+      <span style="background: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">SlashMenu</span>
+      <span style="background: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">AIPanel</span>
+      <span style="background: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">FilesPanel</span>
+    </div>
+  </div>
+
+  <!-- Layer 2 -->
+  <div style="background: #f6ffed; padding: 12px 16px; border-bottom: 1px solid #ddd;">
+    <div style="font-size: 12px; font-weight: bold; color: #237804; margin-bottom: 8px;">🧩 服务层 (Service Layer) ← 优先建设</div>
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+      <div style="background: #fff; border: 1px solid #b7eb8f; padding: 8px; border-radius: 4px;">
+        <div style="font-size: 12px; font-weight: bold;">EditorService</div>
+        <div style="font-size: 11px; color: #666; margin-top: 4px;">编辑器实例管理、状态追踪</div>
+      </div>
+      <div style="background: #fff; border: 1px solid #b7eb8f; padding: 8px; border-radius: 4px;">
+        <div style="font-size: 12px; font-weight: bold;">DocumentService</div>
+        <div style="font-size: 11px; color: #666; margin-top: 4px;">文档加载、保存、版本管理</div>
+      </div>
+      <div style="background: #fff; border: 1px solid #b7eb8f; padding: 8px; border-radius: 4px;">
+        <div style="font-size: 12px; font-weight: bold;">CommandService</div>
+        <div style="font-size: 11px; color: #666; margin-top: 4px;">命令注册、执行、快捷键</div>
+      </div>
+      <div style="background: #fff; border: 1px solid #b7eb8f; padding: 8px; border-radius: 4px;">
+        <div style="font-size: 12px; font-weight: bold;">BlockRegistry</div>
+        <div style="font-size: 11px; color: #666; margin-top: 4px;">块类型注册、工厂创建</div>
+      </div>
+      <div style="background: #fff; border: 1px solid #b7eb8f; padding: 8px; border-radius: 4px;">
+        <div style="font-size: 12px; font-weight: bold;">AIContextService</div>
+        <div style="font-size: 11px; color: #666; margin-top: 4px;">上下文协议、请求处理</div>
+      </div>
+      <div style="background: #fff; border: 1px solid #b7eb8f; padding: 8px; border-radius: 4px;">
+        <div style="font-size: 12px; font-weight: bold;">AutoSaveService</div>
+        <div style="font-size: 11px; color: #666; margin-top: 4px;">防抖保存、冲突解决</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Layer 3 -->
+  <div style="background: #fff7e6; padding: 12px 16px; border-bottom: 1px solid #ddd;">
+    <div style="font-size: 12px; font-weight: bold; color: #ad6800; margin-bottom: 8px;">📐 领域模型层 (Domain Layer)</div>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+      <span style="background: #fff; border: 1px solid #ffd591; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Document</span>
+      <span style="background: #fff; border: 1px solid #ffd591; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Block</span>
+      <span style="background: #fff; border: 1px solid #ffd591; padding: 4px 8px; border-radius: 4px; font-size: 12px;">BlockType</span>
+      <span style="background: #fff; border: 1px solid #ffd591; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Selection</span>
+      <span style="background: #fff; border: 1px solid #ffd591; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Position</span>
+      <span style="background: #fff; border: 1px solid #ffd591; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Operation</span>
+    </div>
+  </div>
+
+  <!-- Layer 4 -->
+  <div style="background: #f9f0ff; padding: 12px 16px; border-bottom: 1px solid #ddd;">
+    <div style="font-size: 12px; font-weight: bold; color: #531dab; margin-bottom: 8px;">🔌 平台层 (Platform Layer)</div>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+      <span style="background: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Lexical Editor</span>
+      <span style="background: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Lexical Nodes</span>
+      <span style="background: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">FileSystemService</span>
+      <span style="background: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">EventBus</span>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h3>还需要哪些系统？</h3>
+<p style="font-size: 14px; color: #666; margin-bottom: 12px;">以下是可能遗漏的能力，选择你认为需要的：</p>
+
+<div class="options" data-multiselect>
+  <div class="option" data-choice="undo-redo" onclick="toggleSelect(this)">
+    <div class="letter">↩️</div>
+    <div class="content">
+      <h4>撤销/重做管理器 (HistoryService)</h4>
+      <p>维护操作历史栈，支持撤销重做，与自动保存协同</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="clipboard" onclick="toggleSelect(this)">
+    <div class="letter">📋</div>
+    <div class="content">
+      <h4>剪贴板服务 (ClipboardService)</h4>
+      <p>处理复制/粘贴/剪切，支持富文本、图片、跨文档拖拽</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="input-rule" onclick="toggleSelect(this)">
+    <div class="letter">⚡</div>
+    <div class="content">
+      <h4>输入规则引擎 (InputRuleService)</h4>
+      <p>Markdown 快捷输入（# → 标题）、自动格式化</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="node-view" onclick="toggleSelect(this)">
+    <div class="letter">👁️</div>
+    <div class="content">
+      <h4>节点视图渲染 (NodeViewRegistry)</h4>
+      <p>Lexical Node → React 组件映射，处理块 UI 渲染</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="collab" onclick="toggleSelect(this)">
+    <div class="letter">👥</div>
+    <div class="content">
+      <h4>协作引擎 (CollaborationEngine)</h4>
+      <p>未来多人协作的 CRDT/OT 基础，操作转换</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="perf" onclick="toggleSelect(this)">
+    <div class="letter">⚙️</div>
+    <div class="content">
+      <h4>性能优化 (PerformanceOptimization)</h4>
+      <p>大文档虚拟滚动、懒加载、更新批处理</p>
+    </div>
+  </div>
+</div>
+</div>
+
+<p style="margin-top: 16px; font-size: 14px; color: #666;">💡 提示：选择后我们将进入详细设计阶段</p>

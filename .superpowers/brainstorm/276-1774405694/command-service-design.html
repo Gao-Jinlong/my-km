@@ -1,0 +1,217 @@
+<h2>CommandService 详细设计</h2>
+<p class="subtitle">命令系统 - 统一命令注册、执行、快捷键管理</p>
+
+<div class="section">
+<h3>1. 核心职责</h3>
+
+<div class="cards" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+  <div class="card">
+    <div class="card-body">
+      <h4>📦 命令注册</h4>
+      <p style="font-size: 12px;">管理所有编辑命令的注册表</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>⚡ 命令执行</h4>
+      <p style="font-size: 12px;">执行命令、权限检查、状态反馈</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>⌨️ 快捷键绑定</h4>
+      <p style="font-size: 12px;">快捷键 → 命令映射、冲突解决</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>🔘 工具栏同步</h4>
+      <p style="font-size: 12px;">命令状态 → UI 按钮状态</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>📢 命令历史</h4>
+      <p style="font-size: 12px;">记录执行的命令，支持撤销</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h4>🔌 插件扩展</h4>
+      <p style="font-size: 12px)">支持第三方注册自定义命令</p>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h3>2. 接口定义</h3>
+
+<div class="mockup" style="border: 1px solid #ddd; border-radius: 8px; padding: 16px;">
+  <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 10px; overflow-x: auto; line-height: 1.6;">
+<span style="color: #0050b3;">interface</span> <span style="color: #722ed1;">CommandConfig</span> {
+  <span style="color: #1890ff;">/** 命令名称（唯一标识）*/</span>
+  name: string;
+
+  <span style="color: #1890ff;">/** 命令描述 */</span>
+  description?: string;
+
+  <span style="color: #1890ff;">/** 命令分类 */</span>
+  category: <span style="color: #52c41a;">'format'</span> | <span style="color: #52c41a;">'insert'</span> | <span style="color: #52c41a;">'delete'</span> | <span style="color: #52c41a;">'transform'</span>;
+
+  <span style="color: #1890ff;">/** 执行函数 */</span>
+  execute: (editor: LexicalEditor, payload?: any) => <span style="color: #722ed1;">void</span> | <span style="color: #722ed1;">Promise</span>&lt;<span style="color: #722ed1;">void</span>&gt;;
+
+  <span style="color: #1890ff;">/** 是否可执行（权限检查）*/</span>
+  canExecute: (editor: LexicalEditor) => <span style="color: #722ed1;">boolean</span>;
+
+  <span style="color: #1890ff;">/** 是否激活（用于按钮高亮）*/</span>
+  isActive: (editor: LexicalEditor) => <span style="color: #722ed1;">boolean</span>;
+
+  <span style="color: #1890ff;">/** 快捷键绑定 */</span>
+  hotkey?: string | string[]; <span style="color: #999;">// 如："Mod+B", "Ctrl+Alt+1"</span>
+
+  <span style="color: #1890ff;">/** 图标（用于工具栏/菜单）*/</span>
+  icon?: string;
+
+  <span style="color: #1890ff;">/** 标签（用于菜单显示）*/</span>
+  label?: string;
+}
+
+<span style="color: #0050b3;">interface</span> <span style="color: #722ed1;">CommandRegistry</span> {
+  <span style="color: #1890ff;">/** 注册命令 */</span>
+  register(config: CommandConfig): <span style="color: #722ed1;">void</span>;
+
+  <span style="color: #1890ff;">/** 注销命令 */</span>
+  unregister(name: string): <span style="color: #722ed1;">void</span>;
+
+  <span style="color: #1890ff;">/** 获取命令 */</span>
+  get(name: string): CommandConfig | <span style="color: #722ed1;">undefined</span>;
+
+  <span style="color: #1890ff;">/** 是否有命令 */</span>
+  has(name: string): <span style="color: #722ed1;">boolean</span>;
+
+  <span style="color: #1890ff;">/** 列出所有命令 */</span>
+  list(): CommandConfig[];
+
+  <span style="color: #1890ff;">/** 按分类筛选 */</span>
+  listByCategory(category: CommandConfig[<span style="color: #52c41a;">'category'</span>]): CommandConfig[];
+
+  <span style="color: #1890ff;">/** 执行命令 */</span>
+  execute(name: string, payload?: any): <span style="color: #722ed1;">boolean</span>;
+
+  <span style="color: #1890ff;">/** 检查是否可执行 */</span>
+  canExecute(name: string): <span style="color: #722ed1;">boolean</span>;
+
+  <span style="color: #1890ff;">/** 检查是否激活 */</span>
+  isActive(name: string): <span style="color: #722ed1;">boolean</span>;
+}
+  </pre>
+</div>
+</div>
+
+<div class="section">
+<h3>3. 内置命令清单</h3>
+
+<div class="mockup" style="border: 1px solid #ddd; border-radius: 8px; padding: 16px;">
+  <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+    <thead style="background: #f5f5f5;">
+      <tr>
+        <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">命令</th>
+        <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">快捷键</th>
+        <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">分类</th>
+        <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">描述</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>bold</code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">Mod+B</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">format</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">加粗</td></tr>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>italic</code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">Mod+I</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">format</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">斜体</td></tr>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>underline</code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">Mod+U</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">format</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">下划线</td></tr>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>strikethrough</code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">Mod+Shift+S</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">format</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">删除线</td></tr>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>code</code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">Mod+E</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">format</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">行内代码</td></tr>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>heading1</code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">Ctrl+Alt+1</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">transform</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">H1 标题</td></tr>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>heading2</code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">Ctrl+Alt+2</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">transform</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">H2 标题</td></tr>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>paragraph</code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">Ctrl+Alt+0</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">transform</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">段落</td></tr>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>bullet-list</code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">Ctrl+Shift+8</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">transform</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">无序列表</td></tr>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>numbered-list</code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">Ctrl+Shift+7</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">transform</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">有序列表</td></tr>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>quote</code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">Ctrl+Shift+9</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">transform</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">引用块</td></tr>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>insert-code-block</code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">-</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">insert</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">插入代码块</td></tr>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>insert-table</code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">-</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">insert</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">插入表格</td></tr>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>insert-image</code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">-</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">insert</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">插入图片</td></tr>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>insert-equation</code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">-</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">insert</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">插入公式</td></tr>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>undo</code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">Mod+Z</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">format</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">撤销</td></tr>
+      <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>redo</code></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">Mod+Shift+Z</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">format</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">重做</td></tr>
+    </tbody>
+  </table>
+</div>
+</div>
+
+<div class="section">
+<h3>4. 快捷键系统</h3>
+
+<div class="mockup" style="border: 1px solid #ddd; border-radius: 8px; padding: 16px;">
+  <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 10px; overflow-x: auto; line-height: 1.6;">
+<span style="color: #999;">// 快捷键绑定服务</span>
+<span style="color: #0050b3;">class</span> <span style="color: #722ed1;">HotkeyService</span> {
+  <span style="color: #0050b3;">private</span> bindings: Map&lt;string, string&gt; = <span style="color: #0050b3;">new</span> Map(); <span style="color: #999;">// "Mod+B" -&gt; "bold"</span>
+
+  <span style="color: #1890ff;">/** 绑定快捷键 */</span>
+  bind(hotkey: string, commandName: string): <span style="color: #722ed1;">void</span>;
+
+  <span style="color: #1890ff;">/** 解绑快捷键 */</span>
+  unbind(hotkey: string): <span style="color: #722ed1;">void</span>;
+
+  <span style="color: #1890ff;">/** 解析快捷键字符串 */</span>
+  parse(hotkey: string): HotkeyConfig;
+
+  <span style="color: #1890ff;">/** 匹配键盘事件 */</span>
+  match(event: KeyboardEvent): string | <span style="color: #722ed1;">null</span>; <span style="color: #999;">// 返回命令名</span>
+}
+
+<span style="color: #999;">// 快捷键修饰符</span>
+<span style="color: #0050b3;">type</span> Modifier = <span style="color: #52c41a;">'Ctrl'</span> | <span style="color: #52c41a;">'Alt'</span> | <span style="color: #52c41a;">'Shift'</span> | <span style="color: #52c41a;">'Mod'</span>; <span style="color: #999;">// Mod = Ctrl(Cmd on Mac)</span>
+
+<span style="color: #999;">// 快捷键格式示例</span>
+<span style="color: #999;">// "Mod+B"       → Ctrl+B (Windows) / Cmd+B (Mac)</span>
+<span style="color: #999;">// "Ctrl+Alt+1"  → Ctrl+Alt+1</span>
+<span style="color: #999;">// "Shift+Delete"→ Shift+Delete</span>
+  </pre>
+</div>
+</div>
+
+<div class="section">
+<h3>5. 命令执行流程</h3>
+
+<div class="mockup" style="border: 1px solid #ddd; border-radius: 8px; padding: 16px;">
+  <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 10px; overflow-x: auto; line-height: 1.6;">
+<span style="color: #999;">// === 时序图 ===</span>
+
+用户按键     CommandService   LexicalEditor   UI
+   │               │                 │          │
+   │──Ctrl+B──────>│                 │          │
+   │               │                 │          │
+   │               │ matchHotkey()   │          │
+   │               │                 │          │
+   │               │──canExecute───>│          │
+   │               │                 │          │
+   │               │<── true ──────│          │
+   │               │                 │          │
+   │               │──execute─────>│          │
+   │               │                 │          │
+   │               │                 │ 应用加粗  │
+   │               │                 │          │
+   │               │<── 完成 ──────│          │
+   │               │                 │          │
+   │               │──updateUI────>│          │
+   │               │                 │          │
+   │               │                 │<────────│
+   │               │                 │ 按钮高亮  │
+   │               │                 │          │
+  </pre>
+</div>
+</div>

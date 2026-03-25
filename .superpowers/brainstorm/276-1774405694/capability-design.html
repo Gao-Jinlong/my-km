@@ -1,0 +1,120 @@
+<h2>富文本编辑器 - 产品需求驱动的能力设计</h2>
+<p class="subtitle">从用户场景出发，推导需要的能力</p>
+
+<div class="section">
+<h3>核心用户场景</h3>
+
+<div class="cards" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+  <div class="card" data-choice="scenario-a" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <h4>📝 知识创作</h4>
+      <p style="font-size: 13px; color: #666;">用户打开编辑器，从零开始写一篇技术文章，需要插入代码、公式、表格</p>
+      <div class="label">需要能力</div>
+      <div style="font-size: 12px; margin-top: 4px;">流畅的输入体验、块插入、格式切换、内容自动保存</div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="scenario-b" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <h4>🔗 知识连接</h4>
+      <p style="font-size: 13px; color: #666;">写作中引用其他文档，建立双向链接，形成知识网络</p>
+      <div class="label">需要能力</div>
+      <div style="font-size: 12px; margin-top: 4px;">文档搜索、链接插入、引用解析、反向链接</div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="scenario-c" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <h4>🤖 AI 协作</h4>
+      <p style="font-size: 13px; color: #666;">选中一段文字，让 AI 帮忙润色、扩写、翻译或解释</p>
+      <div class="label">需要能力</div>
+      <div style="font-size: 12px; margin-top: 4px;">选区感知、上下文传递、流式响应、内容替换</div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="scenario-d" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <h4>📁 文件管理</h4>
+      <p style="font-size: 13px; color: #666;">从文件树打开文档，编辑后保存，多文档切换</p>
+      <div class="label">需要能力</div>
+      <div style="font-size: 12px; margin-top: 4px;">文件句柄、读写权限、脏标记、Tab 管理</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h3>推导出的平台能力需求</h3>
+<p style="font-size: 14px; color: #666; margin-bottom: 12px;">以下是编辑器需要但当前项目可能缺失的能力，选择你认为需要优先建设的：</p>
+
+<div class="options" data-multiselect>
+  <div class="option" data-choice="cap-a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h4>文档存储层 (Document Store)</h4>
+      <p>Lexical  EditorState → JSON 序列化 → 持久化存储 → 反序列化恢复</p>
+      <div class="pros-cons" style="margin-top: 8px;">
+        <div class="cons"><h5 style="color: #f59e0b; margin: 0 0 4px;">当前缺失</h5><ul style="margin: 0; padding-left: 16px;"><li>无文档模型定义</li><li>无序列化规范</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="cap-b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h4>事件总线 (Event Bus)</h4>
+      <p>编辑器 ↔ AI 面板 ↔ 文件树 之间的松耦合通信</p>
+      <div class="pros-cons" style="margin-top: 8px;">
+        <div class="pros"><h5 style="color: #22c55e; margin: 0 0 4px;">已有基础</h5><ul style="margin: 0; padding-left: 16px;"><li>EventEmitter 已实现</li></ul></div>
+        <div class="cons"><h5 style="color: #f59e0b; margin: 0 0 4px;">需要增强</h5><ul style="margin: 0; padding-left: 16px;"><li>无编辑器事件定义</li><li>无跨组件通信协议</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="cap-c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h4>命令注册表 (Command Registry)</h4>
+      <p>统一注册/执行编辑器命令（加粗、插入块等），支持快捷键绑定</p>
+      <div class="pros-cons" style="margin-top: 8px;">
+        <div class="cons"><h5 style="color: #f59e0b; margin: 0 0 4px;">当前缺失</h5><ul style="margin: 0; padding-left: 16px;"><li>无命令系统</li><li>无快捷键管理</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="cap-d" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h4>块类型注册中心 (Block Registry)</h4>
+      <p>注册和管理所有块类型（文本、代码、表格...），支持扩展</p>
+      <div class="pros-cons" style="margin-top: 8px;">
+        <div class="cons"><h5 style="color: #f59e0b; margin: 0 0 4px;">当前缺失</h5><ul style="margin: 0; padding-left: 16px;"><li>Lexical 节点未封装</li><li>无块类型抽象</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="cap-e" onclick="toggleSelect(this)">
+    <div class="letter">E</div>
+    <div class="content">
+      <h4>文档模型层 (Document Model)</h4>
+      <p>定义文档结构、块类型接口、序列化格式、版本管理</p>
+      <div class="pros-cons" style="margin-top: 8px;">
+        <div class="cons"><h5 style="color: #f59e0b; margin: 0 0 4px;">当前缺失</h5><ul style="margin: 0; padding-left: 16px;"><li>无统一文档模型</li><li>无版本控制设计</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="cap-f" onclick="toggleSelect(this)">
+    <div class="letter">F</div>
+    <div class="content">
+      <h4>AI 上下文协议 (AI Context Protocol)</h4>
+      <p>定义编辑器如何向 AI 面板传递上下文（选区、全文、文件信息）</p>
+      <div class="pros-cons" style="margin-top: 8px;">
+        <div class="cons"><h5 style="color: #f59e0b; margin: 0 0 4px;">当前缺失</h5><ul style="margin: 0; padding-left: 16px;"><li>无上下文传递规范</li><li>无 AI 响应处理机制</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<p style="margin-top: 16px; font-size: 14px; color: #666;">💡 提示：选择你认为需要优先建设的能力（建议 3-5 个）</p>

@@ -1,0 +1,39 @@
+<h2>文档编辑器架构方案</h2>
+<p class="subtitle">选择一种技术架构方向</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>方案 A: Lexical 富文本编辑器</h3>
+      <p>基于已安装的 @lexical/* 包，构建类似 Notion 的块编辑器，支持 Markdown 语法、表格、代码块等</p>
+      <div class="pros-cons" style="margin-top: 8px;">
+        <div class="pros"><h5 style="color: #22c55e; margin: 0 0 4px;">优势</h5><ul style="margin: 0; padding-left: 16px;"><li>已有依赖，无需新增</li><li>强大的扩展性</li><li>支持协作编辑</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>方案 B: Monaco Editor</h3>
+      <p>VS Code 同款编辑器核心，强大的代码编辑能力，适合技术文档</p>
+      <div class="pros-cons" style="margin-top: 8px;">
+        <div class="pros"><h5 style="color: #22c55e; margin: 0 0 4px;">优势</h5><ul style="margin: 0; padding-left: 16px;"><li>业界最强的代码编辑体验</li><li>完美的语法高亮</li><li>支持 LSP 语言服务</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>方案 C: 混合方案</h3>
+      <p>Markdown 用 Lexical，代码用 Monaco，根据文件类型自动切换</p>
+      <div class="pros-cons" style="margin-top: 8px;">
+        <div class="pros"><h5 style="color: #22c55e; margin: 0 0 4px;">优势</h5><ul style="margin: 0; padding-left: 16px;"><li>兼顾两者优势</li><li>最专业的体验</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p style="margin-top: 16px; font-size: 14px; color: #666;">💡 提示：点击选项可选择，可以多点选择来对比</p>

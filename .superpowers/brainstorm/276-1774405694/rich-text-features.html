@@ -1,0 +1,91 @@
+<h2>富文本编辑器 - 核心功能设计</h2>
+<p class="subtitle">选择你希望优先实现的功能</p>
+
+<div class="section">
+<h3>问题 1：核心功能优先级</h3>
+<p>选择最重要的 3 个功能（可多选）</p>
+
+<div class="options" data-multiselect>
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h4>基础富文本</h4>
+      <p>标题、段落、加粗、斜体、列表、引用、链接、图片</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h4>高级块元素</h4>
+      <p>代码块（语法高亮）、表格、待办清单、折叠块</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h4>公式/图表</h4>
+      <p>LaTeX 数学公式、流程图、时序图、思维导图</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="d" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h4>文档链接</h4>
+      <p>双向链接 <code>[[文档]]</code>、引用卡片、反向链接面板</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="e" onclick="toggleSelect(this)">
+    <div class="letter">E</div>
+    <div class="content">
+      <h4>文档大纲</h4>
+      <p>右侧目录导航、标题跳转、阅读进度</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="f" onclick="toggleSelect(this)">
+    <div class="letter">F</div>
+    <div class="content">
+      <h4>AI 辅助</h4>
+      <p>AI 续写、润色、翻译、总结（与右侧 AI 面板联动）</p>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h3>问题 2：块级编辑体验</h3>
+<p>是否支持类似 Notion 的 <code>/</code> 斜杠菜单？</p>
+
+<div class="options">
+  <div class="option" data-choice="slash-yes" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content">
+      <h4>支持斜杠菜单</h4>
+      <p>输入 <code>/</code> 弹出命令菜单，快速插入各种块类型</p>
+      <div class="mockup" style="margin-top: 8px; border: 1px solid #ddd; border-radius: 4px; padding: 8px; max-width: 200px;">
+        <div style="font-size: 12px;">输入 <code>/</code> 后弹出：</div>
+        <div style="background: #f5f5f5; padding: 4px; margin-top: 4px; border-radius: 4px;">
+          <div>📝 文本</div>
+          <div>📋 列表</div>
+          <div>🔢 代码块</div>
+          <div>📊 表格</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="slash-no" onclick="toggleSelect(this)">
+    <div class="letter">✗</div>
+    <div class="content">
+      <h4>传统工具栏</h4>
+      <p>顶部固定工具栏 + 选中浮动工具栏（类似 Google Docs）</p>
+    </div>
+  </div>
+</div>
+</div>
+
+<p style="margin-top: 16px; font-size: 14px; color: #666;">💡 提示：核心功能可多选，斜杠菜单单选</p>
