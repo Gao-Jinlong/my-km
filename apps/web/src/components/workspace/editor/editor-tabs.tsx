@@ -1,20 +1,73 @@
+'use client';
+
 import { FileText, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// Placeholder tabs for now
-const placeholderTabs = [
-    { id: '1', name: 'README.md', active: true },
-    { id: '2', name: 'document.md', active: false },
+/**
+ * 编辑器文档标签页接口
+ */
+export interface EditorTab {
+    id: string;
+    name: string;
+    documentId: string;
+    active: boolean;
+}
+
+/**
+ * EditorTabsProps - EditorTabs 组件的属性
+ */
+interface EditorTabsProps {
+    /** 文档列表 */
+    documents?: EditorTab[];
+    /** 标签页关闭处理函数 */
+    onCloseTab?: (documentId: string) => void;
+    /** 标签页切换处理函数 */
+    onActivateTab?: (documentId: string) => void;
+}
+
+// 占位数据 - 未来将从 EditorContainer 或 store 获取
+const placeholderTabs: EditorTab[] = [
+    { id: '1', name: 'README.md', documentId: 'doc-1', active: true },
+    { id: '2', name: 'document.md', documentId: 'doc-2', active: false },
 ];
 
-export function EditorTabs() {
+/**
+ * EditorTabs - 编辑器标签页组件
+ *
+ * 显示打开的文档标签页
+ * 支持切换和关闭文档
+ */
+export function EditorTabs({
+    documents = placeholderTabs,
+    onCloseTab,
+    onActivateTab,
+}: EditorTabsProps) {
+    const handleTabClick = (tab: EditorTab) => {
+        onActivateTab?.(tab.documentId);
+    };
+
+    const handleCloseClick = (e: React.MouseEvent, tab: EditorTab) => {
+        e.stopPropagation();
+        onCloseTab?.(tab.documentId);
+    };
+
     return (
         <div className="flex h-[36px] items-center bg-ws-bg-tertiary">
-            {placeholderTabs.map(tab => (
+            {documents.map(tab => (
                 <div
                     key={tab.id}
+                    role="tab"
+                    aria-selected={tab.active}
+                    tabIndex={0}
+                    onClick={() => handleTabClick(tab)}
+                    onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleTabClick(tab);
+                        }
+                    }}
                     className={cn(
-                        'group flex items-center gap-1.5 border-ws-border border-r px-2.5 py-2 text-sm transition-colors',
+                        'group flex cursor-pointer items-center gap-1.5 border-ws-border border-r px-2.5 py-2 text-sm transition-colors',
                         tab.active
                             ? 'bg-ws-bg-secondary text-ws-fg-primary'
                             : 'text-ws-fg-muted hover:bg-ws-bg-secondary/50',
@@ -26,6 +79,7 @@ export function EditorTabs() {
 
                     <button
                         type="button"
+                        onClick={e => handleCloseClick(e, tab)}
                         className="rounded-sm p-0.5 opacity-0 transition-opacity hover:bg-ws-bg-tertiary group-hover:opacity-100"
                         aria-label="Close tab"
                     >
@@ -35,4 +89,13 @@ export function EditorTabs() {
             ))}
         </div>
     );
+}
+
+/**
+ * EditorTabs - 编辑器标签页组件（无参数版本，使用内部状态）
+ *
+ * 简化版本，用于向后兼容
+ */
+export function EditorTabsDefault() {
+    return <EditorTabs />;
 }
