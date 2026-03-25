@@ -128,7 +128,6 @@ describe('AI Integration', () => {
 
     beforeEach(() => {
         aiContextService = createAIContextService();
-        registerBuiltinBlocks();
         vi.clearAllMocks();
     });
 
