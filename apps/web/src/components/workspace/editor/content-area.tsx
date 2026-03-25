@@ -1,4 +1,7 @@
 import { cn } from '@/lib/utils';
+import { LexicalEditor } from './lexical-editor';
+import { useEditorUIStore } from '@/stores/editor-ui-store';
+import type { Document } from '@/features/editor/types';
 
 interface ContentAreaProps {
     documentId: string;
@@ -8,22 +11,35 @@ interface ContentAreaProps {
 /**
  * ContentArea - 内容区域组件
  *
- * 显示文档内容
- * 未来将集成 Lexical 编辑器
+ * 显示文档内容，集成 Lexical 编辑器
  */
 export function ContentArea({ documentId, className }: ContentAreaProps) {
-    // TODO: 集成 EditorService 获取文档内容
-    // const { document, isLoading, error } = useEditorService(documentId);
+    // 从 store 获取文档信息
+    const { openDocuments } = useEditorUIStore();
+    const openDoc = openDocuments.find(d => d.id === documentId);
+
+    // 构造文档对象（MVP 简化版本）
+    const document: Document | null = openDoc
+        ? {
+              id: openDoc.id,
+              path: openDoc.path,
+              title: openDoc.title,
+              type: openDoc.type,
+              content: [], // MVP 阶段先使用空内容
+              version: 1,
+              createdAt: openDoc.openedAt,
+              updatedAt: openDoc.openedAt,
+          }
+        : null;
 
     return (
-        <div className={cn('flex-1 overflow-y-auto bg-ws-bg-primary p-4', className)}>
-            <div className="mx-auto max-w-[800px]">
-                {/* TODO: 渲染文档内容 */}
-                <div className="text-sm text-ws-fg-muted">Document ID: {documentId}</div>
-                <div className="mt-2 text-ws-fg-placeholder text-xs">
-                    Editor content area - Lexical integration pending
-                </div>
-            </div>
+        <div className={cn('flex-1 overflow-y-auto bg-ws-bg-primary', className)}>
+            <LexicalEditor
+                documentId={documentId}
+                document={document}
+                className="h-full"
+                placeholder="开始编写内容..."
+            />
         </div>
     );
 }
