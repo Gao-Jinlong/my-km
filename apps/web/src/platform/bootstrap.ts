@@ -17,6 +17,7 @@
 import { ContextMenuService } from './context-menu/service';
 import { ServiceContainer } from './di';
 import { EditorContainer } from './editor/container';
+import { EventBusService } from './event-bus/service';
 import { FileOpenService } from './file-open/service';
 import { FileSystemService } from './file-system/service';
 
@@ -28,6 +29,7 @@ export interface AppServices {
     contextMenuService: ContextMenuService;
     editorContainer: EditorContainer;
     fileOpenService: FileOpenService;
+    eventBusService: EventBusService;
 }
 
 /**
@@ -41,6 +43,7 @@ function createServiceContainer(): ServiceContainer {
     container.register(ContextMenuService);
     container.register(EditorContainer);
     container.register(FileOpenService);
+    container.register(EventBusService);
 
     return container;
 }
