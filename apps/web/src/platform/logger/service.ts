@@ -35,7 +35,9 @@ export class LoggerService implements ILoggerService {
 
         if (!logger) {
             const level = this.categoryLevels.get(cat) ?? this.globalLevel;
-            logger = new SimpleLogger(cat, level, this.writers, this.includeLocation);
+            logger = new SimpleLogger(cat, level, this.writers, this.includeLocation, entry =>
+                this.addToHistory(entry),
+            );
             this.loggers.set(cat, logger);
         }
 

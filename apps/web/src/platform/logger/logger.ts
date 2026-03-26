@@ -7,12 +7,20 @@ export class SimpleLogger implements Logger {
     private category: string;
     private writers: LogWriter[];
     private includeLocation: boolean;
+    private onLog?: (entry: LogEntry) => void;
 
-    constructor(category: string, level: LogLevel, writers: LogWriter[], includeLocation = false) {
+    constructor(
+        category: string,
+        level: LogLevel,
+        writers: LogWriter[],
+        includeLocation = false,
+        onLog?: (entry: LogEntry) => void,
+    ) {
         this.category = category;
         this.level = level;
         this.writers = [...writers];
         this.includeLocation = includeLocation;
+        this.onLog = onLog;
     }
 
     setLevel(level: LogLevel): void {
@@ -41,7 +49,13 @@ export class SimpleLogger implements Logger {
 
     child(category: string): Logger {
         const fullCategory = `${this.category}.${category}`;
-        return new SimpleLogger(fullCategory, this.level, this.writers, this.includeLocation);
+        return new SimpleLogger(
+            fullCategory,
+            this.level,
+            this.writers,
+            this.includeLocation,
+            this.onLog,
+        );
     }
 
     private log(level: LogLevel, message: string, ...data: unknown[]): void {
@@ -67,6 +81,9 @@ export class SimpleLogger implements Logger {
         for (const writer of this.writers) {
             writer.write(entry);
         }
+
+        // 通知服务添加到历史
+        this.onLog?.(entry);
     }
 
     private getLocation(): string {
