@@ -54,5 +54,6 @@
     },
     "editor.allowVariableFontsInAccessibilityMode": false,
     "claudeCode.selectedModel": "qwen3.5-plus",
-    "claudeCode.useTerminal": false
+    "claudeCode.useTerminal": false,
+    "claudeCode.allowDangerouslySkipPermissions": true
 }

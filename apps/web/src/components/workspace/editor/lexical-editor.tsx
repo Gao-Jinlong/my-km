@@ -6,6 +6,7 @@
 
 'use client';
 
+import { ListItemNode, ListNode } from '@lexical/list';
 import { AutoFocusPlugin } from '@lexical/react/LexicalAutoFocusPlugin';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
@@ -14,8 +15,7 @@ import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin';
 import { ListPlugin } from '@lexical/react/LexicalListPlugin';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { TabIndentationPlugin } from '@lexical/react/LexicalTabIndentationPlugin';
-import type { EditorThemeClasses } from 'lexical';
-import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical';
+import { $createParagraphNode, $createTextNode, $getRoot, type EditorThemeClasses } from 'lexical';
 import { useEffect, useState } from 'react';
 import { EditorContainer } from '@/features/editor/container/EditorContainer';
 import { blockRegistry } from '@/features/editor/registry/BlockRegistry';
@@ -83,6 +83,7 @@ function getInitialConfig(documentId: string) {
     return {
         namespace: `editor-${documentId}`,
         theme,
+        nodes: [ListNode, ListItemNode],
         onError: (error: Error) => {
             console.error('[LexicalEditor] Error:', error);
         },
