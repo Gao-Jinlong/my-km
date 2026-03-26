@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { container } from '../../bootstrap';
 import { ProjectManager } from '../project-manager';
-import { fileSystemService } from '../service';
+import { FileSystemService } from '../service';
+
+// 获取 fileSystemService 实例
+const fileSystemService = container.get<FileSystemService>(FileSystemService);
 
 // Mock FileSystemDirectoryHandle
 const createMockDirectoryHandle = (name = 'test-project') =>

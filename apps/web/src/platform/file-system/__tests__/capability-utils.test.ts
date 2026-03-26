@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { FileSystemCapability } from '../types';
+import {
+    combineCapabilities,
+    getCapabilityMode,
+    getCapabilityNames,
+    hasCapability,
+    isCapabilityMode,
+    removeCapability,
+} from '../utils/capability';
 
 describe('capability utils', () => {
     describe('hasCapability', () => {

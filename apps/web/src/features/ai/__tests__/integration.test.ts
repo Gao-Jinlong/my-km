@@ -132,7 +132,7 @@ describe('AI Integration', () => {
     });
 
     afterEach(() => {
-        aiContextService.destroy();
+        aiContextService.dispose();
         vi.clearAllMocks();
     });
 

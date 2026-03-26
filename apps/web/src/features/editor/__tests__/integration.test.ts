@@ -75,7 +75,7 @@ describe('Editor Integration', () => {
     });
 
     afterEach(() => {
-        aiContextService.destroy();
+        aiContextService.dispose();
         vi.clearAllMocks();
     });
 
