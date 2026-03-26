@@ -1,16 +1,13 @@
-// apps/web/src/platform/event-bus/service.ts
-
-import { Emitter } from '@/base/common/event';
-import { ServiceBase } from '@/platform/base/service-base';
-import { Service } from '@/platform/di';
+import { Emitter } from '../../base/common/event';
+import { ServiceBase } from '../../platform/base/service-base';
+import { Service } from '../di';
 import type {
     EventDefinition,
     EventHistoryOptions,
     EventInterceptor,
+    EventListener,
     EventSubscriptionOptions,
 } from './types';
-
-type EventListener<T = unknown> = (event: EventDefinition<T>) => void | Promise<void>;
 
 interface Subscription {
     eventType: string;
@@ -106,10 +103,10 @@ export class EventBusService extends ServiceBase {
         }
 
         // 触发 onEventPublished
-        this._onEventPublished.fire(processedEvent);
+        this._onEventPublished.fire(processedEvent as EventDefinition);
 
         // 查找并调用监听器
-        const listeners = this._getListenersForEvent(processedEvent);
+        const listeners = this._getListenersForEvent(processedEvent as EventDefinition);
 
         // 按优先级排序
         listeners.sort((a, b) => (b.options?.priority ?? 0) - (a.options?.priority ?? 0));
@@ -130,10 +127,13 @@ export class EventBusService extends ServiceBase {
         }
 
         // 触发 onEventHandled
-        this._onEventHandled.fire({ event: processedEvent, listeners: listeners.length });
+        this._onEventHandled.fire({
+            event: processedEvent as EventDefinition,
+            listeners: listeners.length,
+        });
 
         // 记录历史
-        this._addToHistory(processedEvent);
+        this._addToHistory(processedEvent as EventDefinition);
     }
 
     /**

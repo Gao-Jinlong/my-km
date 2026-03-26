@@ -1,5 +1,4 @@
-// apps/web/src/platform/event-bus/__tests__/service.test.ts
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventBusService } from '../service';
 
 describe('EventBusService', () => {

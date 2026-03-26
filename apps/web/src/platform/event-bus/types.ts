@@ -1,5 +1,3 @@
-// apps/web/src/platform/event-bus/types.ts
-
 /**
  * 事件定义
  */
@@ -61,6 +59,11 @@ export interface EventHistoryOptions {
     /** 返回数量限制 */
     limit?: number;
 }
+
+/**
+ * 事件监听器类型
+ */
+export type EventListener<T = unknown> = (event: EventDefinition<T>) => void | Promise<void>;
 
 /**
  * 系统级事件

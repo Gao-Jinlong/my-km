@@ -1,5 +1,3 @@
-// apps/web/src/platform/event-bus/errors.ts
-
 /**
  * 事件总线基础错误
  */

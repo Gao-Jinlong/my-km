@@ -1,4 +1,3 @@
-// apps/web/src/platform/event-bus/__tests__/types.test.ts
 import { describe, expect, it } from 'vitest';
 import { EditorEvents, FileSystemEvents, SystemEvents } from '../types';
 
