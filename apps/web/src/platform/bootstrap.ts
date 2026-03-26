@@ -21,6 +21,7 @@ import { EditorContainer } from './editor/container';
 import { EventBusService } from './event-bus/service';
 import { FileOpenService } from './file-open/service';
 import { FileSystemService } from './file-system/service';
+import { MessageChannelService } from './message-channel/service';
 
 /**
  * 应用服务容器类型
@@ -32,6 +33,7 @@ export interface AppServices {
     fileOpenService: FileOpenService;
     eventBusService: EventBusService;
     commandService: CommandService;
+    messageChannelService: MessageChannelService;
 }
 
 /**
@@ -47,6 +49,7 @@ function createServiceContainer(): ServiceContainer {
     container.register(FileOpenService);
     container.register(EventBusService);
     container.register(CommandService);
+    container.register(MessageChannelService);
 
     return container;
 }

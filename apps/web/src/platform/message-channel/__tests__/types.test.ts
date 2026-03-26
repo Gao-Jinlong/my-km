@@ -28,7 +28,7 @@ describe('MessageChannel Types', () => {
     it('应正确定义消息处理器', () => {
         const handler: MessageHandler<{ data: string }> = message => {
             console.log('Received:', message.payload.data);
-            return { processed: true };
+            return undefined;
         };
         expect(typeof handler).toBe('function');
     });

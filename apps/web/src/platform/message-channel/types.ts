@@ -1,5 +1,7 @@
 // apps/web/src/platform/message-channel/types.ts
 
+import type { IDisposable } from '@/base/common/event';
+
 /**
  * 消息定义
  */
@@ -29,7 +31,7 @@ export interface Message<T = unknown> {
 /**
  * 消息处理器
  */
-export type MessageHandler<T = unknown> = (message: Message<T>) => void | Promise<unknown>;
+export type MessageHandler<T = unknown> = (message: Message<T>) => undefined | Promise<unknown>;
 
 /**
  * 消息通道配置
