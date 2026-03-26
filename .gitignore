@@ -59,3 +59,6 @@ apps/server/prisma/migrations/
 
 # Turbo
 .turbo/
+
+# Worktrees
+.worktrees/
