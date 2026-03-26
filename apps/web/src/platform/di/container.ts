@@ -14,7 +14,7 @@ import {
     DisposableStore,
     type IDisposable,
     toDisposable,
-} from '@/base/common/lifecycle';
+} from '../../base/common/lifecycle';
 import { SERVICE_DEPS_KEY, SERVICE_ID_KEY, SINGLETON_KEY } from './decorators';
 
 export type ServiceConstructor<T = unknown> = new (...args: unknown[]) => T;

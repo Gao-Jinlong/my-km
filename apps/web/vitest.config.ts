@@ -4,11 +4,18 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
     resolve: {
         alias: {
-            '@': path.resolve(__dirname, './src'),
+            // 具体路径在前，通用路径在后
+            '@platform': path.resolve(__dirname, './src/platform'),
             '@/components': path.resolve(__dirname, './src/components'),
             '@/lib': path.resolve(__dirname, './src/lib'),
+            '@/base': path.resolve(__dirname, './src/base'),
+            '@/platform': path.resolve(__dirname, './src/platform'),
             '@workspace/shared': path.resolve(__dirname, '../packages/shared/src'),
             '@my-km/file-system': path.resolve(__dirname, './src/platform/file-system'),
+            '@my-km/platform': path.resolve(__dirname, './src/platform'),
+            '@my-km/base': path.resolve(__dirname, './src/base'),
+            '@base': path.resolve(__dirname, './src/base'),
+            '@': path.resolve(__dirname, './src'),
         },
     },
     test: {

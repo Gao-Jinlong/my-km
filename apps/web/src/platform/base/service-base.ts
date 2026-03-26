@@ -4,8 +4,8 @@
  * 所有服务都应继承此类，以获得统一的资源管理和生命周期
  */
 
-import { Emitter } from '@/base/common/event';
-import { Disposable, DisposableStore } from '@/base/common/lifecycle';
+import { Emitter } from '../../base/common/event';
+import { Disposable, DisposableStore } from '../../base/common/lifecycle';
 
 /**
  * 服务基类

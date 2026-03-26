@@ -1,8 +1,8 @@
 // apps/web/src/platform/command/service.ts
 
-import { Emitter, type IDisposable } from '@/base/common/event';
-import { ServiceBase } from '@/platform/base/service-base';
-import { Service } from '@/platform/di';
+import { Emitter, type IDisposable } from '../../base/common/event';
+import { ServiceBase } from '../../platform/base/service-base';
+import { Service } from '../../platform/di';
 import type {
     CommandContext,
     CommandDefinition,

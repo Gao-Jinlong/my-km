@@ -1,5 +1,5 @@
 // apps/web/src/platform/command/__tests__/service.test.ts
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CommandService } from '../service';
 
 describe('CommandService', () => {
