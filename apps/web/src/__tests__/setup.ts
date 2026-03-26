@@ -6,3 +6,8 @@
 import '@testing-library/jest-dom/vitest';
 
 // 全局 mock 和工具函数可以在这里定义
+
+// Mock localStorage for Node.js environment
+if (typeof global.localStorage === 'undefined') {
+    global.localStorage = {} as Storage;
+}
