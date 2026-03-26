@@ -8,6 +8,17 @@
 
 **Tech Stack:** TypeScript, Vitest (测试), ServiceBase (服务基类), DI 装饰器, Emitter (事件原语)
 
+**Status**: ✅ 已完成 (2026-03-26)
+
+**Test Results**: 72 个测试全部通过
+- EventBusService: 20 个测试
+- CommandService: 23 个测试
+- MessageChannelService: 29 个测试
+
+**实施说明**:
+- 事件总线服务已按计划完成
+- 命令服务使用现有 `command` 模块实现（已在之前批次创建）
+- 消息通道服务已按计划完成
 ---
 
 ## 文件结构总览
