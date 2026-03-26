@@ -14,6 +14,7 @@
  * ```
  */
 
+import { CommandService } from './command/service';
 import { ContextMenuService } from './context-menu/service';
 import { ServiceContainer } from './di';
 import { EditorContainer } from './editor/container';
@@ -30,6 +31,7 @@ export interface AppServices {
     editorContainer: EditorContainer;
     fileOpenService: FileOpenService;
     eventBusService: EventBusService;
+    commandService: CommandService;
 }
 
 /**
@@ -44,6 +46,7 @@ function createServiceContainer(): ServiceContainer {
     container.register(EditorContainer);
     container.register(FileOpenService);
     container.register(EventBusService);
+    container.register(CommandService);
 
     return container;
 }
