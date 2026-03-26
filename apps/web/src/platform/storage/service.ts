@@ -1,5 +1,6 @@
 // apps/web/src/platform/storage/service.ts
 
+import { ServiceBase } from '@/platform/base/service-base';
 import { StorageNotInitializedError, StorageNotSupportedError } from './errors';
 import { IndexedDBProvider } from './providers/indexed-db';
 import { LocalStorageProvider } from './providers/local-storage';
@@ -8,13 +9,14 @@ import type { IStorageProvider, StorageOptions, StorageType } from './types';
 import { decrypt, encrypt, generateKey } from './utils/crypto';
 import { deserialize, serialize } from './utils/serializer';
 
-export class StorageService {
+export class StorageService extends ServiceBase {
     private provider: IStorageProvider | null = null;
     private encryptionKey: CryptoKey | null = null;
     private namespace: string;
     private initialized = false;
 
     constructor(options: StorageOptions = {}) {
+        super();
         this.namespace = options.namespace || '';
         if (options.encryptionKey) {
             this.initializeEncryption(options.encryptionKey);
@@ -158,12 +160,13 @@ export class StorageService {
     /**
      * 销毁服务
      */
-    dispose(): void {
+    override dispose(): void {
         if (this.provider) {
             this.provider.dispose();
             this.provider = null;
             this.initialized = false;
         }
+        super.dispose();
     }
 
     /**

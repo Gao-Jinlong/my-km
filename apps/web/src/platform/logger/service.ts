@@ -1,11 +1,12 @@
 // apps/web/src/platform/logger/service.ts
 
+import { ServiceBase } from '@/platform/base/service-base';
 import { SimpleLogger } from './logger';
 import type { ILoggerService, LogEntry, Logger, LogWriter } from './types';
 import { LogLevel } from './types';
 import { ConsoleWriter } from './writers/console';
 
-export class LoggerService implements ILoggerService {
+export class LoggerService extends ServiceBase implements ILoggerService {
     private globalLevel: LogLevel = LogLevel.INFO;
     private categoryLevels = new Map<string, LogLevel>();
     private writers: LogWriter[] = [];
@@ -15,6 +16,7 @@ export class LoggerService implements ILoggerService {
     private includeLocation = false;
 
     constructor() {
+        super();
         // 默认添加控制台输出
         this.writers.push(new ConsoleWriter());
     }
@@ -113,13 +115,14 @@ export class LoggerService implements ILoggerService {
         this.loggers.clear(); // 需要重新创建所有 logger
     }
 
-    dispose(): void {
+    override dispose(): void {
         for (const writer of this.writers) {
             writer.dispose();
         }
         this.writers = [];
         this.loggers.clear();
         this.history = [];
+        super.dispose();
     }
 
     // 供 SimpleLogger 内部使用

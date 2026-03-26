@@ -5,8 +5,8 @@
  * 支持按需请求和事件推送两种模式
  */
 
+import { ServiceBase } from '@/platform/base/service-base';
 import { Emitter } from '../../../base/common/event';
-import { Disposable } from '../../../base/common/lifecycle';
 import type { EditorService } from '../../editor/service';
 import type { FormatState, Position } from '../../editor/types';
 
@@ -99,13 +99,13 @@ export interface AIContextService {
     /**
      * 销毁服务
      */
-    destroy(): void;
+    dispose(): void;
 }
 
 /**
  * AIContextService 实现类
  */
-class AIContextServiceImpl extends Disposable implements AIContextService {
+class AIContextServiceImpl extends ServiceBase implements AIContextService {
     /** 存储已注册的编辑器服务 */
     private _editors: Map<string, EditorService> = new Map();
 
@@ -116,16 +116,13 @@ class AIContextServiceImpl extends Disposable implements AIContextService {
     private _contextChangeEmitter: Emitter<{ documentId: string; context: AIContext }> =
         new Emitter<{ documentId: string; context: AIContext }>({ copyListeners: true });
 
-    /** 标记服务是否已销毁 */
-    private _disposed = false;
-
     /**
      * 获取上下文（按需请求）
      * @param documentId - 文档 ID
      * @returns AI 上下文或 null
      */
     async getContext(documentId: string): Promise<AIContext | null> {
-        if (this._disposed) {
+        if (this._isDisposed) {
             throw new Error('AIContextService has been destroyed');
         }
 
@@ -189,7 +186,7 @@ class AIContextServiceImpl extends Disposable implements AIContextService {
      * @param subscriber - 订阅者
      */
     subscribe(documentId: string, subscriber: AIContextSubscriber): void {
-        if (this._disposed) {
+        if (this._isDisposed) {
             throw new Error('AIContextService has been destroyed');
         }
 
@@ -213,7 +210,7 @@ class AIContextServiceImpl extends Disposable implements AIContextService {
      * @param subscriberId - 订阅者 ID
      */
     unsubscribe(documentId: string, subscriberId: string): void {
-        if (this._disposed) {
+        if (this._isDisposed) {
             return;
         }
 
@@ -233,7 +230,7 @@ class AIContextServiceImpl extends Disposable implements AIContextService {
      * @param documentId - 文档 ID
      */
     notifyContextChange(documentId: string): void {
-        if (this._disposed) {
+        if (this._isDisposed) {
             return;
         }
 
@@ -277,7 +274,7 @@ class AIContextServiceImpl extends Disposable implements AIContextService {
      * @param editorService - 编辑器服务实例
      */
     registerEditor(documentId: string, editorService: EditorService): void {
-        if (this._disposed) {
+        if (this._isDisposed) {
             throw new Error('AIContextService has been destroyed');
         }
 
@@ -287,21 +284,15 @@ class AIContextServiceImpl extends Disposable implements AIContextService {
     /**
      * 销毁服务
      */
-    destroy(): void {
-        if (this._disposed) {
+    override dispose(): void {
+        if (this._isDisposed) {
             return;
         }
 
-        this._disposed = true;
-
-        // 清理所有订阅者
         this._subscribers.clear();
-
-        // 清理编辑器引用
         this._editors.clear();
-
-        // 处理事件发射器
         this._contextChangeEmitter.dispose();
+        super.dispose();
     }
 }
 

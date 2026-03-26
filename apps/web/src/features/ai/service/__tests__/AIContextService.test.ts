@@ -10,6 +10,7 @@ import {
     type AIContextSubscriber,
     createAIContextService,
 } from '../AIContextService';
+import type { AIContext } from '../types';
 
 /**
  * 创建模拟的 EditorService
@@ -22,7 +23,7 @@ function createMockEditorService(
 ): EditorService {
     return {
         documentId: document?.id || 'test-doc-id',
-        editor: {} as any,
+        editor: {} as unknown as EditorService,
         store: {
             document: document || null,
             setDocument: vi.fn(),
@@ -31,7 +32,7 @@ function createMockEditorService(
             markDirty: vi.fn(),
             markClean: vi.fn(),
             reset: vi.fn(),
-        } as any,
+        } as unknown as EditorService['store'],
         loadDocument: vi.fn(),
         saveDocument: vi.fn().mockResolvedValue({ success: true }),
         getSelection: vi.fn().mockReturnValue(selection ?? null),
@@ -81,7 +82,7 @@ describe('AIContextService', () => {
     });
 
     afterEach(() => {
-        service.destroy();
+        service.dispose();
     });
 
     describe('createAIContextService', () => {
@@ -95,7 +96,7 @@ describe('AIContextService', () => {
             expect(typeof service.unsubscribe).toBe('function');
             expect(typeof service.notifyContextChange).toBe('function');
             expect(typeof service.registerEditor).toBe('function');
-            expect(typeof service.destroy).toBe('function');
+            expect(typeof service.dispose).toBe('function');
         });
     });
 
@@ -120,7 +121,7 @@ describe('AIContextService', () => {
 
         it('在销毁后注册应该抛出异常', () => {
             const editorService = createMockEditorService();
-            service.destroy();
+            service.dispose();
 
             expect(() => {
                 service.registerEditor('doc-1', editorService);
@@ -218,7 +219,7 @@ describe('AIContextService', () => {
         it('在销毁后调用应该抛出异常', async () => {
             const editorService = createMockEditorService();
             service.registerEditor('doc-1', editorService);
-            service.destroy();
+            service.dispose();
 
             await expect(service.getContext('doc-1')).rejects.toThrow(
                 'AIContextService has been destroyed',
@@ -281,7 +282,7 @@ describe('AIContextService', () => {
                 onContextChange: vi.fn(),
             };
 
-            service.destroy();
+            service.dispose();
 
             expect(() => {
                 service.subscribe('doc-1', subscriber);
@@ -289,7 +290,7 @@ describe('AIContextService', () => {
         });
 
         it('在销毁后取消订阅不应该抛出异常', () => {
-            service.destroy();
+            service.dispose();
 
             expect(() => {
                 service.unsubscribe('doc-1', 'sub-1');
@@ -380,7 +381,7 @@ describe('AIContextService', () => {
             const onContextChange = vi.fn();
             service.subscribe('doc-1', { id: 'sub-1', onContextChange });
 
-            service.destroy();
+            service.dispose();
             service.notifyContextChange('doc-1');
 
             // 等待异步操作完成
@@ -420,7 +421,7 @@ describe('AIContextService', () => {
             };
 
             service.subscribe('doc-1', subscriber);
-            service.destroy();
+            service.dispose();
 
             // 销毁后，内部订阅者 Map 应该被清空
             // 这里通过验证是否可以重新订阅来间接测试
@@ -468,7 +469,7 @@ describe('AIContextService', () => {
             service.registerEditor('doc-1', editorService);
 
             // 订阅
-            const receivedContexts: any[] = [];
+            const receivedContexts: AIContext[] = [];
             const subscriber: AIContextSubscriber = {
                 id: 'test-sub',
                 onContextChange: context => {
@@ -489,7 +490,7 @@ describe('AIContextService', () => {
             expect(receivedContexts[0].selection?.text).toBe('Hello');
 
             // 清理
-            service.destroy();
+            service.dispose();
         });
 
         it('多文档场景应该正常工作', async () => {
@@ -505,8 +506,8 @@ describe('AIContextService', () => {
             service.registerEditor('doc-2', editor2);
 
             // 分别订阅
-            const receivedContexts1: any[] = [];
-            const receivedContexts2: any[] = [];
+            const receivedContexts1: AIContext[] = [];
+            const receivedContexts2: AIContext[] = [];
 
             service.subscribe('doc-1', {
                 id: 'sub-1',
@@ -529,7 +530,7 @@ describe('AIContextService', () => {
             expect(receivedContexts2.length).toBe(1);
             expect(receivedContexts2[0].document.title).toBe('Document 2');
 
-            service.destroy();
+            service.dispose();
         });
     });
 });
