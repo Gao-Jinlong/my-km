@@ -116,7 +116,13 @@ export class FileSystemService extends ServiceBase {
         this.checkCapability(provider, 'listFiles', FileSystemCapability.List);
 
         const cleanPath = this.cleanPath(path, provider.scheme);
-        return provider.listFiles(cleanPath);
+        const files = await provider.listFiles(cleanPath);
+
+        // 为每个 FileStat 添加完整的 URI 路径
+        return files.map(file => ({
+            ...file,
+            path: `${provider.scheme}://${file.path}`,
+        }));
     }
 
     /**
