@@ -3,6 +3,7 @@
 import { Emitter, type IDisposable } from '../../base/common/event';
 import { ServiceBase } from '../../platform/base/service-base';
 import { Service } from '../../platform/di';
+import { CommandNotRegisteredError } from './errors';
 import type {
     CommandContext,
     CommandDefinition,
@@ -113,7 +114,7 @@ export class CommandService extends ServiceBase implements ICommandService {
         const command = this.commands.get(commandId);
 
         if (!command) {
-            throw new Error(`命令未找到：${commandId}`);
+            throw new CommandNotRegisteredError(commandId);
         }
 
         // 构建完整上下文

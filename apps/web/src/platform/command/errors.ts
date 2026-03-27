@@ -32,6 +32,8 @@ export class CommandNotAvailableError extends CommandCenterError {
  * 命令执行失败错误
  */
 export class CommandExecutionError extends CommandCenterError {
+    public cause: Error;
+
     constructor(commandId: string, cause: Error) {
         super(`Command "${commandId}" execution failed: ${cause.message}`);
         this.name = 'CommandExecutionError';

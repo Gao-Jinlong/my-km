@@ -44,7 +44,7 @@ describe('CommandService', () => {
     });
 
     it('应支持命令拦截器', async () => {
-        const beforeMock = vi.fn(() => true);
+        const beforeMock = vi.fn().mockResolvedValue(true);
         const afterMock = vi.fn();
 
         commandService.addInterceptor({
@@ -65,7 +65,7 @@ describe('CommandService', () => {
 
     it('应支持拦截器取消执行', async () => {
         commandService.addInterceptor({
-            before: () => false,
+            before: vi.fn().mockResolvedValue(false),
             priority: 100,
         });
 
@@ -152,8 +152,18 @@ describe('CommandService', () => {
     });
 
     it('应获取所有命令', () => {
-        commandService.registerCommand({ id: 'cmd1', label: 'Command 1', category: 'Test' });
-        commandService.registerCommand({ id: 'cmd2', label: 'Command 2', category: 'Test' });
+        commandService.registerCommand({
+            id: 'cmd1',
+            label: 'Command 1',
+            category: 'Test',
+            handler: vi.fn(),
+        });
+        commandService.registerCommand({
+            id: 'cmd2',
+            label: 'Command 2',
+            category: 'Test',
+            handler: vi.fn(),
+        });
 
         const commands = commandService.getAllCommands();
         expect(commands).toHaveLength(2);
@@ -175,6 +185,67 @@ describe('CommandService', () => {
     });
 
     it('应抛出错误对于未注册命令', async () => {
-        await expect(commandService.executeCommand('nonexistent')).rejects.toThrow('命令未找到');
+        await expect(commandService.executeCommand('nonexistent')).rejects.toThrow(
+            'Command "nonexistent" is not registered',
+        );
+    });
+
+    it('应调用拦截器的 onError 钩子', async () => {
+        const onErrorMock = vi.fn();
+        commandService.addInterceptor({ onError: onErrorMock });
+
+        commandService.registerCommand({
+            id: 'test.cmd',
+            handler: vi.fn().mockRejectedValue(new Error('Test error')),
+        });
+
+        await expect(commandService.executeCommand('test.cmd')).rejects.toThrow();
+        expect(onErrorMock).toHaveBeenCalled();
+        expect(onErrorMock).toHaveBeenCalledWith(
+            expect.objectContaining({ commandId: 'test.cmd' }),
+            expect.any(Error),
+        );
+    });
+
+    it('应按优先级执行拦截器', async () => {
+        const executionOrder: string[] = [];
+
+        commandService.addInterceptor({
+            before: () => {
+                executionOrder.push('low');
+            },
+            priority: 0,
+        });
+        commandService.addInterceptor({
+            before: () => {
+                executionOrder.push('high');
+            },
+            priority: 100,
+        });
+
+        commandService.registerCommand({
+            id: 'test.cmd',
+            handler: vi.fn(),
+        });
+
+        await commandService.executeCommand('test.cmd');
+        expect(executionOrder).toEqual(['high', 'low']);
+    });
+
+    it('应限制历史记录数量', async () => {
+        commandService.registerCommand({
+            id: 'test.cmd',
+            handler: vi.fn(),
+        });
+
+        // 执行 150 次命令
+        for (let i = 0; i < 150; i++) {
+            await commandService.executeCommand('test.cmd', i);
+        }
+
+        const history = commandService.getHistory();
+        expect(history).toHaveLength(100); // 限制为 100
+        expect(history[0].args).toEqual([50]); // 最早的 50 条被移除
+        expect(history[99].args).toEqual([149]); // 最后一条是 149
     });
 });
