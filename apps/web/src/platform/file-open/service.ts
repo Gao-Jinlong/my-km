@@ -156,14 +156,16 @@ export class FileOpenService extends ServiceBase {
 
     /**
      * 创建文档对象
+     *
+     * 使用文件路径作为文档 ID，确保同一文件不会打开多个标签页
      */
     private createDocument(
         path: string,
         content: unknown,
         type: 'rich-text' | 'markdown',
     ): OpenDocument {
-        // 生成文档 ID
-        const id = `doc-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+        // 使用文件路径作为文档 ID（确保唯一性）
+        const id = `file:${path}`;
 
         // 从路径提取标题
         const title =

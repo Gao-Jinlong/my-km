@@ -21,6 +21,7 @@ import { EditorContainer } from './editor/container';
 import { EventBusService } from './event-bus/service';
 import { FileOpenService } from './file-open/service';
 import { FileSystemService } from './file-system/service';
+import { KeyboardShortcutService } from './keyboard/shortcut.service';
 import { MessageChannelService } from './message-channel/service';
 
 /**
@@ -34,6 +35,7 @@ export interface AppServices {
     eventBusService: EventBusService;
     commandService: CommandService;
     messageChannelService: MessageChannelService;
+    keyboardShortcutService: KeyboardShortcutService;
 }
 
 /**
@@ -50,6 +52,7 @@ function createServiceContainer(): ServiceContainer {
     container.register(EventBusService);
     container.register(CommandService);
     container.register(MessageChannelService);
+    container.register(KeyboardShortcutService);
 
     return container;
 }

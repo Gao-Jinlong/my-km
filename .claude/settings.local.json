@@ -20,7 +20,9 @@
             "Bash(node screenshot.js)",
             "Bash(pnpm exec:*)",
             "Bash(git add:*)",
-            "Bash(git commit:*)"
+            "Bash(git commit:*)",
+            "mcp__sentrux__scan",
+            "mcp__sentrux__health"
         ]
     }
 }

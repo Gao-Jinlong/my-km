@@ -3,7 +3,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { IFileSystemProvider } from '../../../../platform/file-system/provider';
+import type { FileSystemService } from '../../../../platform/file-system/service';
 import type { Document } from '../../types';
 import { createAutoSaveService, SaveStatus } from '../AutoSaveService';
 import type { EditorService, SaveResult } from '../EditorService';
@@ -90,39 +90,35 @@ function createMockEditorService(
 }
 
 /**
- * 创建模拟的 FileSystemProvider
+ * 创建模拟的 FileSystemService
  */
-function createMockFileSystemProvider(): IFileSystemProvider {
+function createMockSystemService() {
     return {
-        name: 'mock-fs',
-        scheme: 'mock',
-        rootPath: '/mock',
-        capabilities: 0,
         canHandle: vi.fn(() => true),
-        openDirectory: vi.fn(),
         listFiles: vi.fn(() => Promise.resolve([])),
         createDirectory: vi.fn(),
         deleteDirectory: vi.fn(),
-        readFile: vi.fn(() => Promise.resolve({ type: 'text', content: '' })),
+        readFile: vi.fn(() => Promise.resolve(new Uint8Array())),
         writeFile: vi.fn(),
         deleteFile: vi.fn(),
-        getFileHandle: vi.fn(() => Promise.resolve({} as unknown as FileSystemFileHandle)),
         stat: vi.fn(() =>
             Promise.resolve({
+                name: 'test',
+                path: '/test',
                 type: 'file',
                 size: 0,
-                createdAt: Date.now(),
-                modifiedAt: Date.now(),
+                ctime: Date.now(),
+                mtime: Date.now(),
             }),
         ),
-    };
+    } as unknown as FileSystemService;
 }
 
 describe('AutoSaveService', () => {
-    let mockProvider: IFileSystemProvider;
+    let mockSystemService: FileSystemService;
 
     beforeEach(() => {
-        mockProvider = createMockFileSystemProvider();
+        mockSystemService = createMockSystemService();
     });
 
     afterEach(() => {
@@ -131,7 +127,7 @@ describe('AutoSaveService', () => {
 
     describe('creation', () => {
         it('should create an AutoSaveService instance with default options', () => {
-            const service = createAutoSaveService(mockProvider);
+            const service = createAutoSaveService(mockSystemService);
 
             expect(service).toBeDefined();
             expect(typeof service.register).toBe('function');
@@ -148,7 +144,7 @@ describe('AutoSaveService', () => {
             const onStatusChange = vi.fn();
             const onError = vi.fn();
 
-            const service = createAutoSaveService(mockProvider, {
+            const service = createAutoSaveService(mockSystemService, {
                 debounceMs: 1000,
                 maxWaitMs: 10000,
                 onStatusChange,
@@ -161,7 +157,7 @@ describe('AutoSaveService', () => {
 
     describe('register', () => {
         it('should register an editor', () => {
-            const service = createAutoSaveService(mockProvider);
+            const service = createAutoSaveService(mockSystemService);
             const { service: mockEditor } = createMockEditorService('doc-123');
 
             service.register('doc-123', mockEditor);
@@ -170,7 +166,7 @@ describe('AutoSaveService', () => {
         });
 
         it('should warn when registering duplicate editor', () => {
-            const service = createAutoSaveService(mockProvider);
+            const service = createAutoSaveService(mockSystemService);
             const { service: mockEditor } = createMockEditorService('doc-123');
             const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -182,7 +178,7 @@ describe('AutoSaveService', () => {
         });
 
         it('should initialize status to IDLE after registration', () => {
-            const service = createAutoSaveService(mockProvider);
+            const service = createAutoSaveService(mockSystemService);
             const { service: mockEditor } = createMockEditorService('doc-123');
 
             service.register('doc-123', mockEditor);
@@ -193,7 +189,7 @@ describe('AutoSaveService', () => {
 
     describe('unregister', () => {
         it('should unregister an editor', () => {
-            const service = createAutoSaveService(mockProvider);
+            const service = createAutoSaveService(mockSystemService);
             const { service: mockEditor } = createMockEditorService('doc-123');
 
             service.register('doc-123', mockEditor);
@@ -204,7 +200,7 @@ describe('AutoSaveService', () => {
         });
 
         it('should handle unregistering non-existent editor gracefully', () => {
-            const service = createAutoSaveService(mockProvider);
+            const service = createAutoSaveService(mockSystemService);
 
             expect(() => {
                 service.unregister('non-existent');
@@ -216,7 +212,7 @@ describe('AutoSaveService', () => {
         it('should trigger save after debounce delay', async () => {
             vi.useFakeTimers();
 
-            const service = createAutoSaveService(mockProvider, {
+            const service = createAutoSaveService(mockSystemService, {
                 debounceMs: 100,
                 maxWaitMs: 1000,
             });
@@ -242,7 +238,7 @@ describe('AutoSaveService', () => {
         it('should debounce multiple trigger calls', async () => {
             vi.useFakeTimers();
 
-            const service = createAutoSaveService(mockProvider, {
+            const service = createAutoSaveService(mockSystemService, {
                 debounceMs: 100,
                 maxWaitMs: 1000,
             });
@@ -269,7 +265,7 @@ describe('AutoSaveService', () => {
         it('should respect maxWait timeout', async () => {
             vi.useFakeTimers();
 
-            const service = createAutoSaveService(mockProvider, {
+            const service = createAutoSaveService(mockSystemService, {
                 debounceMs: 1000,
                 maxWaitMs: 300,
             });
@@ -290,7 +286,7 @@ describe('AutoSaveService', () => {
         });
 
         it('should not trigger save when disabled', async () => {
-            const service = createAutoSaveService(mockProvider, {
+            const service = createAutoSaveService(mockSystemService, {
                 debounceMs: 10,
                 maxWaitMs: 100,
             });
@@ -309,7 +305,7 @@ describe('AutoSaveService', () => {
         });
 
         it('should not trigger save for unregistered editor', () => {
-            const service = createAutoSaveService(mockProvider);
+            const service = createAutoSaveService(mockSystemService);
 
             expect(() => {
                 service.triggerSave('non-existent');
@@ -319,7 +315,7 @@ describe('AutoSaveService', () => {
 
     describe('saveNow', () => {
         it('should save immediately without debounce', async () => {
-            const service = createAutoSaveService(mockProvider);
+            const service = createAutoSaveService(mockSystemService);
             const { service: mockEditor, mocks } = createMockEditorService('doc-123');
 
             service.register('doc-123', mockEditor);
@@ -333,7 +329,7 @@ describe('AutoSaveService', () => {
         it('should clear pending debounce timer when calling saveNow', async () => {
             vi.useFakeTimers();
 
-            const service = createAutoSaveService(mockProvider, {
+            const service = createAutoSaveService(mockSystemService, {
                 debounceMs: 1000,
                 maxWaitMs: 5000,
             });
@@ -361,7 +357,7 @@ describe('AutoSaveService', () => {
         });
 
         it('should return error for unregistered editor', async () => {
-            const service = createAutoSaveService(mockProvider);
+            const service = createAutoSaveService(mockSystemService);
 
             const result = await service.saveNow('non-existent');
 
@@ -371,7 +367,7 @@ describe('AutoSaveService', () => {
 
         it('should handle save error', async () => {
             const onErrorSpy = vi.fn();
-            const service = createAutoSaveService(mockProvider, {
+            const service = createAutoSaveService(mockSystemService, {
                 onError: onErrorSpy,
             });
             const { service: mockEditor, mocks } = createMockEditorService('doc-123');
@@ -393,7 +389,7 @@ describe('AutoSaveService', () => {
 
     describe('enable/disable', () => {
         it('should enable auto-save for registered editor', () => {
-            const service = createAutoSaveService(mockProvider);
+            const service = createAutoSaveService(mockSystemService);
             const { service: mockEditor } = createMockEditorService('doc-123');
 
             service.register('doc-123', mockEditor);
@@ -406,7 +402,7 @@ describe('AutoSaveService', () => {
         });
 
         it('should disable auto-save for registered editor', () => {
-            const service = createAutoSaveService(mockProvider);
+            const service = createAutoSaveService(mockSystemService);
             const { service: mockEditor } = createMockEditorService('doc-123');
 
             service.register('doc-123', mockEditor);
@@ -418,7 +414,7 @@ describe('AutoSaveService', () => {
         });
 
         it('should warn when enabling non-existent editor', () => {
-            const service = createAutoSaveService(mockProvider);
+            const service = createAutoSaveService(mockSystemService);
             const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
             service.enable('non-existent');
@@ -428,7 +424,7 @@ describe('AutoSaveService', () => {
         });
 
         it('should warn when disabling non-existent editor', () => {
-            const service = createAutoSaveService(mockProvider);
+            const service = createAutoSaveService(mockSystemService);
             const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
             service.disable('non-existent');
@@ -440,13 +436,13 @@ describe('AutoSaveService', () => {
 
     describe('getStatus', () => {
         it('should return IDLE for unregistered editor', () => {
-            const service = createAutoSaveService(mockProvider);
+            const service = createAutoSaveService(mockSystemService);
 
             expect(service.getStatus('non-existent')).toBe(SaveStatus.IDLE);
         });
 
         it('should return current status', () => {
-            const service = createAutoSaveService(mockProvider);
+            const service = createAutoSaveService(mockSystemService);
             const { service: mockEditor } = createMockEditorService('doc-123');
 
             service.register('doc-123', mockEditor);
@@ -462,7 +458,7 @@ describe('AutoSaveService', () => {
             const statusCalls: SaveStatus[] = [];
             const onStatusChange = (status: SaveStatus) => statusCalls.push(status);
 
-            const service = createAutoSaveService(mockProvider, {
+            const service = createAutoSaveService(mockSystemService, {
                 debounceMs: 50,
                 onStatusChange,
             });
@@ -490,7 +486,7 @@ describe('AutoSaveService', () => {
 
         it('should call onError when save fails', async () => {
             const onErrorSpy = vi.fn();
-            const service = createAutoSaveService(mockProvider, {
+            const service = createAutoSaveService(mockSystemService, {
                 onError: onErrorSpy,
             });
             const { service: mockEditor, mocks } = createMockEditorService('doc-123');
@@ -511,7 +507,7 @@ describe('AutoSaveService', () => {
         it('should clean up all editors and timers', () => {
             vi.useFakeTimers();
 
-            const service = createAutoSaveService(mockProvider);
+            const service = createAutoSaveService(mockSystemService);
             const { service: mockEditor1 } = createMockEditorService('doc-123');
             const { service: mockEditor2 } = createMockEditorService('doc-456');
 
@@ -534,7 +530,7 @@ describe('AutoSaveService', () => {
         });
 
         it('should handle destroy gracefully when no editors registered', () => {
-            const service = createAutoSaveService(mockProvider);
+            const service = createAutoSaveService(mockSystemService);
 
             expect(() => {
                 service.destroy();
@@ -546,7 +542,7 @@ describe('AutoSaveService', () => {
         it('should handle multiple editors independently', async () => {
             vi.useFakeTimers();
 
-            const service = createAutoSaveService(mockProvider, {
+            const service = createAutoSaveService(mockSystemService, {
                 debounceMs: 100,
                 maxWaitMs: 500,
             });

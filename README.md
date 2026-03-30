@@ -62,10 +62,24 @@ pnpm build      # 构建项目
 
 ## 📚 文档
 
-- [产品文档](docs/01-product/README.md) - 产品愿景、需求、路线图
-- [架构文档](docs/02-architecture/README.md) - 系统架构、设计模式
-- [前端文档](docs/03-frontend/README.md) - 技术栈、组件、模块
-- [后端文档](docs/04-backend/README.md) - API、数据库、规范
+### Agents 工作指南
+
+**重要**: 请阅读 [AGENTS.md](AGENTS.md) - 按需读取文档，避免冗余
+
+### 核心文档
+
+| 文档 | 说明 |
+|------|------|
+| [AGENTS.md](AGENTS.md) | **Agents 工作指南** - 文档索引和按需读取指南 |
+| [docs/](docs/architecture/overview.md) | 模块文档 - 架构、前端、后端、Platform、指南 |
+
+### 其他文档
+
+| 文档 | 说明 |
+|------|------|
+| [CHANGELOG.md](CHANGELOG.md) | 版本变更记录 |
+| [VERSION](VERSION) | 当前版本号 |
+| [CLAUDE.md](CLAUDE.md) | 项目指令 |
 
 ## 🎯 核心特性
 

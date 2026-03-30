@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { AuthProvider } from '@/components/auth/auth-provider';
+import { ShortcutProvider } from '@/components/workspace/shortcut-provider';
 import { ContextMenuProvider } from '@/platform/context-menu';
 import './globals.css';
 
@@ -28,7 +29,9 @@ export default function RootLayout({
         <html lang="zh-CN">
             <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
                 <AuthProvider>
-                    <ContextMenuProvider>{children}</ContextMenuProvider>
+                    <ShortcutProvider>
+                        <ContextMenuProvider>{children}</ContextMenuProvider>
+                    </ShortcutProvider>
                 </AuthProvider>
             </body>
         </html>

@@ -7,7 +7,7 @@
  * - 与文件系统集成
  */
 
-import type { IFileSystemProvider } from '../../../platform/file-system/provider';
+import type { FileSystemService } from '../../../platform/file-system/service';
 import type { EditorService, SaveResult } from './EditorService';
 
 /**
@@ -104,21 +104,25 @@ export interface AutoSaveService {
 /**
  * 创建 AutoSaveService 的工厂函数
  *
- * @param fileSystemProvider 文件系统 Provider
+ * @param fileSystemService 文件系统服务实例
  * @param options 自动保存配置选项
  * @returns AutoSaveService 实例
  */
 export function createAutoSaveService(
-    _fileSystemProvider: IFileSystemProvider,
+    fileSystemService: FileSystemService,
     options?: AutoSaveOptions,
 ): AutoSaveService {
-    const { debounceMs = 500, maxWaitMs = 5000, onStatusChange, onError } = options ?? {};
+    const { debounceMs = 2000, maxWaitMs = 5000, onStatusChange, onError } = options ?? {};
 
     /** 已注册的编辑器映射表 */
     const editors = new Map<string, RegisteredEditor>();
 
     /** 每个编辑器的保存状态 */
     const statusMap = new Map<string, SaveStatus>();
+
+    /** 文件系统服务实例 */
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _fileService = fileSystemService;
 
     /**
      * 更新保存状态

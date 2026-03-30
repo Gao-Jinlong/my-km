@@ -1,35 +1,40 @@
 # 文档索引
 
-> docs 目录的文档导航
-
-## 📁 目录结构
-
-```
-docs/
-├── 01-product/           # 产品文档
-├── 02-architecture/      # 架构文档
-├── 03-frontend/          # 前端文档
-├── 04-backend/           # 后端文档
-├── 05-infrastructure/    # 基础设施
-└── exec-plan/            # 长期任务追踪
-```
-
-## 🎯 按角色导航
-
-| 角色 | 推荐文档 |
-|------|----------|
-| **产品经理** | [docs/01-product/](01-product/README.md) |
-| **前端开发者** | [docs/03-frontend/](03-frontend/README.md) |
-| **后端开发者** | [docs/04-backend/](04-backend/README.md) |
-| **架构师** | [docs/02-architecture/](02-architecture/README.md) |
-
-## 🔗 入口文档
-
-| 文档 | 位置 |
-|------|------|
-| **AGENTS.md** | 项目根目录 |
-| **CLAUDE.md** | 项目根目录 |
-| **README.md** | 项目根目录 |
+> **Agents 工作指南**: 请阅读根目录 [AGENTS.md](../AGENTS.md) - 按需读取，避免冗余
 
 ---
-**最后更新**: 2026-03-22
+
+## 📚 模块文档
+
+| 模块 | 文档 | 说明 |
+|------|------|------|
+| 架构 | [architecture/overview.md](./architecture/overview.md) | 系统架构概览 |
+| 前端 | [frontend/architecture.md](./frontend/architecture.md) | 前端架构详解 |
+| 前端 Platform | [frontend/platform/services.md](./frontend/platform/services.md) | DI 容器和服务注册 |
+| 后端 | [backend/architecture.md](./backend/architecture.md) | 后端架构详解 |
+
+## 📖 开发指南
+
+| 指南 | 说明 |
+|------|------|
+| [guides/dev-setup.md](./guides/dev-setup.md) | 开发环境配置 |
+| [guides/code-style.md](./guides/code-style.md) | 代码风格 |
+| [guides/workflow.md](./guides/workflow.md) | 开发工作流 |
+
+---
+
+## 📝 其他文档
+
+### 开发记录
+- [implementation-summary-2026-03-30.md](./implementation-summary-2026-03-30.md) - 前端迭代总结
+- [development/2026-03-25-rich-text-editor.md](./development/2026-03-25-rich-text-editor.md) - 富文本编辑器开发记录
+
+### 实施计划
+- [superpowers/plans/](./superpowers/plans/) - Superpowers 实施计划
+
+### 变更档案
+- [../openspec/changes/archive/](../openspec/changes/archive/) - OpenSpec 归档变更
+
+---
+
+**最后更新**: 2026-03-30

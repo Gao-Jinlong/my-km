@@ -16,11 +16,14 @@ import { ListPlugin } from '@lexical/react/LexicalListPlugin';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { TabIndentationPlugin } from '@lexical/react/LexicalTabIndentationPlugin';
 import { $createParagraphNode, $createTextNode, $getRoot, type EditorThemeClasses } from 'lexical';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { EditorContainer } from '@/features/editor/container/EditorContainer';
 import { blockRegistry } from '@/features/editor/registry/BlockRegistry';
 import type { Document } from '@/features/editor/types';
 import { cn } from '@/lib/utils';
+import { container } from '@/platform/bootstrap';
+import { ContextMenuService } from '@/platform/context-menu/service';
+import type { ContextMenuContext } from '@/platform/context-menu/types';
 
 /**
  * 编辑器主题配置
@@ -139,6 +142,7 @@ interface LexicalEditorProps {
  */
 function LexicalEditorImpl({ documentId, document, className, placeholder }: LexicalEditorProps) {
     const [editorContainer] = useState(() => EditorContainer.getInstance(blockRegistry));
+    const contextMenuServiceRef = useRef<ContextMenuService | null>(null);
 
     // 创建 EditorService 实例
     useEffect(() => {
@@ -148,6 +152,54 @@ function LexicalEditorImpl({ documentId, document, className, placeholder }: Lex
             editorContainer.disposeInstance(documentId);
         };
     }, [documentId, editorContainer]);
+
+    // 注册编辑器右键菜单提供者
+    useEffect(() => {
+        const contextMenuService = container.get(ContextMenuService);
+        contextMenuServiceRef.current = contextMenuService;
+
+        const dispose = contextMenuService.registerProvider(
+            'editor',
+            (_ctx: ContextMenuContext) => {
+                return [
+                    {
+                        id: 'editor-actions',
+                        entries: [
+                            {
+                                id: 'copy',
+                                label: '复制',
+                                action: async () => {
+                                    // TODO: 复制选中文本
+                                    console.log('[Editor ContextMenu] Copy');
+                                },
+                            },
+                            {
+                                id: 'paste',
+                                label: '粘贴',
+                                action: async () => {
+                                    // TODO: 粘贴文本
+                                    console.log('[Editor ContextMenu] Paste');
+                                },
+                            },
+                            { id: 'separator-1', type: 'separator' },
+                            {
+                                id: 'select-all',
+                                label: '全选',
+                                action: async () => {
+                                    // TODO: 全选文本
+                                    console.log('[Editor ContextMenu] Select All');
+                                },
+                            },
+                        ],
+                    },
+                ];
+            },
+        );
+
+        return () => {
+            dispose.dispose();
+        };
+    }, []);
 
     const initialConfig = getInitialConfig(documentId);
 
@@ -167,7 +219,23 @@ function LexicalEditorImpl({ documentId, document, className, placeholder }: Lex
                     <div className="mx-auto max-w-[800px] px-4 py-6">
                         <RichTextPlugin
                             contentEditable={
-                                <ContentEditable className="prose prose-ws min-h-[500px] max-w-none outline-none" />
+                                <ContentEditable
+                                    className="prose prose-ws min-h-[500px] max-w-none outline-none"
+                                    onContextMenu={e => {
+                                        // 触发编辑器右键菜单
+                                        const contextMenuService =
+                                            container.get(ContextMenuService);
+                                        contextMenuService.show(e, {
+                                            target: e.currentTarget,
+                                            data: {
+                                                documentId,
+                                                type: 'editor',
+                                            },
+                                            x: e.clientX,
+                                            y: e.clientY,
+                                        });
+                                    }}
+                                />
                             }
                             placeholder={
                                 <div className="pointer-events-none absolute top-6 left-4 text-ws-fg-placeholder">
