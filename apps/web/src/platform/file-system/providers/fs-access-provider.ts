@@ -125,7 +125,7 @@ export class FileSystemAccessAPIProvider extends Disposable implements IFileSyst
      * 写入文件内容
      */
     async writeFile(path: string, content: FileContent): Promise<void> {
-        const fileHandle = await this.getFileHandle(path, 'readwrite') as FileSystemFileHandle;
+        const fileHandle = (await this.getFileHandle(path, 'readwrite')) as FileSystemFileHandle;
 
         try {
             const writable = await fileHandle.createWritable();
@@ -372,7 +372,7 @@ export class FileSystemAccessAPIProvider extends Disposable implements IFileSyst
         sourceDir: FileSystemDirectoryHandle,
         targetDir: FileSystemDirectoryHandle,
     ): Promise<void> {
-        // @ts-ignore - values() is supported in modern browsers but not in TS lib
+        // @ts-expect-error - values() is supported in modern browsers but not in TS lib
         for await (const entry of sourceDir.values()) {
             if (entry.kind === 'file') {
                 const file = await entry.getFile();

@@ -1,7 +1,8 @@
 'use client';
 
-import { FileText, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useCallback, useEffect } from 'react';
+import { getFileIconComponent } from '@/lib/file-icon';
 import { cn } from '@/lib/utils';
 import { container } from '@/platform/bootstrap';
 import { ContextMenuService } from '@/platform/context-menu/service';
@@ -111,43 +112,47 @@ export function EditorTabs() {
 
     return (
         <div className="flex h-[36px] items-center bg-ws-bg-tertiary">
-            {openDocuments.map(tab => (
-                <div
-                    key={tab.id}
-                    role="tab"
-                    aria-selected={tab.id === activeDocumentId}
-                    tabIndex={0}
-                    onClick={() => handleTabClick(tab.id)}
-                    onContextMenu={e => handleTabContextMenu(e, tab.id)}
-                    onKeyDown={e => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            handleTabClick(tab.id);
-                        }
-                    }}
-                    className={cn(
-                        'group flex cursor-pointer items-center gap-1.5 border-ws-border border-r px-2.5 py-2 text-sm transition-colors',
-                        tab.id === activeDocumentId
-                            ? 'bg-ws-bg-secondary text-ws-fg-primary'
-                            : 'text-ws-fg-muted hover:bg-ws-bg-secondary/50',
-                    )}
-                >
-                    <FileText className="h-3.5 w-3.5 text-ws-icon" />
+            {openDocuments.map(tab => {
+                const { Icon, props } = getFileIconComponent({ path: tab.path });
 
-                    <span className="text-[12px]">{tab.title}</span>
-
-                    {tab.isDirty && <span className="h-1.5 w-1.5 rounded-full bg-ws-accent" />}
-
-                    <button
-                        type="button"
-                        onClick={e => handleCloseClick(e, tab.id)}
-                        className="rounded-sm p-0.5 opacity-0 transition-opacity hover:bg-ws-bg-tertiary group-hover:opacity-100"
-                        aria-label="Close tab"
+                return (
+                    <div
+                        key={tab.id}
+                        role="tab"
+                        aria-selected={tab.id === activeDocumentId}
+                        tabIndex={0}
+                        onClick={() => handleTabClick(tab.id)}
+                        onContextMenu={e => handleTabContextMenu(e, tab.id)}
+                        onKeyDown={e => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                handleTabClick(tab.id);
+                            }
+                        }}
+                        className={cn(
+                            'group flex cursor-pointer items-center gap-1.5 border-ws-border border-r px-2.5 py-2 text-sm transition-colors',
+                            tab.id === activeDocumentId
+                                ? 'bg-ws-bg-secondary text-ws-fg-primary'
+                                : 'text-ws-fg-muted hover:bg-ws-bg-secondary/50',
+                        )}
                     >
-                        <X className="h-3 w-3 text-ws-icon" />
-                    </button>
-                </div>
-            ))}
+                        <Icon {...props} />
+
+                        <span className="text-[12px]">{tab.title}</span>
+
+                        {tab.isDirty && <span className="h-1.5 w-1.5 rounded-full bg-ws-accent" />}
+
+                        <button
+                            type="button"
+                            onClick={e => handleCloseClick(e, tab.id)}
+                            className="rounded-sm p-0.5 opacity-0 transition-opacity hover:bg-ws-bg-tertiary group-hover:opacity-100"
+                            aria-label="Close tab"
+                        >
+                            <X className="h-3 w-3 text-ws-icon" />
+                        </button>
+                    </div>
+                );
+            })}
         </div>
     );
 }

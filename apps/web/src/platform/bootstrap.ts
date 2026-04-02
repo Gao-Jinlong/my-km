@@ -15,6 +15,8 @@
  */
 
 import { CommandService } from './command/service';
+import { registerConditionEvaluators } from './conditional/evaluators';
+import { ConditionalService } from './conditional/service';
 import { ContextMenuService } from './context-menu/service';
 import { ServiceContainer } from './di';
 import { DialogService } from './dialog/service';
@@ -42,6 +44,7 @@ export interface AppServices {
     messageChannelService: MessageChannelService;
     keyboardShortcutService: KeyboardShortcutService;
     panelService: PanelService;
+    conditionalService: ConditionalService;
 }
 
 /**
@@ -62,6 +65,7 @@ function createServiceContainer(): ServiceContainer {
     container.register(MessageChannelService);
     container.register(KeyboardShortcutService);
     container.register(PanelService);
+    container.register(ConditionalService);
 
     return container;
 }
@@ -83,6 +87,9 @@ export function bootstrap(): ServiceContainer {
         console.error('Service validation failed:', validation.errors);
         throw new Error(`Service container validation failed: ${validation.errors.join(', ')}`);
     }
+
+    // 注册条件评估器
+    registerConditionEvaluators();
 
     // 打印依赖图（开发模式）
     if (process.env.NODE_ENV === 'development') {

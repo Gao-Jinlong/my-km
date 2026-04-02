@@ -10,29 +10,13 @@
 
 import { Emitter, type IDisposable, toDisposable } from '@/base/common/event';
 import { ServiceBase } from '@/platform/base/service-base';
+import { container } from '@/platform/bootstrap';
+import { ConditionalService } from '@/platform/conditional/service';
 import { Service } from '@/platform/di';
+import type { ShortcutHandler, ShortcutConfig as KeyboardShortcutConfig, KeyBinding, ShortcutScope } from './types';
 
-/**
- * 快捷键处理器接口
- */
-export interface ShortcutHandler {
-    /** 处理函数 */
-    handle: () => void | Promise<void>;
-    /** 描述 */
-    description?: string;
-}
-
-/**
- * 快捷键配置
- */
-export interface ShortcutConfig {
-    /** 快捷键组合，如 'ctrl+s', 'ctrl+shift+p' */
-    keybinding: string;
-    /** 处理函数 */
-    handler: ShortcutHandler;
-    /** 作用域（可选），如 'editor', 'global', 'file-tree' */
-    scope?: string;
-}
+// 重新导出类型以便现有代码使用
+export type { ShortcutHandler };
 
 /**
  * 注册的快捷键信息
@@ -49,10 +33,12 @@ interface RegisteredShortcut {
  *
  * @example
  * ```typescript
+ * import { KeyBinding, ShortcutScope } from '@/platform/keyboard';
+ *
  * const shortcutService = container.get(KeyboardShortcutService);
  *
- * // 注册快捷键
- * const dispose = shortcutService.register('ctrl+s', {
+ * // 使用枚举注册快捷键
+ * const dispose = shortcutService.register(KeyBinding.CTRL_S, {
  *     handle: () => saveCurrentFile(),
  *     description: '保存当前文件'
  * });
@@ -65,6 +51,9 @@ interface RegisteredShortcut {
 export class KeyboardShortcutService extends ServiceBase {
     private shortcuts = new Map<string, RegisteredShortcut>();
     private keyDownListener: ((e: KeyboardEvent) => void) | null = null;
+
+    // 注入条件服务
+    private readonly conditionalService = container.get(ConditionalService);
 
     // 事件发射器
     private readonly _onShortcutExecuted = new Emitter<{ keybinding: string; scope: string }>();
@@ -94,6 +83,17 @@ export class KeyboardShortcutService extends ServiceBase {
             const shortcut = this.shortcuts.get(keybinding);
 
             if (shortcut) {
+                // 检查条件（如果注册了条件）
+                if (shortcut.handler.condition) {
+                    const isMet = this.conditionalService.evaluate(shortcut.handler.condition);
+                    if (!isMet) {
+                        // 条件不满足，阻止浏览器默认行为，但不执行快捷键
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return;
+                    }
+                }
+
                 e.preventDefault();
                 e.stopPropagation();
 
@@ -189,27 +189,29 @@ export class KeyboardShortcutService extends ServiceBase {
     /**
      * 注册快捷键
      *
-     * @param keybinding 快捷键组合，如 'ctrl+s'
+     * @param keybinding 快捷键组合，如 KeyBinding.CTRL_S 或 'ctrl+s'
      * @param handler 处理函数
      * @param scope 作用域（可选）
      * @returns IDisposable 用于注销快捷键
      *
      * @example
      * ```typescript
-     * // 注册全局快捷键
-     * shortcutService.register('ctrl+s', {
+     * import { KeyBinding, ShortcutScope } from '@/platform/keyboard';
+     *
+     * // 使用枚举注册全局快捷键
+     * shortcutService.register(KeyBinding.CTRL_S, {
      *     handle: () => saveFile(),
      *     description: '保存文件'
      * });
      *
      * // 注册作用域快捷键
-     * shortcutService.register('ctrl+shift+p', {
+     * shortcutService.register(KeyBinding.CTRL_SHIFT_P, {
      *     handle: () => openCommandPalette(),
-     *     description: '打开命令面板'
-     * }, 'global');
+     *     description: '打开命令面板',
+     * }, ShortcutScope.GLOBAL);
      * ```
      */
-    register(keybinding: string, handler: ShortcutHandler, scope: string = 'global'): IDisposable {
+    register(keybinding: KeyBinding | string, handler: ShortcutHandler, scope: ShortcutScope | string = 'global'): IDisposable {
         const normalizedKeybinding = keybinding.toLowerCase();
         const existing = this.shortcuts.get(normalizedKeybinding);
 
@@ -239,7 +241,7 @@ export class KeyboardShortcutService extends ServiceBase {
      * @param configs 快捷键配置数组
      * @returns IDisposable 用于注销所有快捷键
      */
-    registerBatch(configs: ShortcutConfig[]): IDisposable {
+    registerBatch(configs: KeyboardShortcutConfig[]): IDisposable {
         const disposables: IDisposable[] = [];
 
         for (const config of configs) {
@@ -292,6 +294,15 @@ export class KeyboardShortcutService extends ServiceBase {
         const shortcut = this.shortcuts.get(normalizedKeybinding);
 
         if (shortcut) {
+            // 检查条件（如果注册了条件）
+            if (shortcut.handler.condition) {
+                const isMet = this.conditionalService.evaluate(shortcut.handler.condition);
+                if (!isMet) {
+                    // 条件不满足，不执行快捷键
+                    return false;
+                }
+            }
+
             try {
                 const result = shortcut.handler.handle();
                 if (result instanceof Promise) {

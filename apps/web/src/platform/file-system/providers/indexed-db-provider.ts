@@ -376,7 +376,7 @@ export class IndexedDBProvider extends Disposable implements IFileSystemProvider
     async verifyHandle(handle: FileSystemHandle): Promise<boolean> {
         try {
             // 尝试查询权限状态
-            // @ts-ignore - queryPermission is supported in modern browsers but not in TS lib
+            // @ts-expect-error - queryPermission is supported in modern browsers but not in TS lib
             const permission = await handle.queryPermission();
             return permission === 'granted';
         } catch {

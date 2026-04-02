@@ -170,12 +170,9 @@ export class FileOpenService extends ServiceBase {
         // 使用文件路径作为文档 ID（确保唯一性）
         const id = `file:${path}`;
 
-        // 从路径提取标题
-        const title =
-            path
-                .split('/')
-                .pop()
-                ?.replace(/\.[^.]+$/, '') || '未命名文档';
+        // 从路径提取标题（保留扩展名）
+        const fileName = path.split('/').pop() || '未命名文档';
+        const title = fileName;
 
         // 将内容转换为字符串存储
         let contentString: string;

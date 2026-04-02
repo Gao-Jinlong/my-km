@@ -40,7 +40,7 @@ export class IndexedDBProvider implements IStorageProvider {
         if (!this.db) throw new Error('IndexedDB 未初始化');
 
         return new Promise(resolve => {
-            // @ts-ignore - db is guaranteed to exist after check
+            // @ts-expect-error - db is guaranteed to exist after check
             const transaction = this.db.transaction(STORE_NAME, 'readonly');
             const store = transaction.objectStore(STORE_NAME);
             const request = store.get(key);
@@ -57,7 +57,7 @@ export class IndexedDBProvider implements IStorageProvider {
         if (!this.db) throw new Error('IndexedDB 未初始化');
 
         return new Promise((resolve, reject) => {
-            // @ts-ignore - db is guaranteed to exist after check
+            // @ts-expect-error - db is guaranteed to exist after check
             const transaction = this.db.transaction(STORE_NAME, 'readwrite');
             const store = transaction.objectStore(STORE_NAME);
             const request = store.put({ key, value });
@@ -71,7 +71,7 @@ export class IndexedDBProvider implements IStorageProvider {
         if (!this.db) throw new Error('IndexedDB 未初始化');
 
         return new Promise((resolve, reject) => {
-            // @ts-ignore - db is guaranteed to exist after check
+            // @ts-expect-error - db is guaranteed to exist after check
             const transaction = this.db.transaction(STORE_NAME, 'readwrite');
             const store = transaction.objectStore(STORE_NAME);
             const request = store.delete(key);
@@ -85,7 +85,7 @@ export class IndexedDBProvider implements IStorageProvider {
         if (!this.db) throw new Error('IndexedDB 未初始化');
 
         return new Promise(resolve => {
-            // @ts-ignore - db is guaranteed to exist after check
+            // @ts-expect-error - db is guaranteed to exist after check
             const transaction = this.db.transaction(STORE_NAME, 'readonly');
             const store = transaction.objectStore(STORE_NAME);
             const request = store.get(key);
@@ -102,7 +102,7 @@ export class IndexedDBProvider implements IStorageProvider {
         if (!this.db) throw new Error('IndexedDB 未初始化');
 
         return new Promise((resolve, reject) => {
-            // @ts-ignore - db is guaranteed to exist after check
+            // @ts-expect-error - db is guaranteed to exist after check
             const transaction = this.db.transaction(STORE_NAME, 'readonly');
             const store = transaction.objectStore(STORE_NAME);
             const request = store.getAllKeys();
@@ -119,7 +119,7 @@ export class IndexedDBProvider implements IStorageProvider {
         if (!this.db) throw new Error('IndexedDB 未初始化');
 
         return new Promise((resolve, reject) => {
-            // @ts-ignore - db is guaranteed to exist after check
+            // @ts-expect-error - db is guaranteed to exist after check
             const transaction = this.db.transaction(STORE_NAME, 'readwrite');
             const store = transaction.objectStore(STORE_NAME);
             const request = store.clear();

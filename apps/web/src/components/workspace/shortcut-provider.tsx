@@ -10,7 +10,14 @@ import { useEffect, useRef } from 'react';
 import { container } from '@/platform/bootstrap';
 import { EditorTabService } from '@/platform/editor-tab/service';
 import { useEditorTabs } from '@/platform/editor-tab/use-editor-tabs';
-import { KeyboardShortcutService } from '@/platform/keyboard/shortcut.service';
+import { EventBusService } from '@/platform/event-bus/service';
+import { KeyboardShortcutService, KeyBinding, ShortcutScope } from '@/platform/keyboard';
+import { ConditionId } from '@/platform/conditional';
+
+/**
+ * 文件搜索聚焦事件类型
+ */
+const FILE_SEARCH_FOCUS_EVENT = 'file-search.focus';
 
 /**
  * 快捷键提供者组件
@@ -22,12 +29,13 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         // 获取快捷键服务实例
         const shortcutService = container.get(KeyboardShortcutService);
+        const eventBus = container.get(EventBusService);
         shortcutServiceRef.current = shortcutService;
 
         // 注册默认快捷键
         const disposables = shortcutService.registerBatch([
             {
-                keybinding: 'ctrl+w',
+                keybinding: KeyBinding.CTRL_W,
                 handler: {
                     handle: () => {
                         // 关闭当前活动文档
@@ -37,10 +45,10 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
                     },
                     description: '关闭当前标签页',
                 },
-                scope: 'global',
+                scope: ShortcutScope.GLOBAL,
             },
             {
-                keybinding: 'ctrl+s',
+                keybinding: KeyBinding.CTRL_S,
                 handler: {
                     handle: () => {
                         // TODO: 触发保存当前文档
@@ -49,10 +57,10 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
                     },
                     description: '保存当前文档',
                 },
-                scope: 'editor',
+                scope: ShortcutScope.EDITOR,
             },
             {
-                keybinding: 'ctrl+shift+s',
+                keybinding: KeyBinding.CTRL_SHIFT_S,
                 handler: {
                     handle: () => {
                         // TODO: 另存为功能
@@ -60,10 +68,10 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
                     },
                     description: '另存为',
                 },
-                scope: 'editor',
+                scope: ShortcutScope.EDITOR,
             },
             {
-                keybinding: 'ctrl+p',
+                keybinding: KeyBinding.CTRL_P,
                 handler: {
                     handle: () => {
                         // TODO: 快速打开文件
@@ -71,10 +79,10 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
                     },
                     description: '快速打开文件',
                 },
-                scope: 'global',
+                scope: ShortcutScope.GLOBAL,
             },
             {
-                keybinding: 'ctrl+shift+p',
+                keybinding: KeyBinding.CTRL_SHIFT_P,
                 handler: {
                     handle: () => {
                         // TODO: 打开命令面板
@@ -82,10 +90,10 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
                     },
                     description: '打开命令面板',
                 },
-                scope: 'global',
+                scope: ShortcutScope.GLOBAL,
             },
             {
-                keybinding: 'ctrl+tab',
+                keybinding: KeyBinding.CTRL_TAB,
                 handler: {
                     handle: () => {
                         // 切换到下一个标签页
@@ -104,10 +112,10 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
                     },
                     description: '切换到下一个标签页',
                 },
-                scope: 'editor',
+                scope: ShortcutScope.EDITOR,
             },
             {
-                keybinding: 'ctrl+shift+tab',
+                keybinding: KeyBinding.CTRL_SHIFT_TAB,
                 handler: {
                     handle: () => {
                         // 切换到上一个标签页
@@ -127,7 +135,23 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
                     },
                     description: '切换到上一个标签页',
                 },
-                scope: 'editor',
+                scope: ShortcutScope.EDITOR,
+            },
+            {
+                keybinding: KeyBinding.CTRL_F,
+                handler: {
+                    handle: () => {
+                        // 触发文件搜索聚焦事件
+                        eventBus.publish({
+                            type: FILE_SEARCH_FOCUS_EVENT,
+                            source: 'shortcut-provider',
+                            payload: undefined,
+                        });
+                    },
+                    description: '搜索文件',
+                    condition: ConditionId.IS_FILE_PANEL_ACTIVE,
+                },
+                scope: ShortcutScope.FILE_TREE,
             },
         ]);
 

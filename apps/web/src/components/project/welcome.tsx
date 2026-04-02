@@ -101,7 +101,9 @@ export function Welcome({ onOpenProject }: WelcomeProps) {
                                 <h3 className="mb-1.5 font-medium text-base text-ws-fg-primary">
                                     {feature.title}
                                 </h3>
-                                <p className="text-sm leading-relaxed text-ws-fg-muted">{feature.description}</p>
+                                <p className="text-sm leading-relaxed text-ws-fg-muted">
+                                    {feature.description}
+                                </p>
                             </div>
                         ))}
                     </div>

@@ -60,7 +60,11 @@ export class EventBusService extends ServiceBase {
         listener: EventListener<T>,
         options?: EventSubscriptionOptions,
     ) {
-        const subscription: Subscription = { eventType, listener: listener as EventListener<unknown>, options };
+        const subscription: Subscription = {
+            eventType,
+            listener: listener as EventListener<unknown>,
+            options,
+        };
 
         let subs = this.subscriptions.get(eventType);
         if (!subs) {
@@ -96,7 +100,9 @@ export class EventBusService extends ServiceBase {
         // 经过拦截器链
         let processedEvent: EventDefinition<T> | null = fullEvent;
         for (const interceptor of this.interceptors) {
-            processedEvent = interceptor(processedEvent as EventDefinition<unknown>) as EventDefinition<T> | null;
+            processedEvent = interceptor(
+                processedEvent as EventDefinition<unknown>,
+            ) as EventDefinition<T> | null;
             if (processedEvent === null) {
                 return; // 被拦截器阻止
             }

@@ -7,8 +7,9 @@
 
 'use client';
 
-import { ChevronRight, File, Folder, FolderOpen } from 'lucide-react';
+import { ChevronRight, Folder, FolderOpen } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { getFileIconComponent } from '@/lib/file-icon';
 import { cn } from '@/lib/utils';
 import { container } from '@/platform/bootstrap';
 import { ContextMenuService } from '@/platform/context-menu/service';
@@ -19,6 +20,14 @@ import { FileOpenService } from '@/platform/file-open/service';
 import { projectManager } from '@/platform/file-system/project-manager';
 import { FileSystemService } from '@/platform/file-system/service';
 import type { FileStat } from '@/platform/file-system/types';
+
+/**
+ * 文件图标组件 - 根据文件类型显示对应图标
+ */
+function FileIcon({ path }: { path: string }) {
+    const { Icon, props } = getFileIconComponent({ path });
+    return <Icon {...props} />;
+}
 
 interface FileTreeNodeProps {
     file: FileStat;
@@ -108,7 +117,7 @@ function FileTreeNode({
                         )}
                     />
                 )}
-                {!isDirectory && <File className="h-3.5 w-3.5" />}
+                {!isDirectory && <FileIcon path={file.path} />}
                 {isDirectory &&
                     (isExpanded ? (
                         <FolderOpen className="h-4 w-4 text-ws-icon" />
