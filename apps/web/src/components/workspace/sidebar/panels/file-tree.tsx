@@ -129,6 +129,7 @@ function FileTreeNode({
                             expandedNodes={expandedNodes}
                             selectedFile={selectedFile}
                             activeDocumentId={activeDocumentId}
+                            loadedChildren={loadedChildren}
                             onToggleFolder={onToggleFolder}
                             onSelectFile={onSelectFile}
                             onOpenFile={onOpenFile}
@@ -155,12 +156,8 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // 展开状态使用 localStorage 持久化
-    const [expandedNodes, setExpandedNodes] = useState<string[]>(() => {
-        if (typeof window === 'undefined') return [];
-        const stored = localStorage.getItem('file-tree-expanded-nodes');
-        return stored ? JSON.parse(stored) : [];
-    });
+    // 展开状态（不持久化，每次刷新重置）
+    const [expandedNodes, setExpandedNodes] = useState<string[]>([]);
 
     // 已加载的子目录映射：path -> children
     const [loadedChildren, setLoadedChildren] = useState<Map<string, FileStat[]>>(() => new Map());
@@ -172,12 +169,6 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
     const fileOpenService = container.get<FileOpenService>(FileOpenService);
     const contextMenuService = container.get<ContextMenuService>(ContextMenuService);
     const dialogService = container.get<DialogService>(DialogService);
-
-    // 保存展开状态到 localStorage
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-        localStorage.setItem('file-tree-expanded-nodes', JSON.stringify(expandedNodes));
-    }, [expandedNodes]);
 
     // 清除失效的缓存（当文件/文件夹被重命名或删除后）
     const clearStaleCache = useCallback((affectedPath: string, isDirectory: boolean) => {
