@@ -18,9 +18,9 @@ export interface ContextMenuProps {
     onOpenChange?: (open: boolean) => void;
     /** 菜单组 */
     groups: ContextMenuGroup[];
-    /** X 坐标 */
+    /** X 坐标（已计算好的位置） */
     x: number;
-    /** Y 坐标 */
+    /** Y 坐标（已计算好的位置） */
     y?: number;
     /** 触发元素 */
     triggerElement?: HTMLElement | null;
@@ -32,43 +32,9 @@ export interface ContextMenuProps {
 export function ContextMenu({ open, onOpenChange, groups, x, y }: ContextMenuProps) {
     // 菜单容器 ref，用于获取尺寸以进行边界检测
     const menuRef = React.useRef<HTMLDivElement>(null);
-    // 计算菜单位置
-    const [position, setPosition] = React.useState({ x: 0, y: 0 });
 
-    React.useEffect(() => {
-        if (open && x !== undefined && y !== undefined) {
-            // 获取窗口尺寸
-            const viewportWidth = window.innerWidth;
-            const viewportHeight = window.innerHeight;
-
-            // 默认菜单位置
-            let posX = x;
-            let posY = y;
-
-            // 获取菜单尺寸（如果已渲染）
-            const menuRect = menuRef.current?.getBoundingClientRect();
-            const menuWidth = menuRect?.width || 220;
-            const menuHeight = menuRect?.height || 300;
-
-            // 边界检测 - X 轴
-            if (posX + menuWidth > viewportWidth) {
-                posX = viewportWidth - menuWidth - 8;
-            }
-            if (posX < 8) {
-                posX = 8;
-            }
-
-            // 边界检测 - Y 轴
-            if (posY + menuHeight > viewportHeight) {
-                posY = viewportHeight - menuHeight - 8;
-            }
-            if (posY < 8) {
-                posY = 8;
-            }
-
-            setPosition({ x: posX, y: posY });
-        }
-    }, [open, x, y]);
+    // 注意：位置计算已由 ContextMenuProvider 处理
+    // x, y 参数现在是已计算好的最终位置，直接使用即可
 
     // 点击菜单外部时关闭菜单
     React.useEffect(() => {
@@ -112,8 +78,8 @@ export function ContextMenu({ open, onOpenChange, groups, x, y }: ContextMenuPro
                 'fixed z-50 min-w-55 overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md',
             )}
             style={{
-                left: `${position.x}px`,
-                top: `${position.y}px`,
+                left: `${x}px`,
+                top: `${y}px`,
             }}
             onContextMenu={handleContextMenu}
             role="menu"

@@ -220,7 +220,12 @@ export class IndexedDBProvider extends Disposable implements IFileSystemProvider
 
         try {
             const writable = await handle.createWritable();
-            await writable.write(content);
+            // 将 Uint8Array 转换为 ArrayBuffer，或字符串直接写入
+            if (content instanceof Uint8Array) {
+                await writable.write(content.buffer as unknown as ArrayBuffer);
+            } else {
+                await writable.write(content);
+            }
             await writable.close();
         } catch (error) {
             throw new WriteFailedError(path, error as Error);
@@ -371,6 +376,7 @@ export class IndexedDBProvider extends Disposable implements IFileSystemProvider
     async verifyHandle(handle: FileSystemHandle): Promise<boolean> {
         try {
             // 尝试查询权限状态
+            // @ts-ignore - queryPermission is supported in modern browsers but not in TS lib
             const permission = await handle.queryPermission();
             return permission === 'granted';
         } catch {

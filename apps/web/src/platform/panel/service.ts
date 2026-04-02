@@ -324,7 +324,7 @@ export class PanelService extends ServiceBase {
      */
     isVisible(id: string): boolean {
         const state = this._states.get(id);
-        return state?.expanded && state.size > 0;
+        return !!(state?.expanded && state.size > 0);
     }
 
     /**

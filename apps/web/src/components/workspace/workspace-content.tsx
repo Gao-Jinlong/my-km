@@ -67,11 +67,13 @@ export function WorkspaceContent() {
     }, [setSidebarCollapsed]);
 
     // 处理面板大小变化
-    const handleSidebarResize = (size: number) => {
+    const handleSidebarResize = (panelSize: import('react-resizable-panels').PanelSize) => {
+        const size = typeof panelSize === 'number' ? panelSize : 0;
         panelServiceRef.current?.setSize('sidebar', size, true);
     };
 
-    const handleAIPanelResize = (size: number) => {
+    const handleAIPanelResize = (panelSize: import('react-resizable-panels').PanelSize) => {
+        const size = typeof panelSize === 'number' ? panelSize : 0;
         panelServiceRef.current?.setSize('ai-panel', size, true);
     };
 

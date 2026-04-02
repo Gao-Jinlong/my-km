@@ -1,6 +1,7 @@
 // apps/web/src/platform/command/types.ts
 
 import type { Event } from '@/base/common/event';
+import type { IDisposable } from '@/base/common/lifecycle';
 
 /**
  * 命令执行上下文

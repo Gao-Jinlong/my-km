@@ -27,9 +27,8 @@ export class DialogService extends ServiceBase {
      * @returns 用户输入的值，取消时返回 null
      */
     askText(title: string, defaultValue?: string): Promise<string | null> {
-        const { request, promise } = this.createRequest('input', title, undefined, defaultValue);
-        this._onDidRequestDialog.fire(request);
-        return promise;
+        const { promise } = this.createRequest('input', title, undefined, defaultValue);
+        return promise as Promise<string | null>;
     }
 
     /**
@@ -39,9 +38,8 @@ export class DialogService extends ServiceBase {
      * @returns 用户点击确定返回 true，取消返回 false
      */
     confirm(message: string): Promise<boolean> {
-        const { request, promise } = this.createRequest('confirm', '确认', message);
-        this._onDidRequestDialog.fire(request);
-        return promise;
+        const { promise } = this.createRequest('confirm', '确认', message);
+        return promise as Promise<boolean>;
     }
 
     /**
@@ -51,9 +49,8 @@ export class DialogService extends ServiceBase {
      * @returns 用户关闭对话框后 resolve
      */
     alert(message: string): Promise<void> {
-        const { request, promise } = this.createRequest('alert', '提示', message);
-        this._onDidRequestDialog.fire(request);
-        return promise;
+        const { promise } = this.createRequest('alert', '提示', message);
+        return promise as Promise<void>;
     }
 
     /**
@@ -70,11 +67,11 @@ export class DialogService extends ServiceBase {
         title: string,
         message?: string,
         defaultValue?: string,
-    ): { request: DialogRequest; promise: Promise<string | boolean | null | undefined> } {
+    ): { request: DialogRequest; promise: Promise<unknown> } {
         const id = `dialog-${++this._counter}`;
 
-        let resolveFn: (value: string | boolean | null | undefined) => void;
-        const promise = new Promise<string | boolean | null | undefined>(r => {
+        let resolveFn: ((value: unknown) => void) | undefined;
+        const promise = new Promise<unknown>(r => {
             resolveFn = r;
         });
 
@@ -84,7 +81,7 @@ export class DialogService extends ServiceBase {
             title,
             message,
             defaultValue,
-            resolve: resolveFn as (value: string | boolean | null | undefined) => void,
+            resolve: resolveFn!,
         };
 
         return { request, promise };

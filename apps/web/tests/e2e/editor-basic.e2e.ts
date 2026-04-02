@@ -243,8 +243,7 @@ test.describe('Editor Persistence E2E', () => {
             const restoredContent = await restoredEditor.textContent();
 
             // 验证内容已恢复（根据实际保存机制）
-            expect(restoredContent).toContain(uniqueText) ||
-                expect(restoredContent).toContain('Unique test content');
+            expect(restoredContent).toContain(uniqueText);
         }
     });
 });

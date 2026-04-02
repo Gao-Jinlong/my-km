@@ -1,5 +1,6 @@
 import { ServiceBase } from '@/platform/base/service-base';
 import { Service } from '@/platform/di';
+import type { IDisposable } from '@/base/common/lifecycle';
 import { PermissionDeniedError, ProviderNotFoundError } from './errors';
 import type { IFileSystemProvider } from './provider';
 import { type FileContent, type FileStat, FileSystemCapability, type ParsedPath } from './types';

@@ -20,10 +20,45 @@ interface MenuState {
     open: boolean;
     context: ContextMenuContext | null;
     groups: import('./types').ContextMenuGroup[];
+    position: { x: number; y: number };
 }
 
 // 在模块级别获取服务实例，避免每次渲染都获取
 const contextMenuService = container.get<ContextMenuService>(ContextMenuService);
+
+/**
+ * 计算菜单位置（带边界检测）
+ */
+function calculateMenuPosition(
+    x: number,
+    y: number,
+    menuWidth: number = 220,
+    menuHeight: number = 300,
+): { x: number; y: number } {
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    let posX = x;
+    let posY = y;
+
+    // X 轴边界检测
+    if (posX + menuWidth > viewportWidth) {
+        posX = viewportWidth - menuWidth - 8;
+    }
+    if (posX < 8) {
+        posX = 8;
+    }
+
+    // Y 轴边界检测
+    if (posY + menuHeight > viewportHeight) {
+        posY = viewportHeight - menuHeight - 8;
+    }
+    if (posY < 8) {
+        posY = 8;
+    }
+
+    return { x: posX, y: posY };
+}
 
 /**
  * 右键菜单提供者 - 应用根组件级别
@@ -51,6 +86,7 @@ export function ContextMenuProvider({ children }: ContextMenuProviderProps) {
         open: false,
         context: null,
         groups: [],
+        position: { x: 0, y: 0 },
     });
 
     React.useEffect(() => {
@@ -58,10 +94,15 @@ export function ContextMenuProvider({ children }: ContextMenuProviderProps) {
         const unsubShown = contextMenuService.onMenuShown((ctx: ContextMenuContext) => {
             const groups =
                 (ctx.data as { groups?: import('./types').ContextMenuGroup[] })?.groups || [];
+
+            // 计算菜单位置（带边界检测）
+            const calculatedPos = calculateMenuPosition(ctx.x, ctx.y);
+
             setMenuState({
                 open: true,
                 context: ctx,
                 groups,
+                position: calculatedPos,
             });
         });
 
@@ -91,8 +132,8 @@ export function ContextMenuProvider({ children }: ContextMenuProviderProps) {
                     open={menuState.open}
                     onOpenChange={handleOpenChange}
                     groups={menuState.groups}
-                    x={menuState.context.x}
-                    y={menuState.context.y}
+                    x={menuState.position.x}
+                    y={menuState.position.y}
                     triggerElement={menuState.context.target}
                 />
             )}

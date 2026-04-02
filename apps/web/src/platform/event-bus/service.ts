@@ -11,7 +11,7 @@ import type {
 
 interface Subscription {
     eventType: string;
-    listener: EventListener;
+    listener: EventListener<unknown>;
     options?: EventSubscriptionOptions;
 }
 
@@ -60,7 +60,7 @@ export class EventBusService extends ServiceBase {
         listener: EventListener<T>,
         options?: EventSubscriptionOptions,
     ) {
-        const subscription: Subscription = { eventType, listener, options };
+        const subscription: Subscription = { eventType, listener: listener as EventListener<unknown>, options };
 
         let subs = this.subscriptions.get(eventType);
         if (!subs) {
@@ -96,7 +96,7 @@ export class EventBusService extends ServiceBase {
         // 经过拦截器链
         let processedEvent: EventDefinition<T> | null = fullEvent;
         for (const interceptor of this.interceptors) {
-            processedEvent = interceptor(processedEvent as EventDefinition);
+            processedEvent = interceptor(processedEvent as EventDefinition<unknown>) as EventDefinition<T> | null;
             if (processedEvent === null) {
                 return; // 被拦截器阻止
             }

@@ -50,10 +50,12 @@
     --color-ws-bg-primary: var(--ws-bg-primary);
     --color-ws-bg-secondary: var(--ws-bg-secondary);
     --color-ws-bg-tertiary: var(--ws-bg-tertiary);
+    --color-ws-bg-hover: var(--ws-bg-hover);
     --color-ws-border: var(--ws-border);
     --color-ws-fg-primary: var(--ws-fg-primary);
     --color-ws-fg-muted: var(--ws-fg-muted);
     --color-ws-accent: var(--ws-accent);
+    --color-ws-accent-foreground: var(--ws-accent-foreground);
     --color-ws-icon: var(--ws-icon);
 }
 
@@ -95,10 +97,12 @@
     --ws-bg-primary: #ffffff;
     --ws-bg-secondary: #f6f8fa;
     --ws-bg-tertiary: #ebeef1;
+    --ws-bg-hover: #f3f4f6;
     --ws-border: #d0d7de;
     --ws-fg-primary: #1f2328;
     --ws-fg-muted: #636c76;
     --ws-accent: #0969da;
+    --ws-accent-foreground: #ffffff;
     --ws-icon: #636c76;
 }
 
@@ -139,10 +143,12 @@
     --ws-bg-primary: #181818;
     --ws-bg-secondary: #1e1e1e;
     --ws-bg-tertiary: #252525;
+    --ws-bg-hover: #2a2a2a;
     --ws-border: #333333;
     --ws-fg-primary: #cccccc;
     --ws-fg-muted: #999999;
     --ws-accent: #58a6ff;
+    --ws-accent-foreground: #000000;
     --ws-icon: #999999;
 }
 
