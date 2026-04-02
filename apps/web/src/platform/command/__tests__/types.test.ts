@@ -40,10 +40,10 @@ describe('CommandService Types', () => {
                 console.log('Before:', ctx.commandId);
                 return true;
             },
-            after: (ctx, result) => {
+            after: (_ctx, result) => {
                 console.log('After:', result);
             },
-            onError: (ctx, error) => {
+            onError: (_ctx, error) => {
                 console.error('Error:', error);
             },
             priority: 0,

@@ -26,6 +26,7 @@ interface FileTreeNodeProps {
     expandedNodes: string[];
     selectedFile: string | null;
     activeDocumentId: string | null;
+    loadedChildren: Map<string, FileStat[]>;
     onToggleFolder: (path: string) => void;
     onSelectFile: (path: string) => void;
     onOpenFile: (path: string) => Promise<void>;
@@ -41,30 +42,19 @@ function FileTreeNode({
     expandedNodes,
     selectedFile,
     activeDocumentId,
+    loadedChildren,
     onToggleFolder,
     onSelectFile,
     onOpenFile,
     onContextMenu,
 }: FileTreeNodeProps) {
-    const [children, setChildren] = useState<FileStat[]>([]);
-    const [isLoaded, setIsLoaded] = useState(false);
-
     const isExpanded = expandedNodes.includes(file.path);
     const isSelected = selectedFile === file.path;
     const isDirectory = file.type === 'directory';
+    const children = loadedChildren.get(file.path) || [];
 
     const handleClick = async () => {
         if (isDirectory) {
-            if (!isLoaded) {
-                try {
-                    const fileSystemService = container.get<FileSystemService>(FileSystemService);
-                    const childFiles = await fileSystemService.listFiles(file.path);
-                    setChildren(childFiles);
-                    setIsLoaded(true);
-                } catch (err) {
-                    console.error('加载子目录失败:', err);
-                }
-            }
             onToggleFolder(file.path);
         } else {
             // 点击文件时，先更新选中状态，然后打开文件
@@ -161,10 +151,19 @@ interface FileTreeProps {
  */
 export function FileTree({ className, onFileSelect }: FileTreeProps) {
     const [files, setFiles] = useState<FileStat[]>([]);
-    const [expandedNodes, setExpandedNodes] = useState<string[]>([]);
     const [selectedFile, setSelectedFile] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    // 展开状态使用 localStorage 持久化
+    const [expandedNodes, setExpandedNodes] = useState<string[]>(() => {
+        if (typeof window === 'undefined') return [];
+        const stored = localStorage.getItem('file-tree-expanded-nodes');
+        return stored ? JSON.parse(stored) : [];
+    });
+
+    // 已加载的子目录映射：path -> children
+    const [loadedChildren, setLoadedChildren] = useState<Map<string, FileStat[]>>(() => new Map());
 
     const { activeDocumentId } = useEditorTabs();
 
@@ -173,6 +172,35 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
     const fileOpenService = container.get<FileOpenService>(FileOpenService);
     const contextMenuService = container.get<ContextMenuService>(ContextMenuService);
     const dialogService = container.get<DialogService>(DialogService);
+
+    // 保存展开状态到 localStorage
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        localStorage.setItem('file-tree-expanded-nodes', JSON.stringify(expandedNodes));
+    }, [expandedNodes]);
+
+    // 清除失效的缓存（当文件/文件夹被重命名或删除后）
+    const clearStaleCache = useCallback((affectedPath: string, isDirectory: boolean) => {
+        setLoadedChildren(prevMap => {
+            const newMap = new Map(prevMap);
+            // 删除被操作目录的缓存
+            newMap.delete(affectedPath);
+            // 删除所有子目录的缓存
+            for (const key of newMap.keys()) {
+                if (key.startsWith(`${affectedPath}/`)) {
+                    newMap.delete(key);
+                }
+            }
+            // 如果是文件，删除其父目录的缓存以刷新显示
+            if (!isDirectory) {
+                const parentPath = affectedPath.substring(0, affectedPath.lastIndexOf('/'));
+                if (parentPath) {
+                    newMap.delete(parentPath);
+                }
+            }
+            return newMap;
+        });
+    }, []);
 
     // 加载文件树
     const loadFiles = useCallback(async () => {
@@ -188,9 +216,6 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
 
             const rootFiles = await fileSystemService.listFiles('file://');
             setFiles(rootFiles);
-
-            const directories = rootFiles.filter(f => f.type === 'directory').map(f => f.path);
-            setExpandedNodes(directories);
         } catch (err) {
             setError(err instanceof Error ? err.message : '加载文件失败');
         } finally {
@@ -248,7 +273,14 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                                             newFilePath,
                                             new Uint8Array(),
                                         );
-                                        await loadFiles();
+                                        // 清除父目录缓存并重新加载
+                                        clearStaleCache(targetDir, true);
+                                        // 重新加载目标目录
+                                        const updatedFiles =
+                                            await fileSystemService.listFiles(targetDir);
+                                        setLoadedChildren(prev =>
+                                            new Map(prev).set(targetDir, updatedFiles),
+                                        );
                                         console.log('新建文件成功:', newFilePath);
                                     } catch (err) {
                                         console.error('新建文件失败:', err);
@@ -269,7 +301,13 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                                     try {
                                         const newFolderPath = `${targetDir}/${folderName}`;
                                         await fileSystemService.createDirectory(newFolderPath);
-                                        await loadFiles();
+                                        // 清除父目录缓存并重新加载
+                                        clearStaleCache(targetDir, true);
+                                        const updatedFiles =
+                                            await fileSystemService.listFiles(targetDir);
+                                        setLoadedChildren(prev =>
+                                            new Map(prev).set(targetDir, updatedFiles),
+                                        );
                                         console.log('新建文件夹成功:', newFolderPath);
                                     } catch (err) {
                                         console.error('新建文件夹失败:', err);
@@ -279,7 +317,8 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                                     }
                                 },
                             },
-                            { id: 'separator-1', type: 'separator' },
+                            // separator-1: 只在 open 显示时显示（右键文件）
+                            { id: 'separator-1', type: 'separator', hidden: isDirectory || isRoot },
                             {
                                 id: 'open',
                                 label: '打开',
@@ -288,7 +327,8 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                                     await fileOpenService.openFile(fileData.path);
                                 },
                             },
-                            { id: 'separator-2', type: 'separator' },
+                            // separator-2: 只在 rename/delete 显示时显示（非根目录）
+                            { id: 'separator-2', type: 'separator', hidden: isRoot },
                             {
                                 id: 'rename',
                                 label: '重命名',
@@ -302,6 +342,13 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                                     if (!newName || newName === currentName) return;
 
                                     try {
+                                        const oldPath = fileData.path;
+                                        // 获取父目录路径
+                                        const parentPath = oldPath.substring(
+                                            0,
+                                            oldPath.lastIndexOf('/'),
+                                        );
+
                                         if (isDirectory) {
                                             await fileSystemService.renameDirectory(
                                                 fileData.path,
@@ -313,7 +360,18 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                                                 newName,
                                             );
                                         }
-                                        await loadFiles();
+                                        // 清除旧路径缓存
+                                        clearStaleCache(oldPath, isDirectory);
+                                        // 重新加载父目录
+                                        const updatedFiles = await fileSystemService.listFiles(
+                                            parentPath || 'file://',
+                                        );
+                                        setLoadedChildren(prev =>
+                                            new Map(prev).set(
+                                                parentPath || 'file://',
+                                                updatedFiles,
+                                            ),
+                                        );
                                         console.log('重命名成功:', fileData.path, '->', newName);
                                     } catch (err) {
                                         console.error('重命名失败:', err);
@@ -337,12 +395,29 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                                     }
 
                                     try {
+                                        // 获取父目录路径
+                                        const parentPath = fileData.path.substring(
+                                            0,
+                                            fileData.path.lastIndexOf('/'),
+                                        );
+
                                         if (isDirectory) {
                                             await fileSystemService.deleteDirectory(fileData.path);
                                         } else {
                                             await fileSystemService.deleteFile(fileData.path);
                                         }
-                                        await loadFiles();
+                                        // 清除被删除项的缓存
+                                        clearStaleCache(fileData.path, isDirectory);
+                                        // 重新加载父目录
+                                        const updatedFiles = await fileSystemService.listFiles(
+                                            parentPath || 'file://',
+                                        );
+                                        setLoadedChildren(prev =>
+                                            new Map(prev).set(
+                                                parentPath || 'file://',
+                                                updatedFiles,
+                                            ),
+                                        );
                                         console.log('删除成功:', fileData.path);
                                     } catch (err) {
                                         console.error('删除失败:', err);
@@ -361,13 +436,38 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
         return () => {
             dispose.dispose();
         };
-    }, [contextMenuService, dialogService, fileOpenService, fileSystemService, loadFiles]);
+    }, [contextMenuService, dialogService, fileOpenService, fileSystemService, clearStaleCache]);
 
-    const handleToggleFolder = useCallback((folderPath: string) => {
-        setExpandedNodes(prev =>
-            prev.includes(folderPath) ? prev.filter(p => p !== folderPath) : [...prev, folderPath],
-        );
-    }, []);
+    const handleToggleFolder = useCallback(
+        (folderPath: string) => {
+            setExpandedNodes(prev => {
+                const isExpanded = prev.includes(folderPath);
+                if (isExpanded) {
+                    // 折叠
+                    return prev.filter(p => p !== folderPath);
+                } else {
+                    // 展开 - 如果还未加载，先加载
+                    if (!loadedChildren.has(folderPath)) {
+                        // 异步加载，先返回展开状态
+                        setTimeout(async () => {
+                            try {
+                                const fileSystemService =
+                                    container.get<FileSystemService>(FileSystemService);
+                                const childFiles = await fileSystemService.listFiles(folderPath);
+                                setLoadedChildren(prevMap =>
+                                    new Map(prevMap).set(folderPath, childFiles),
+                                );
+                            } catch (err) {
+                                console.error('加载子目录失败:', err);
+                            }
+                        }, 0);
+                    }
+                    return [...prev, folderPath];
+                }
+            });
+        },
+        [loadedChildren],
+    );
 
     const _handleSelectFile = useCallback(
         (filePath: string) => {
@@ -466,6 +566,7 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                     expandedNodes={expandedNodes}
                     selectedFile={selectedFile}
                     activeDocumentId={activeDocumentId}
+                    loadedChildren={loadedChildren}
                     onToggleFolder={handleToggleFolder}
                     onSelectFile={_handleSelectFile}
                     onOpenFile={handleFileOpen}

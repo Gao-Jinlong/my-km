@@ -25,6 +25,7 @@ import { FileOpenService } from './file-open/service';
 import { FileSystemService } from './file-system/service';
 import { KeyboardShortcutService } from './keyboard/shortcut.service';
 import { MessageChannelService } from './message-channel/service';
+import { PanelService } from './panel/service';
 
 /**
  * 应用服务容器类型
@@ -40,6 +41,7 @@ export interface AppServices {
     commandService: CommandService;
     messageChannelService: MessageChannelService;
     keyboardShortcutService: KeyboardShortcutService;
+    panelService: PanelService;
 }
 
 /**
@@ -59,6 +61,7 @@ function createServiceContainer(): ServiceContainer {
     container.register(CommandService);
     container.register(MessageChannelService);
     container.register(KeyboardShortcutService);
+    container.register(PanelService);
 
     return container;
 }

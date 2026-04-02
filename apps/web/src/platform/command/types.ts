@@ -25,7 +25,7 @@ export interface CommandContext {
 /**
  * 命令处理器
  */
-export type CommandHandler = (context: CommandContext) => void | Promise<unknown>;
+export type CommandHandler = (context: CommandContext) => undefined | Promise<unknown>;
 
 /**
  * 命令元数据
@@ -72,7 +72,7 @@ export interface CommandDefinition extends CommandMetadata {
  */
 export interface CommandInterceptor {
     /** 执行前钩子（可取消） */
-    before?: (context: CommandContext) => void | Promise<boolean | void>;
+    before?: (context: CommandContext) => undefined | Promise<boolean | undefined>;
 
     /** 执行后钩子 */
     after?: (context: CommandContext, result: unknown) => void;

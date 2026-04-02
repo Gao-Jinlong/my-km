@@ -286,6 +286,102 @@ export class FileSystemAccessAPIProvider extends Disposable implements IFileSyst
     }
 
     /**
+     * 重命名文件/目录
+     *
+     * 使用 File System Access API 的 move 操作实现
+     * 注意：move API 仍在实验阶段，这里通过复制 + 删除实现
+     */
+    async rename(oldPath: string, newName: string): Promise<void> {
+        const parentPath = this.dirname(oldPath);
+        const oldName = this.basename(oldPath);
+        const _newPath = `${parentPath}/${newName}`;
+
+        const parentHandle = await this.getDirectoryHandle(parentPath);
+
+        try {
+            // 获取原句柄 - 先尝试文件，再尝试目录
+            let oldHandle: FileSystemHandle;
+            let isDirectory: boolean;
+
+            try {
+                oldHandle = await (parentHandle as FileSystemDirectoryHandle).getFileHandle(
+                    oldName,
+                );
+                isDirectory = false;
+            } catch (fileError) {
+                if ((fileError as DOMException).name === 'NotFoundError') {
+                    // 不是文件，尝试目录
+                    oldHandle = await (
+                        parentHandle as FileSystemDirectoryHandle
+                    ).getDirectoryHandle(oldName);
+                    isDirectory = true;
+                } else {
+                    // 其他错误（包括 TypeMismatchError），抛出
+                    throw fileError;
+                }
+            }
+
+            // File System Access API 没有直接的 rename 方法
+            // 需要通过复制 + 删除实现
+            if (isDirectory) {
+                // 目录重命名：创建新目录 -> 递归复制内容 -> 删除原目录
+                const newDirHandle = await parentHandle.getDirectoryHandle(newName, {
+                    create: true,
+                });
+                await this._copyDirectoryContents(
+                    oldHandle as FileSystemDirectoryHandle,
+                    newDirHandle as FileSystemDirectoryHandle,
+                );
+                await parentHandle.removeEntry(oldName, { recursive: true });
+            } else {
+                // 文件重命名：读取 -> 写入新文件 -> 删除原文件
+                const oldFileHandle = await (
+                    parentHandle as FileSystemDirectoryHandle
+                ).getFileHandle(oldName);
+                const file = await oldFileHandle.getFile();
+                const content = await file.text();
+
+                const newFileHandle = await parentHandle.getFileHandle(newName, { create: true });
+                const writable = await newFileHandle.createWritable();
+                await writable.write(content);
+                await writable.close();
+
+                await parentHandle.removeEntry(oldName);
+            }
+
+            // 清理缓存
+            this.handleCache.clear();
+        } catch (error) {
+            if ((error as DOMException).name === 'NotFoundError') {
+                throw new FileNotFoundError(oldPath);
+            }
+            throw new WriteFailedError(oldPath, error as Error);
+        }
+    }
+
+    /**
+     * 递归复制目录内容
+     */
+    private async _copyDirectoryContents(
+        sourceDir: FileSystemDirectoryHandle,
+        targetDir: FileSystemDirectoryHandle,
+    ): Promise<void> {
+        for await (const entry of sourceDir.values()) {
+            if (entry.kind === 'file') {
+                const file = await entry.getFile();
+                const content = await file.text();
+                const newFile = await targetDir.getFileHandle(entry.name, { create: true });
+                const writable = await newFile.createWritable();
+                await writable.write(content);
+                await writable.close();
+            } else {
+                const newSubDir = await targetDir.getDirectoryHandle(entry.name, { create: true });
+                await this._copyDirectoryContents(entry as FileSystemDirectoryHandle, newSubDir);
+            }
+        }
+    }
+
+    /**
      * 设置目录句柄（用于从外部传入）
      */
     setDirectoryHandle(handle: FileSystemDirectoryHandle): void {

@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Group, Panel, Separator } from 'react-resizable-panels';
 import { PANEL_SIZES } from '@/lib/workspace/constants';
+import { container } from '@/platform/bootstrap';
 import { DialogProvider } from '@/platform/dialog';
+import { PanelService } from '@/platform/panel/service';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import { AIPanel } from './ai-panel/ai-panel';
 import { EditorArea } from './editor/editor-area';
@@ -15,7 +17,63 @@ const LAYOUT_VERSION = '1.0.0';
 const VERSION_KEY = 'workspace-layout-version';
 
 export function WorkspaceContent() {
-    const { sidebarCollapsed } = useWorkspaceStore();
+    const { sidebarCollapsed, setSidebarCollapsed } = useWorkspaceStore();
+    const panelServiceRef = useRef<PanelService | null>(null);
+
+    // 初始化面板服务
+    useEffect(() => {
+        const panelService = container.get(PanelService);
+        panelServiceRef.current = panelService;
+
+        // 注册侧边栏面板
+        panelService.register('sidebar', {
+            id: 'sidebar',
+            collapsible: true,
+            hideable: true,
+            defaultSize: 20,
+            minSize: 15,
+            maxSize: 40,
+            collapsedSize: 4,
+        });
+
+        // 注册 AI 面板
+        panelService.register('ai-panel', {
+            id: 'ai-panel',
+            collapsible: true,
+            hideable: true,
+            defaultSize: 25,
+            minSize: 20,
+            maxSize: 45,
+            collapsedSize: 4,
+        });
+
+        // 设置自动隐藏阈值为 10%
+        panelService.setAutoHideThreshold(10);
+
+        // 监听面板大小变化，实现自动隐藏
+        const dispose = panelService.onDidChangeSize(({ id, size }) => {
+            if (size < 10 && panelService.isExpanded(id)) {
+                // 当面板缩小到 10% 以下时，自动隐藏
+                panelService.hide(id);
+                if (id === 'sidebar') {
+                    setSidebarCollapsed(true);
+                }
+            }
+        });
+
+        return () => {
+            dispose.dispose();
+        };
+    }, [setSidebarCollapsed]);
+
+    // 处理面板大小变化
+    const handleSidebarResize = (size: number) => {
+        panelServiceRef.current?.setSize('sidebar', size, true);
+    };
+
+    const handleAIPanelResize = (size: number) => {
+        panelServiceRef.current?.setSize('ai-panel', size, true);
+    };
 
     // 一次性清理：如果版本不匹配，清除旧的 panel 布局数据
     useEffect(() => {
@@ -56,6 +114,7 @@ export function WorkspaceContent() {
                             maxSize={PANEL_SIZES.SIDEBAR.MAX}
                             collapsible={true}
                             collapsedSize={PANEL_SIZES.SIDEBAR.COLLAPSED}
+                            onResize={handleSidebarResize}
                         >
                             <Sidebar collapsed={sidebarCollapsed} />
                         </Panel>
@@ -81,6 +140,7 @@ export function WorkspaceContent() {
                             maxSize={PANEL_SIZES.AI_PANEL.MAX}
                             collapsible={true}
                             collapsedSize={PANEL_SIZES.AI_PANEL.COLLAPSED}
+                            onResize={handleAIPanelResize}
                         >
                             <AIPanel />
                         </Panel>
