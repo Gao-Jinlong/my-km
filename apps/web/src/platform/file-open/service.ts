@@ -12,8 +12,9 @@ import { ServiceBase } from '@/platform/base/service-base';
 import { container } from '@/platform/bootstrap';
 import { Service } from '@/platform/di';
 import { EditorContainer } from '@/platform/editor/container';
+import { EditorTabService } from '@/platform/editor-tab/service';
+import type { OpenDocument } from '@/platform/editor-tab/types';
 import { FileSystemService } from '@/platform/file-system/service';
-import { type OpenDocument, useEditorUIStore } from '@/stores/editor-ui-store';
 
 /**
  * 文件打开服务
@@ -33,11 +34,13 @@ import { type OpenDocument, useEditorUIStore } from '@/stores/editor-ui-store';
 export class FileOpenService extends ServiceBase {
     private fileService: FileSystemService;
     private editorContainer: EditorContainer;
+    private editorTabService: EditorTabService;
 
     constructor() {
         super();
         this.fileService = container.get(FileSystemService);
         this.editorContainer = container.get(EditorContainer);
+        this.editorTabService = container.get(EditorTabService);
     }
 
     /**
@@ -63,8 +66,8 @@ export class FileOpenService extends ServiceBase {
             // 创建文档对象
             const document = this.createDocument(path, content, docType);
 
-            // 更新 UI Store（打开文档）
-            useEditorUIStore.getState().openDocument(document);
+            // 打开文档标签
+            this.editorTabService.openDocument(document);
 
             // TODO: 创建/获取编辑器实例并加载文档
             // const editor = this.editorContainer.createInstance(document.id);
@@ -99,8 +102,8 @@ export class FileOpenService extends ServiceBase {
      * @param path 文件路径
      */
     closeFile(path: string): void {
-        // 从 UI Store 中查找文档
-        const { openDocuments, closeDocument } = useEditorUIStore.getState();
+        // 从标签服务中查找文档
+        const openDocuments = this.editorTabService.getOpenDocuments();
         const openDoc = openDocuments.find(doc => doc.path === path);
 
         if (openDoc) {
@@ -108,7 +111,7 @@ export class FileOpenService extends ServiceBase {
             this.editorContainer.disposeInstance(openDoc.id);
 
             // 关闭文档
-            closeDocument(openDoc.id);
+            this.editorTabService.closeDocument(openDoc.id);
 
             console.log(`[FileOpenService] Closed file: ${path}`);
         }
@@ -121,8 +124,8 @@ export class FileOpenService extends ServiceBase {
         // 销毁所有编辑器实例
         this.editorContainer.disposeAll();
 
-        // 清空 UI Store
-        useEditorUIStore.getState().closeAllDocuments();
+        // 关闭所有文档标签
+        this.editorTabService.closeAllDocuments();
 
         console.log('[FileOpenService] Closed all files');
     }

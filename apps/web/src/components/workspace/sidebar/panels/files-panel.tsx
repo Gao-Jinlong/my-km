@@ -1,7 +1,7 @@
 'use client';
 
-import type { PanelComponentProps } from './index';
 import { FileTree } from './file-tree';
+import type { PanelComponentProps } from './index';
 
 export function FilesPanel({ state, onStateChange }: PanelComponentProps) {
     const expandedFolders = state?.expandedNodes ?? [];
@@ -24,7 +24,7 @@ export function FilesPanel({ state, onStateChange }: PanelComponentProps) {
             </div>
 
             {/* 文件树 */}
-            <FileTree onFileSelect={handleFileSelect} />
+            <FileTree onFileSelect={handleFileSelect} className="flex-1" />
 
             {/* 调试信息（仅开发环境） */}
             {process.env.NODE_ENV === 'development' && (

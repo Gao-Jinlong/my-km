@@ -1,9 +1,11 @@
 'use client';
 
 import { FileText, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useEditorUIStore } from '@/stores/editor-ui-store';
 import { useCallback, useEffect } from 'react';
+import { cn } from '@/lib/utils';
+import { container } from '@/platform/bootstrap';
+import { ContextMenuService } from '@/platform/context-menu/service';
+import { useEditorTabs } from '@/platform/editor-tab/use-editor-tabs';
 
 /**
  * EditorTabs - 编辑器标签页组件
@@ -12,12 +14,7 @@ import { useCallback, useEffect } from 'react';
  * 支持切换和关闭文档
  */
 export function EditorTabs() {
-    const {
-        openDocuments,
-        activeDocumentId,
-        activateDocument,
-        closeDocument,
-    } = useEditorUIStore();
+    const { openDocuments, activeDocumentId, activateDocument, closeDocument } = useEditorTabs();
 
     const handleTabClick = useCallback(
         (documentId: string) => {
@@ -33,6 +30,59 @@ export function EditorTabs() {
         },
         [closeDocument],
     );
+
+    // 右键菜单处理
+    const handleTabContextMenu = useCallback((e: React.MouseEvent, tabId: string) => {
+        e.preventDefault();
+        const contextMenuService = container.get<ContextMenuService>(ContextMenuService);
+        contextMenuService.show(e, { data: { tabId } });
+    }, []);
+
+    // 注册编辑器标签页右键菜单
+    useEffect(() => {
+        const contextMenuService = container.get<ContextMenuService>(ContextMenuService);
+        const dispose = contextMenuService.registerProvider('editorTab', async ctx => {
+            const tabId = ctx.data?.tabId as string;
+            const tab = openDocuments.find(d => d.id === tabId);
+            if (!tab) return [];
+
+            return [
+                {
+                    id: 'tab-actions',
+                    entries: [
+                        { id: 'close', label: '关闭', action: () => closeDocument(tabId) },
+                        {
+                            id: 'close-others',
+                            label: '关闭其他',
+                            action: () => {
+                                for (const doc of openDocuments) {
+                                    if (doc.id !== tabId) {
+                                        closeDocument(doc.id);
+                                    }
+                                }
+                            },
+                        },
+                        {
+                            id: 'close-all',
+                            label: '关闭所有',
+                            action: () => {
+                                for (const doc of openDocuments) {
+                                    closeDocument(doc.id);
+                                }
+                            },
+                        },
+                        { id: 'sep-1', type: 'separator' as const },
+                        {
+                            id: 'copy-path',
+                            label: '复制路径',
+                            action: () => navigator.clipboard.writeText(tab.path),
+                        },
+                    ],
+                },
+            ];
+        });
+        return () => dispose.dispose();
+    }, [openDocuments, closeDocument]);
 
     // 键盘快捷键处理
     useEffect(() => {
@@ -68,6 +118,7 @@ export function EditorTabs() {
                     aria-selected={tab.id === activeDocumentId}
                     tabIndex={0}
                     onClick={() => handleTabClick(tab.id)}
+                    onContextMenu={e => handleTabContextMenu(e, tab.id)}
                     onKeyDown={e => {
                         if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
@@ -85,9 +136,7 @@ export function EditorTabs() {
 
                     <span className="text-[12px]">{tab.title}</span>
 
-                    {tab.isDirty && (
-                        <span className="h-1.5 w-1.5 rounded-full bg-ws-accent" />
-                    )}
+                    {tab.isDirty && <span className="h-1.5 w-1.5 rounded-full bg-ws-accent" />}
 
                     <button
                         type="button"

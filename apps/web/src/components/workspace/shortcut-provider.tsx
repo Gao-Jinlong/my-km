@@ -8,15 +8,16 @@
 
 import { useEffect, useRef } from 'react';
 import { container } from '@/platform/bootstrap';
+import { EditorTabService } from '@/platform/editor-tab/service';
+import { useEditorTabs } from '@/platform/editor-tab/use-editor-tabs';
 import { KeyboardShortcutService } from '@/platform/keyboard/shortcut.service';
-import { useEditorUIStore } from '@/stores/editor-ui-store';
 
 /**
  * 快捷键提供者组件
  */
 export function ShortcutProvider({ children }: { children: React.ReactNode }) {
     const shortcutServiceRef = useRef<KeyboardShortcutService | null>(null);
-    const { openDocuments, activeDocumentId, closeDocument } = useEditorUIStore();
+    const { openDocuments, activeDocumentId, closeDocument } = useEditorTabs();
 
     useEffect(() => {
         // 获取快捷键服务实例
@@ -96,7 +97,8 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
                             const nextDoc = openDocuments[nextIndex];
                             if (nextDoc) {
                                 // 激活下一个文档
-                                useEditorUIStore.getState().activateDocument(nextDoc.id);
+                                const tabService = container.get(EditorTabService);
+                                tabService.activateDocument(nextDoc.id);
                             }
                         }
                     },
@@ -118,7 +120,8 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
                             const prevDoc = openDocuments[prevIndex];
                             if (prevDoc) {
                                 // 激活上一个文档
-                                useEditorUIStore.getState().activateDocument(prevDoc.id);
+                                const tabService = container.get(EditorTabService);
+                                tabService.activateDocument(prevDoc.id);
                             }
                         }
                     },

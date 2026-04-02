@@ -13,17 +13,19 @@ import { cn } from '@/lib/utils';
 import { container } from '@/platform/bootstrap';
 import { ContextMenuService } from '@/platform/context-menu/service';
 import type { ContextMenuContext } from '@/platform/context-menu/types';
+import { DialogService } from '@/platform/dialog/service';
+import { useEditorTabs } from '@/platform/editor-tab/use-editor-tabs';
 import { FileOpenService } from '@/platform/file-open/service';
 import { projectManager } from '@/platform/file-system/project-manager';
 import { FileSystemService } from '@/platform/file-system/service';
 import type { FileStat } from '@/platform/file-system/types';
-import { useEditorUIStore } from '@/stores/editor-ui-store';
 
 interface FileTreeNodeProps {
     file: FileStat;
     depth: number;
     expandedNodes: string[];
     selectedFile: string | null;
+    activeDocumentId: string | null;
     onToggleFolder: (path: string) => void;
     onSelectFile: (path: string) => void;
     onOpenFile: (path: string) => Promise<void>;
@@ -38,6 +40,7 @@ function FileTreeNode({
     depth,
     expandedNodes,
     selectedFile,
+    activeDocumentId,
     onToggleFolder,
     onSelectFile,
     onOpenFile,
@@ -93,17 +96,19 @@ function FileTreeNode({
                 onDoubleClick={handleDoubleClick}
                 onKeyUp={e => {
                     if (e.key === 'Enter' || e.key === ' ') {
-                        handleClick(e);
+                        handleClick();
                     }
                 }}
                 onContextMenu={handleContextMenuClick}
                 className={cn(
                     'flex cursor-pointer items-center gap-1.5 rounded-sm px-2 py-1 text-sm transition-colors',
-                    isSelected
-                        ? 'bg-ws-accent/20 text-ws-fg-primary'
-                        : 'text-ws-fg-secondary hover:bg-ws-bg-secondary',
+                    !isDirectory && activeDocumentId === `file:${file.path}`
+                        ? 'bg-ws-accent/20 font-medium text-ws-fg-primary'
+                        : isSelected
+                          ? 'bg-ws-accent/10 text-ws-fg-primary'
+                          : 'text-ws-fg-secondary hover:bg-ws-bg-secondary',
                 )}
-                style={{ paddingLeft: `${depth * 12 + 8}px` }}
+                style={{ paddingLeft: `${depth * 20 + 8}px` }}
             >
                 {isDirectory && (
                     <ChevronRight
@@ -133,6 +138,7 @@ function FileTreeNode({
                             depth={depth + 1}
                             expandedNodes={expandedNodes}
                             selectedFile={selectedFile}
+                            activeDocumentId={activeDocumentId}
                             onToggleFolder={onToggleFolder}
                             onSelectFile={onSelectFile}
                             onOpenFile={onOpenFile}
@@ -160,12 +166,13 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const { openDocument: _openDocument } = useEditorUIStore();
+    const { activeDocumentId } = useEditorTabs();
 
     // 获取服务实例
     const fileSystemService = container.get<FileSystemService>(FileSystemService);
     const fileOpenService = container.get<FileOpenService>(FileOpenService);
     const contextMenuService = container.get<ContextMenuService>(ContextMenuService);
+    const dialogService = container.get<DialogService>(DialogService);
 
     // 加载文件树
     const loadFiles = useCallback(async () => {
@@ -232,7 +239,7 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                                 id: 'new-file',
                                 label: '新建文件',
                                 action: async () => {
-                                    const fileName = prompt('请输入文件名:');
+                                    const fileName = await dialogService.askText('请输入文件名:');
                                     if (!fileName) return;
 
                                     try {
@@ -245,7 +252,9 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                                         console.log('新建文件成功:', newFilePath);
                                     } catch (err) {
                                         console.error('新建文件失败:', err);
-                                        alert(`新建文件失败：${(err as Error).message}`);
+                                        await dialogService.alert(
+                                            `新建文件失败：${(err as Error).message}`,
+                                        );
                                     }
                                 },
                             },
@@ -253,7 +262,8 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                                 id: 'new-folder',
                                 label: '新建文件夹',
                                 action: async () => {
-                                    const folderName = prompt('请输入文件夹名称:');
+                                    const folderName =
+                                        await dialogService.askText('请输入文件夹名称:');
                                     if (!folderName) return;
 
                                     try {
@@ -263,7 +273,9 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                                         console.log('新建文件夹成功:', newFolderPath);
                                     } catch (err) {
                                         console.error('新建文件夹失败:', err);
-                                        alert(`新建文件夹失败：${(err as Error).message}`);
+                                        await dialogService.alert(
+                                            `新建文件夹失败：${(err as Error).message}`,
+                                        );
                                     }
                                 },
                             },
@@ -283,7 +295,10 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                                 hidden: isRoot,
                                 action: async () => {
                                     const currentName = fileData.path.split('/').pop() || '';
-                                    const newName = prompt('请输入新名称:', currentName);
+                                    const newName = await dialogService.askText(
+                                        '请输入新名称:',
+                                        currentName,
+                                    );
                                     if (!newName || newName === currentName) return;
 
                                     try {
@@ -302,7 +317,9 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                                         console.log('重命名成功:', fileData.path, '->', newName);
                                     } catch (err) {
                                         console.error('重命名失败:', err);
-                                        alert(`重命名失败：${(err as Error).message}`);
+                                        await dialogService.alert(
+                                            `重命名失败：${(err as Error).message}`,
+                                        );
                                     }
                                 },
                             },
@@ -312,11 +329,10 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                                 hidden: isRoot,
                                 action: async () => {
                                     const currentName = fileData.path.split('/').pop() || '';
-                                    if (
-                                        !confirm(
-                                            `确定要删除 "${currentName}" 吗？${isDirectory ? '文件夹及其内容' : '文件'}将被永久删除。`,
-                                        )
-                                    ) {
+                                    const confirmed = await dialogService.confirm(
+                                        `确定要删除 "${currentName}" 吗？${isDirectory ? '文件夹及其内容' : '文件'}将被永久删除。`,
+                                    );
+                                    if (!confirmed) {
                                         return;
                                     }
 
@@ -330,7 +346,9 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                                         console.log('删除成功:', fileData.path);
                                     } catch (err) {
                                         console.error('删除失败:', err);
-                                        alert(`删除失败：${(err as Error).message}`);
+                                        await dialogService.alert(
+                                            `删除失败：${(err as Error).message}`,
+                                        );
                                     }
                                 },
                             },
@@ -343,7 +361,7 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
         return () => {
             dispose.dispose();
         };
-    }, [contextMenuService, fileOpenService, fileSystemService, loadFiles]);
+    }, [contextMenuService, dialogService, fileOpenService, fileSystemService, loadFiles]);
 
     const handleToggleFolder = useCallback((folderPath: string) => {
         setExpandedNodes(prev =>
@@ -437,7 +455,7 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
     return (
         <div
             role="tree"
-            className={cn('overflow-y-auto py-2', className)}
+            className={cn('h-full overflow-y-auto py-2', className)}
             onContextMenu={handleEmptySpaceContextMenu}
         >
             {files.map(file => (
@@ -447,6 +465,7 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                     depth={0}
                     expandedNodes={expandedNodes}
                     selectedFile={selectedFile}
+                    activeDocumentId={activeDocumentId}
                     onToggleFolder={handleToggleFolder}
                     onSelectFile={_handleSelectFile}
                     onOpenFile={handleFileOpen}

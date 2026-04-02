@@ -17,7 +17,9 @@
 import { CommandService } from './command/service';
 import { ContextMenuService } from './context-menu/service';
 import { ServiceContainer } from './di';
+import { DialogService } from './dialog/service';
 import { EditorContainer } from './editor/container';
+import { EditorTabService } from './editor-tab/service';
 import { EventBusService } from './event-bus/service';
 import { FileOpenService } from './file-open/service';
 import { FileSystemService } from './file-system/service';
@@ -30,7 +32,9 @@ import { MessageChannelService } from './message-channel/service';
 export interface AppServices {
     fileSystemService: FileSystemService;
     contextMenuService: ContextMenuService;
+    dialogService: DialogService;
     editorContainer: EditorContainer;
+    editorTabService: EditorTabService;
     fileOpenService: FileOpenService;
     eventBusService: EventBusService;
     commandService: CommandService;
@@ -47,7 +51,9 @@ function createServiceContainer(): ServiceContainer {
     // 注册所有服务
     container.register(FileSystemService);
     container.register(ContextMenuService);
+    container.register(DialogService);
     container.register(EditorContainer);
+    container.register(EditorTabService);
     container.register(FileOpenService);
     container.register(EventBusService);
     container.register(CommandService);
