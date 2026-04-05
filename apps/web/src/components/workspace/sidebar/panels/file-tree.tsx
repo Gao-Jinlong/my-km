@@ -8,7 +8,7 @@
 'use client';
 
 import { ChevronRight, Folder, FolderOpen } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getFileIconComponent } from '@/lib/file-icon';
 import { cn } from '@/lib/utils';
 import { container } from '@/platform/bootstrap';
@@ -167,11 +167,13 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
 
     // 展开状态（不持久化，每次刷新重置）
     const [expandedNodes, setExpandedNodes] = useState<string[]>([]);
+    const expandedNodesRef = useRef<string[]>([]);
+    expandedNodesRef.current = expandedNodes;
 
     // 已加载的子目录映射：path -> children
     const [loadedChildren, setLoadedChildren] = useState<Map<string, FileStat[]>>(() => new Map());
 
-    const { activeDocumentId } = useEditorTabs();
+    const { activeDocumentId, closeDocument, openDocuments } = useEditorTabs();
 
     // 获取服务实例
     const fileSystemService = container.get<FileSystemService>(FileSystemService);
@@ -227,6 +229,21 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
         loadFiles();
     }, [loadFiles]);
 
+    // 刷新整个文件树（根目录 + 所有已展开目录的子节点）
+    const refreshTree = useCallback(async () => {
+        await loadFiles();
+        // 重新加载所有已展开目录的子节点
+        const currentExpanded = expandedNodesRef.current;
+        for (const folderPath of currentExpanded) {
+            try {
+                const childFiles = await fileSystemService.listFiles(folderPath);
+                setLoadedChildren(prevMap => new Map(prevMap).set(folderPath, childFiles));
+            } catch (err) {
+                console.error('刷新目录失败:', folderPath, err);
+            }
+        }
+    }, [loadFiles, fileSystemService]);
+
     // 注册文件树右键菜单提供者
     useEffect(() => {
         const dispose = contextMenuService.registerProvider(
@@ -273,14 +290,8 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                                             newFilePath,
                                             new Uint8Array(),
                                         );
-                                        // 清除父目录缓存并重新加载
                                         clearStaleCache(targetDir, true);
-                                        // 重新加载目标目录
-                                        const updatedFiles =
-                                            await fileSystemService.listFiles(targetDir);
-                                        setLoadedChildren(prev =>
-                                            new Map(prev).set(targetDir, updatedFiles),
-                                        );
+                                        await refreshTree();
                                         console.log('新建文件成功:', newFilePath);
                                     } catch (err) {
                                         console.error('新建文件失败:', err);
@@ -301,13 +312,8 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                                     try {
                                         const newFolderPath = `${targetDir}/${folderName}`;
                                         await fileSystemService.createDirectory(newFolderPath);
-                                        // 清除父目录缓存并重新加载
                                         clearStaleCache(targetDir, true);
-                                        const updatedFiles =
-                                            await fileSystemService.listFiles(targetDir);
-                                        setLoadedChildren(prev =>
-                                            new Map(prev).set(targetDir, updatedFiles),
-                                        );
+                                        await refreshTree();
                                         console.log('新建文件夹成功:', newFolderPath);
                                     } catch (err) {
                                         console.error('新建文件夹失败:', err);
@@ -343,11 +349,6 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
 
                                     try {
                                         const oldPath = fileData.path;
-                                        // 获取父目录路径
-                                        const parentPath = oldPath.substring(
-                                            0,
-                                            oldPath.lastIndexOf('/'),
-                                        );
 
                                         if (isDirectory) {
                                             await fileSystemService.renameDirectory(
@@ -360,18 +361,8 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                                                 newName,
                                             );
                                         }
-                                        // 清除旧路径缓存
                                         clearStaleCache(oldPath, isDirectory);
-                                        // 重新加载父目录
-                                        const updatedFiles = await fileSystemService.listFiles(
-                                            parentPath || 'file://',
-                                        );
-                                        setLoadedChildren(prev =>
-                                            new Map(prev).set(
-                                                parentPath || 'file://',
-                                                updatedFiles,
-                                            ),
-                                        );
+                                        await refreshTree();
                                         console.log('重命名成功:', fileData.path, '->', newName);
                                     } catch (err) {
                                         console.error('重命名失败:', err);
@@ -395,29 +386,25 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                                     }
 
                                     try {
-                                        // 获取父目录路径
-                                        const parentPath = fileData.path.substring(
-                                            0,
-                                            fileData.path.lastIndexOf('/'),
-                                        );
-
                                         if (isDirectory) {
                                             await fileSystemService.deleteDirectory(fileData.path);
                                         } else {
                                             await fileSystemService.deleteFile(fileData.path);
                                         }
-                                        // 清除被删除项的缓存
                                         clearStaleCache(fileData.path, isDirectory);
-                                        // 重新加载父目录
-                                        const updatedFiles = await fileSystemService.listFiles(
-                                            parentPath || 'file://',
-                                        );
-                                        setLoadedChildren(prev =>
-                                            new Map(prev).set(
-                                                parentPath || 'file://',
-                                                updatedFiles,
-                                            ),
-                                        );
+                                        // 关闭被删除文件对应的编辑器 tab
+                                        if (isDirectory) {
+                                            // 目录：关闭所有以该目录路径开头的 tab
+                                            const prefix = `file:${fileData.path}/`;
+                                            for (const doc of openDocuments) {
+                                                if (doc.id.startsWith(prefix)) {
+                                                    closeDocument(doc.id);
+                                                }
+                                            }
+                                        } else {
+                                            closeDocument(`file:${fileData.path}`);
+                                        }
+                                        await refreshTree();
                                         console.log('删除成功:', fileData.path);
                                     } catch (err) {
                                         console.error('删除失败:', err);
@@ -436,7 +423,16 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
         return () => {
             dispose.dispose();
         };
-    }, [contextMenuService, dialogService, fileOpenService, fileSystemService, clearStaleCache]);
+    }, [
+        contextMenuService,
+        dialogService,
+        fileOpenService,
+        fileSystemService,
+        clearStaleCache,
+        refreshTree,
+        closeDocument,
+        openDocuments,
+    ]);
 
     const handleToggleFolder = useCallback(
         (folderPath: string) => {
@@ -545,9 +541,13 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
 
     if (files.length === 0) {
         return (
-            <div className={cn('flex h-full items-center justify-center p-4', className)}>
-                <p className="text-center text-sm text-ws-fg-placeholder">暂无文件</p>
-                <p className="mt-2 text-ws-fg-muted text-xs">请先打开一个项目</p>
+            <div
+                role="tree"
+                className={cn('flex h-full flex-col items-center justify-center p-4', className)}
+                onContextMenu={handleEmptySpaceContextMenu}
+            >
+                <p className="text-sm text-ws-fg-placeholder">暂无文件</p>
+                <p className="mt-1 text-ws-fg-muted text-xs">请先打开一个项目</p>
             </div>
         );
     }

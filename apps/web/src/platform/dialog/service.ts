@@ -81,8 +81,11 @@ export class DialogService extends ServiceBase {
             title,
             message,
             defaultValue,
-            resolve: resolveFn!,
+            resolve: resolveFn as (value: string | null) => void,
         };
+
+        // 通知 UI 组件显示对话框
+        this._onDidRequestDialog.fire(request);
 
         return { request, promise };
     }
