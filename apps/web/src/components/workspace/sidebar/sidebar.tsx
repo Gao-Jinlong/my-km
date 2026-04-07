@@ -3,7 +3,6 @@
 import { useCallback } from 'react';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import type { TabPanelState } from '@/types/workspace';
-import { ActivityBar } from './activity-bar';
 import { getPanelComponent, hasPanel } from './panels';
 
 interface SidebarProps {
@@ -31,13 +30,10 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
     const PanelComponent = activeTab?.panelId ? getPanelComponent(activeTab.panelId) : null;
 
     return (
-        <div className="flex h-full border-ws-border border-r bg-ws-bg-primary">
-            {/* Activity Bar - Always visible */}
-            <ActivityBar />
-
+        <div className="flex h-full flex-col bg-ws-bg-primary">
             {/* Sidebar Panel Content - Hidden when collapsed */}
             {!collapsed && (
-                <div className="flex h-full flex-1 flex-col bg-ws-bg-primary">
+                <>
                     {/* Header - 面板标题 */}
                     <div className="flex h-10 shrink-0 items-center px-4">
                         <h2 className="font-semibold text-[11px] text-ws-fg-muted uppercase tracking-wide">
@@ -66,7 +62,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
                             </div>
                         )}
                     </div>
-                </div>
+                </>
             )}
         </div>
     );

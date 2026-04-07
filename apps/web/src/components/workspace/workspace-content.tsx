@@ -9,6 +9,7 @@ import { PanelService } from '@/platform/panel/service';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import { AIPanel } from './ai-panel/ai-panel';
 import { EditorArea } from './editor/editor-area';
+import { ActivityBar } from './sidebar/activity-bar';
 import { Sidebar } from './sidebar/sidebar';
 import { StatusBar } from './status-bar';
 import { TopNav } from './top-nav';
@@ -33,7 +34,7 @@ export function WorkspaceContent() {
             defaultSize: 20,
             minSize: 15,
             maxSize: 40,
-            collapsedSize: 4,
+            collapsedSize: 0,
         });
 
         // 注册 AI 面板
@@ -106,10 +107,14 @@ export function WorkspaceContent() {
             <div className="flex h-screen w-full flex-col bg-ws-bg-primary">
                 <TopNav />
 
-                <div className="flex-1 overflow-hidden">
-                    <Group orientation="horizontal">
-                        {/* Left Sidebar */}
-                        <Panel
+                <div className="flex flex-1 overflow-hidden">
+                    {/* Activity Bar - always visible, outside collapsible panel */}
+                    <ActivityBar />
+
+                    <div className="flex-1 overflow-hidden">
+                        <Group orientation="horizontal">
+                            {/* Left Sidebar Content */}
+                            <Panel
                             id="sidebar-panel"
                             defaultSize={PANEL_SIZES.SIDEBAR.DEFAULT}
                             minSize={PANEL_SIZES.SIDEBAR.MIN}
@@ -147,6 +152,7 @@ export function WorkspaceContent() {
                             <AIPanel />
                         </Panel>
                     </Group>
+                    </div>
                 </div>
 
                 <StatusBar />

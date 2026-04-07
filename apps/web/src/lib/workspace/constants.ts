@@ -9,7 +9,7 @@ export const PANEL_SIZES = {
         DEFAULT: '20', // 20% (~256px)
         MIN: '15', // 15% (~192px)
         MAX: '40', // 40% (~576px)
-        COLLAPSED: '4', // 4% (~48px)
+        COLLAPSED: '0', // 0% - fully hidden when collapsed
     },
     EDITOR: {
         DEFAULT: '55', // 55%
