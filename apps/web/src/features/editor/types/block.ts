@@ -12,17 +12,46 @@ export type BlockType =
     | 'formula';
 
 /**
+ * 行内格式标记
+ */
+export type InlineMark =
+    | 'bold'
+    | 'italic'
+    | 'underline'
+    | 'strikethrough'
+    | 'code'
+    | 'highlight'
+    | 'subscript'
+    | 'superscript';
+
+/**
+ * 行内内容单元
+ */
+export interface Inline {
+    text: string;
+    bold?: boolean;
+    italic?: boolean;
+    underline?: boolean;
+    strikethrough?: boolean;
+    code?: boolean;
+    highlight?: boolean;
+    subscript?: boolean;
+    superscript?: boolean;
+    link?: { url: string; title?: string };
+}
+
+/**
  * 段落块内容
  */
 export interface ParagraphContent {
-    text: string;
+    inline: Inline[];
 }
 
 /**
  * 标题块内容
  */
 export interface HeadingContent {
-    text: string;
+    inline: Inline[];
     level: 1 | 2 | 3 | 4 | 5 | 6;
 }
 
@@ -31,7 +60,7 @@ export interface HeadingContent {
  */
 export interface ListItem {
     id: string;
-    text: string;
+    inline: Inline[];
     checked?: boolean;
 }
 
@@ -47,7 +76,7 @@ export interface ListContent {
  * 引用块内容
  */
 export interface QuoteContent {
-    text: string;
+    inline: Inline[];
     cite?: string;
 }
 

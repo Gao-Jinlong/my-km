@@ -6,6 +6,8 @@
 
 'use client';
 
+import { CodeNode } from '@lexical/code';
+import { LinkNode } from '@lexical/link';
 import { ListItemNode, ListNode } from '@lexical/list';
 import { AutoFocusPlugin } from '@lexical/react/LexicalAutoFocusPlugin';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
@@ -15,10 +17,10 @@ import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin';
 import { ListPlugin } from '@lexical/react/LexicalListPlugin';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { TabIndentationPlugin } from '@lexical/react/LexicalTabIndentationPlugin';
-import { $createParagraphNode, $createTextNode, $getRoot, type EditorThemeClasses } from 'lexical';
-import { useEffect, useRef, useState } from 'react';
+import { HeadingNode, QuoteNode } from '@lexical/rich-text';
+import type { EditorThemeClasses } from 'lexical';
+import { useEffect, useRef } from 'react';
 import { EditorContainer } from '@/features/editor/container/EditorContainer';
-import { blockRegistry } from '@/features/editor/registry/BlockRegistry';
 import type { Document } from '@/features/editor/types';
 import { cn } from '@/lib/utils';
 import { container } from '@/platform/bootstrap';
@@ -80,59 +82,77 @@ const theme: EditorThemeClasses = {
 };
 
 /**
+ * EditorBridgePlugin - 将 Lexical 实例注入 EditorService
+ */
+function EditorBridgePlugin({ documentId, filePath }: { documentId: string; filePath: string }) {
+    const [editor] = useLexicalComposerContext();
+    const editorServiceRef = useRef<ReturnType<
+        typeof EditorContainer.prototype.createInstance
+    > | null>(null);
+
+    useEffect(() => {
+        // 获取 EditorContainer 并创建服务实例
+        const editorContainer = container.get(EditorContainer);
+        editorServiceRef.current = editorContainer.createInstance(documentId, filePath);
+
+        // 将 Lexical 实例注入 EditorService
+        if (editorServiceRef.current) {
+            editorServiceRef.current.setEditor(editor);
+        }
+
+        // 清理时在容器上调用 disposeInstance
+        return () => {
+            if (editorServiceRef.current) {
+                editorContainer.disposeInstance(documentId);
+            }
+        };
+    }, [documentId, filePath, editor]);
+
+    return null;
+}
+
+/**
+ * EditorContentPlugin - 监听 document prop 变化并加载内容
+ */
+function EditorContentPlugin({ document: doc }: { document: Document | null }) {
+    const [editor] = useLexicalComposerContext();
+    const lastLoadedContentRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        if (!doc || !editor) return;
+
+        // 计算当前内容的 hash，防止重复加载
+        const contentHash = JSON.stringify(doc.content);
+        if (contentHash === lastLoadedContentRef.current) {
+            return;
+        }
+        lastLoadedContentRef.current = contentHash;
+
+        // 使用 BlockLexicalConverter 将 Block[] 渲染到编辑器
+        blocksToLexical(doc.content, editor);
+    }, [doc, editor]);
+
+    return null;
+}
+
+/**
  * 编辑器初始化配置
  */
 function getInitialConfig(documentId: string) {
     return {
         namespace: `editor-${documentId}`,
         theme,
-        nodes: [ListNode, ListItemNode],
+        nodes: [ListNode, ListItemNode, HeadingNode, QuoteNode, CodeNode, LinkNode],
         onError: (error: Error) => {
             console.error('[LexicalEditor] Error:', error);
         },
     };
 }
 
-/**
- * 编辑器内容插件 - 负责加载文档内容
- */
-function EditorContentPlugin({ document: doc }: { document: Document | null }) {
-    const [editor] = useLexicalComposerContext();
-
-    useEffect(() => {
-        if (!doc || !editor) return;
-
-        // 读取文档内容并加载到编辑器
-        editor.update(() => {
-            const root = $getRoot();
-            root.clear();
-
-            // 将 Block 内容转换为 Lexical 节点
-            if (doc.content && doc.content.length > 0) {
-                doc.content.forEach(block => {
-                    const paragraph = $createParagraphNode();
-                    const text = $createTextNode(
-                        typeof block.content === 'string'
-                            ? block.content
-                            : JSON.stringify(block.content),
-                    );
-                    paragraph.append(text);
-                    root.append(paragraph);
-                });
-            } else {
-                // 空文档，创建空段落
-                const paragraph = $createParagraphNode();
-                root.append(paragraph);
-            }
-        });
-    }, [doc, editor]);
-
-    return null;
-}
-
 interface LexicalEditorProps {
     documentId: string;
     document: Document | null;
+    filePath: string;
     className?: string;
     placeholder?: string;
 }
@@ -140,18 +160,14 @@ interface LexicalEditorProps {
 /**
  * LexicalEditor 组件内部实现
  */
-function LexicalEditorImpl({ documentId, document, className, placeholder }: LexicalEditorProps) {
-    const [editorContainer] = useState(() => EditorContainer.getInstance(blockRegistry));
+function LexicalEditorImpl({
+    documentId,
+    document,
+    filePath,
+    className,
+    placeholder,
+}: LexicalEditorProps) {
     const contextMenuServiceRef = useRef<ContextMenuService | null>(null);
-
-    // 创建 EditorService 实例
-    useEffect(() => {
-        const _editorService = editorContainer.createInstance(documentId);
-
-        return () => {
-            editorContainer.disposeInstance(documentId);
-        };
-    }, [documentId, editorContainer]);
 
     // 注册编辑器右键菜单提供者
     useEffect(() => {
@@ -252,7 +268,10 @@ function LexicalEditorImpl({ documentId, document, className, placeholder }: Lex
                 </div>
             </div>
 
-            {/* 内容加载插件 */}
+            {/* EditorBridgePlugin - 注入 Lexical 实例到 EditorService */}
+            <EditorBridgePlugin documentId={documentId} filePath={filePath} />
+
+            {/* EditorContentPlugin - 监听 document 变化并加载内容 */}
             <EditorContentPlugin document={document} />
         </LexicalComposer>
     );
@@ -267,6 +286,7 @@ function LexicalEditorImpl({ documentId, document, className, placeholder }: Lex
 export function LexicalEditor({
     documentId,
     document,
+    filePath,
     className,
     placeholder = '开始输入...',
 }: LexicalEditorProps) {
@@ -274,6 +294,7 @@ export function LexicalEditor({
         <LexicalEditorImpl
             documentId={documentId}
             document={document}
+            filePath={filePath}
             className={className}
             placeholder={placeholder}
         />

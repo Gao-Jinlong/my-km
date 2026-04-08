@@ -19,7 +19,7 @@ function createMockEditorService(
         id: documentId,
         path: `/test/${documentId}.md`,
         title: 'Test Document',
-        type: 'rich-text',
+        type: 'markdown',
         content: [],
         version: 1,
         createdAt: new Date().toISOString(),
@@ -28,12 +28,10 @@ function createMockEditorService(
     } as Document;
 
     let isDirty = false;
+    let _disposed = false;
 
     const mocks = {
         saveDocument: vi.fn<() => Promise<SaveResult>>(),
-        insertBlock: vi.fn(),
-        updateBlock: vi.fn(),
-        deleteBlock: vi.fn(),
     };
 
     mocks.saveDocument.mockImplementation(async () => {
@@ -46,46 +44,53 @@ function createMockEditorService(
         return { success: true, document: mockDoc };
     });
 
-    mocks.insertBlock.mockImplementation(() => {
-        isDirty = true;
-    });
-
-    mocks.updateBlock.mockImplementation(() => {
-        isDirty = true;
-    });
-
-    mocks.deleteBlock.mockImplementation(() => {
-        isDirty = true;
-    });
-
     const service: EditorService = {
         documentId,
-        editor: {} as unknown as import('lexical').LexicalEditor,
+        filePath: `/test/${documentId}.md`,
         store: {
             document: mockDoc,
             isDirty,
             selection: null,
             formatState: null,
             error: null,
+            isLoading: false,
             markDirty: () => {
                 isDirty = true;
             },
             markClean: () => {
                 isDirty = false;
             },
+            setDocument: vi.fn(),
+            setSelection: vi.fn(),
+            setFormatState: vi.fn(),
+            setError: vi.fn(),
+            clearError: vi.fn(),
+            reset: vi.fn(),
         },
+        isDisposed: false,
+        setEditor: vi.fn(),
+        getEditor: vi.fn(() => null),
         loadDocument: vi.fn(),
         saveDocument: mocks.saveDocument,
         getSelection: vi.fn(() => null),
         getSelectedText: vi.fn(() => null),
         getFullContent: vi.fn(() => ''),
-        getFormatState: vi.fn(() => ({})),
-        insertBlock: mocks.insertBlock,
-        updateBlock: mocks.updateBlock,
-        deleteBlock: mocks.deleteBlock,
-        destroy: vi.fn(),
+        getFormatState: vi.fn(() => ({
+            bold: false,
+            italic: false,
+            underline: false,
+            code: false,
+            strikethrough: false,
+            subscript: false,
+            superscript: false,
+            highlight: false,
+        })),
+        destroy: vi.fn(() => {
+            _disposed = true;
+        }),
     };
 
+    // Use Proxy to update isDisposed on destroy
     return { service, mocks };
 }
 

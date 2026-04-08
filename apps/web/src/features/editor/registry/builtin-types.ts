@@ -26,10 +26,10 @@ const paragraphConfig: BlockTypeConfig = {
     icon: 'paragraph',
     description: '普通文本段落',
     defaultContent: (): ParagraphContent => ({
-        text: '',
+        inline: [],
     }),
     isValid: (content): content is ParagraphContent => {
-        return typeof content === 'object' && content !== null && typeof content.text === 'string';
+        return typeof content === 'object' && content !== null && Array.isArray(content.inline);
     },
 };
 
@@ -43,14 +43,14 @@ const headingConfig: BlockTypeConfig = {
     icon: 'heading',
     description: '带级别的标题',
     defaultContent: (): HeadingContent => ({
-        text: '',
+        inline: [],
         level: 1,
     }),
     isValid: (content): content is HeadingContent => {
         return (
             typeof content === 'object' &&
             content !== null &&
-            typeof content.text === 'string' &&
+            Array.isArray(content.inline) &&
             [1, 2, 3, 4, 5, 6].includes(content.level)
         );
     },
@@ -90,14 +90,14 @@ const quoteConfig: BlockTypeConfig = {
     icon: 'quote',
     description: '引用文本块',
     defaultContent: (): QuoteContent => ({
-        text: '',
+        inline: [],
         cite: undefined,
     }),
     isValid: (content): content is QuoteContent => {
         return (
             typeof content === 'object' &&
             content !== null &&
-            typeof content.text === 'string' &&
+            Array.isArray(content.inline) &&
             (content.cite === undefined || typeof content.cite === 'string')
         );
     },

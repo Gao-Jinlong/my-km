@@ -24,7 +24,7 @@ export enum SaveStatus {
  * 自动保存配置选项
  */
 export interface AutoSaveOptions {
-    /** 防抖时间，默认 500ms */
+    /** 防抖时间，默认 2000ms */
     debounceMs?: number;
     /** 最大等待时间，默认 5000ms */
     maxWaitMs?: number;
@@ -44,6 +44,7 @@ interface RegisteredEditor {
     maxWaitTimer: ReturnType<typeof setTimeout> | null;
     pendingSave: boolean;
     lastSaveTime: number;
+    unregisterListener?: () => void;
 }
 
 /**
@@ -262,14 +263,26 @@ export function createAutoSaveService(
                 return;
             }
 
-            editors.set(documentId, {
+            const editor = editorService.getEditor();
+
+            const registeredEditor: RegisteredEditor = {
                 editorService,
                 enabled: true,
                 debounceTimer: null,
                 maxWaitTimer: null,
                 pendingSave: false,
                 lastSaveTime: 0,
-            });
+            };
+
+            // 注册编辑器更新监听器
+            if (editor) {
+                registeredEditor.unregisterListener = editor.registerUpdateListener(() => {
+                    // 内容变化时触发保存
+                    triggerSave(documentId);
+                });
+            }
+
+            editors.set(documentId, registeredEditor);
 
             updateStatus(documentId, SaveStatus.IDLE);
         },
@@ -278,8 +291,9 @@ export function createAutoSaveService(
             const editor = editors.get(documentId);
 
             if (editor) {
-                // 清除定时器
+                // 清除定时器和监听器
                 clearTimers(editor);
+                editor.unregisterListener?.();
 
                 // 如果正在保存，等待完成
                 if (statusMap.get(documentId) === SaveStatus.SAVING) {
@@ -327,9 +341,10 @@ export function createAutoSaveService(
         },
 
         destroy(): void {
-            // 清理所有编辑器的定时器
+            // 清理所有编辑器的定时器和监听器
             editors.forEach(editor => {
                 clearTimers(editor);
+                editor.unregisterListener?.();
             });
 
             // 清空映射表

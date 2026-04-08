@@ -1,7 +1,7 @@
 /**
  * Editor Container Module
  *
- * Global container for managing multiple editor instances
+ * Re-export platform layer EditorContainer
  */
 
 export { EditorContainer } from './EditorContainer';

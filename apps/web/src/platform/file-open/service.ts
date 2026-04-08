@@ -15,6 +15,8 @@ import { EditorContainer } from '@/platform/editor/container';
 import { EditorTabService } from '@/platform/editor-tab/service';
 import type { OpenDocument } from '@/platform/editor-tab/types';
 import { FileSystemService } from '@/platform/file-system/service';
+import { parseMarkdown } from '@/features/editor/converter/markdown-parser';
+import type { Document } from '@/features/editor/types';
 
 /**
  * 文件打开服务
@@ -184,6 +186,35 @@ export class FileOpenService extends ServiceBase {
             contentString = '';
         }
 
+        // 对于 Markdown 文件，解析为 Block[] 并序列化存储
+        let storedContent: string;
+        if (type === 'markdown') {
+            const blocks = parseMarkdown(contentString);
+            const document: Document = {
+                id,
+                path,
+                title,
+                type,
+                content: blocks,
+                version: 1,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            };
+            storedContent = JSON.stringify(blocks);
+
+            // 同时返回 Document 对象用于编辑器
+            return {
+                id,
+                path,
+                title,
+                type,
+                isDirty: false,
+                openedAt: new Date().toISOString(),
+                content: storedContent,
+                document,
+            } as OpenDocument;
+        }
+
         return {
             id,
             path,
@@ -192,7 +223,7 @@ export class FileOpenService extends ServiceBase {
             isDirty: false,
             openedAt: new Date().toISOString(),
             content: contentString,
-        };
+        } as OpenDocument;
     }
 
     override dispose(): void {

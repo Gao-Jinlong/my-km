@@ -7,21 +7,10 @@
  * - 编辑器与文件系统的集成
  */
 
-import type { Document } from '@/features/editor/types';
+import type { EditorService } from '@/features/editor/service/EditorService';
+import { createEditorService } from '@/features/editor/service/EditorService';
 import { ServiceBase } from '@/platform/base/service-base';
 import { Service } from '@/platform/di';
-
-/**
- * 编辑器配置
- */
-export interface EditorConfig {
-    /** 命名空间 */
-    namespace?: string;
-    /** 主题配置 */
-    theme?: Record<string, unknown>;
-    /** 是否只读 */
-    readOnly?: boolean;
-}
 
 /**
  * 编辑器服务接口
@@ -29,17 +18,32 @@ export interface EditorConfig {
 export interface IEditorService {
     /** 文档 ID */
     readonly documentId: string;
+    /** 文件路径 */
+    readonly filePath: string;
     /** 是否已销毁 */
     readonly isDisposed: boolean;
 
-    /** 创建编辑器 */
-    create(container: HTMLElement, config?: EditorConfig): void;
+    /** 设置 Lexical 编辑器实例 */
+    setEditor(editor: any): void;
+    /** 获取 Lexical 编辑器实例 */
+    getEditor(): any | null;
     /** 加载文档 */
-    loadDocument(document: Document): void;
+    loadDocument(document: any): void;
     /** 保存文档 */
-    saveDocument(): Promise<void>;
+    saveDocument(): Promise<any>;
     /** 销毁编辑器 */
     destroy(): void;
+
+    /** 获取 store */
+    readonly store: any;
+    /** 获取选区 */
+    getSelection(): any | null;
+    /** 获取选中文本 */
+    getSelectedText(): string | null;
+    /** 获取完整内容 */
+    getFullContent(): string;
+    /** 获取格式状态 */
+    getFormatState(): any;
 }
 
 /**
@@ -50,8 +54,8 @@ export interface IEditorService {
  * const editorContainer = container.get(EditorContainer);
  *
  * // 创建编辑器实例
- * const editor = editorContainer.createInstance('doc-123');
- * editor.create(containerElement);
+ * const editor = editorContainer.createInstance('doc-123', 'path/to/file.md');
+ * editor.setEditor(lexicalEditor);
  * editor.loadDocument(doc);
  * ```
  */
@@ -64,26 +68,26 @@ export class EditorContainer extends ServiceBase {
      * 创建编辑器实例
      *
      * @param documentId 文档 ID
+     * @param filePath 文件路径
      * @returns 编辑器服务实例
      *
      * @example
      * ```typescript
-     * const editor = editorContainer.createInstance('doc-123');
+     * const editor = editorContainer.createInstance('doc-123', 'path/to/file.md');
      * ```
      */
-    createInstance(documentId: string): IEditorService {
+    createInstance(documentId: string, filePath: string): IEditorService {
         // 检查是否已存在
         const existing = this.editors.get(documentId);
         if (existing) {
             return existing;
         }
 
-        // TODO: 创建实际的编辑器实例
-        // 这里需要实现 EditorService 类
-        throw new Error(
-            `EditorService not yet implemented. ` +
-                `Please implement EditorService class that implements IEditorService.`,
-        );
+        // 创建实际的编辑器实例
+        const editorService = createEditorService(documentId, filePath);
+        this.editors.set(documentId, editorService);
+
+        return editorService;
     }
 
     /**
@@ -94,6 +98,16 @@ export class EditorContainer extends ServiceBase {
      */
     getInstance(documentId: string): IEditorService | null {
         return this.editors.get(documentId) || null;
+    }
+
+    /**
+     * 获取编辑器服务（类型安全版本）
+     *
+     * @param documentId 文档 ID
+     * @returns EditorService 实例或 null
+     */
+    getService(documentId: string): EditorService | null {
+        return (this.editors.get(documentId) as EditorService) || null;
     }
 
     /**

@@ -35,6 +35,7 @@ export function ContentArea({ documentId, className }: ContentAreaProps) {
             <LexicalEditor
                 documentId={documentId}
                 document={document}
+                filePath={openDoc?.path || ''}
                 className="h-full"
                 placeholder="开始编写内容..."
             />

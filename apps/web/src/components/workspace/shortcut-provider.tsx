@@ -9,6 +9,7 @@
 import { useEffect, useRef } from 'react';
 import { container } from '@/platform/bootstrap';
 import { EditorTabService } from '@/platform/editor-tab/service';
+import { EditorContainer } from '@/platform/editor/container/editor-container';
 import { useEditorTabs } from '@/platform/editor-tab/use-editor-tabs';
 import { EventBusService } from '@/platform/event-bus/service';
 import { KeyboardShortcutService, KeyBinding, ShortcutScope } from '@/platform/keyboard';
@@ -51,9 +52,14 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
                 keybinding: KeyBinding.CTRL_S,
                 handler: {
                     handle: () => {
-                        // TODO: 触发保存当前文档
-                        console.log('[Shortcut] Save triggered for:', activeDocumentId);
-                        // 这里需要集成 AutoSaveService
+                        // 获取当前活动文档的编辑器服务并保存
+                        if (activeDocumentId) {
+                            const editorContainer = container.get(EditorContainer);
+                            const editorService = editorContainer.getService(activeDocumentId);
+                            if (editorService) {
+                                editorService.saveDocument().catch(console.error);
+                            }
+                        }
                     },
                     description: '保存当前文档',
                 },

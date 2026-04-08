@@ -3,15 +3,11 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BlockRegistry } from '../../registry/BlockRegistry';
 import { registerBuiltinBlocks } from '../../registry/builtin-types';
 import { createEditorService } from '../EditorService';
 
 describe('EditorService', () => {
-    let blockRegistry: BlockRegistry;
-
     beforeEach(() => {
-        blockRegistry = new BlockRegistry();
         registerBuiltinBlocks();
     });
 
@@ -20,15 +16,16 @@ describe('EditorService', () => {
     });
 
     it('should create an editor service instance', () => {
-        const service = createEditorService('doc-123', blockRegistry);
+        const service = createEditorService('doc-123', '/test/doc.md');
 
         expect(service.documentId).toBe('doc-123');
-        expect(service.editor).toBeDefined();
+        expect(service.filePath).toBe('/test/doc.md');
         expect(service.store).toBeDefined();
+        expect(service.getEditor()).toBeNull(); // Editor not injected yet
     });
 
     it('should have correct initial store state', () => {
-        const service = createEditorService('doc-123', blockRegistry);
+        const service = createEditorService('doc-123', '/test/doc.md');
 
         expect(service.store.document).toBeNull();
         expect(service.store.selection).toBeNull();
@@ -38,12 +35,12 @@ describe('EditorService', () => {
     });
 
     it('should load a document', () => {
-        const service = createEditorService('doc-123', blockRegistry);
+        const service = createEditorService('doc-123', '/test/doc.md');
         const mockDoc = {
             id: 'doc-123',
             path: '/test/doc.md',
             title: 'Test Document',
-            type: 'rich-text' as const,
+            type: 'markdown' as const,
             content: [],
             version: 1,
             createdAt: new Date().toISOString(),
@@ -57,58 +54,29 @@ describe('EditorService', () => {
         expect(service.store.error).toBeNull();
     });
 
-    it('should mark dirty when inserting a block', () => {
-        const service = createEditorService('doc-123', blockRegistry);
-        const mockBlock = {
-            id: 'block-123',
-            type: 'paragraph' as const,
-            content: { text: 'Test' },
-        };
-
-        expect(service.store.isDirty).toBe(false);
-        service.insertBlock(mockBlock);
-        expect(service.store.isDirty).toBe(true);
-    });
-
-    it('should mark dirty when updating a block', () => {
-        const service = createEditorService('doc-123', blockRegistry);
-
-        expect(service.store.isDirty).toBe(false);
-        service.updateBlock('block-123', { text: 'Updated' });
-        expect(service.store.isDirty).toBe(true);
-    });
-
-    it('should mark dirty when deleting a block', () => {
-        const service = createEditorService('doc-123', blockRegistry);
-
-        expect(service.store.isDirty).toBe(false);
-        service.deleteBlock('block-123');
-        expect(service.store.isDirty).toBe(true);
-    });
-
-    it('should return null for getSelection when no selection', () => {
-        const service = createEditorService('doc-123', blockRegistry);
+    it('should return null for getSelection when no editor', () => {
+        const service = createEditorService('doc-123', '/test/doc.md');
 
         const selection = service.getSelection();
         expect(selection).toBeNull();
     });
 
-    it('should return null for getSelectedText when no selection', () => {
-        const service = createEditorService('doc-123', blockRegistry);
+    it('should return null for getSelectedText when no editor', () => {
+        const service = createEditorService('doc-123', '/test/doc.md');
 
         const text = service.getSelectedText();
         expect(text).toBeNull();
     });
 
-    it('should return empty string for getFullContent when empty', () => {
-        const service = createEditorService('doc-123', blockRegistry);
+    it('should return empty string for getFullContent when no editor', () => {
+        const service = createEditorService('doc-123', '/test/doc.md');
 
         const content = service.getFullContent();
         expect(content).toBe('');
     });
 
     it('should return default format state', () => {
-        const service = createEditorService('doc-123', blockRegistry);
+        const service = createEditorService('doc-123', '/test/doc.md');
 
         const formatState = service.getFormatState();
         expect(formatState.bold).toBe(false);
@@ -121,40 +89,33 @@ describe('EditorService', () => {
         expect(formatState.highlight).toBe(false);
     });
 
-    it('should return save result with error when no document loaded', async () => {
-        const service = createEditorService('doc-123', blockRegistry);
+    it('should return save result with error when no editor initialized', async () => {
+        const service = createEditorService('doc-123', '/test/doc.md');
 
         const result = await service.saveDocument();
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe('No document loaded');
+        expect(result.error).toBe('Editor not initialized');
     });
 
     it('should destroy the service', () => {
-        const service = createEditorService('doc-123', blockRegistry);
+        const service = createEditorService('doc-123', '/test/doc.md');
 
         service.destroy();
 
-        // After destroy, calling methods should throw or handle gracefully
-        expect(() => {
-            const mockBlock = {
-                id: 'block-123',
-                type: 'paragraph' as const,
-                content: { text: 'Test' },
-            };
-            service.insertBlock(mockBlock);
-        }).toThrow('EditorService has been destroyed');
+        // After destroy, isDisposed should be true
+        expect(service.isDisposed).toBe(true);
     });
 
     it('should throw error when loading document after destroy', () => {
-        const service = createEditorService('doc-123', blockRegistry);
+        const service = createEditorService('doc-123', '/test/doc.md');
         service.destroy();
 
         const mockDoc = {
             id: 'doc-123',
             path: '/test/doc.md',
             title: 'Test Document',
-            type: 'rich-text' as const,
+            type: 'markdown' as const,
             content: [],
             version: 1,
             createdAt: new Date().toISOString(),
@@ -164,5 +125,18 @@ describe('EditorService', () => {
         expect(() => {
             service.loadDocument(mockDoc);
         }).toThrow('EditorService has been destroyed');
+    });
+
+    it('should set and get editor', () => {
+        const service = createEditorService('doc-123', '/test/doc.md');
+
+        const mockEditor = {
+            update: vi.fn(),
+            getEditorState: vi.fn(),
+            registerUpdateListener: vi.fn(),
+        } as any;
+
+        service.setEditor(mockEditor);
+        expect(service.getEditor()).toBe(mockEditor);
     });
 });

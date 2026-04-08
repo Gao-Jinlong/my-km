@@ -1,10 +1,20 @@
-import type { FormatState } from '@/features/editor/types';
+import type { LexicalEditor } from 'lexical';
+import { FORMAT_TEXT_COMMAND, type TextFormatType } from 'lexical';
 
 import { cn } from '@/lib/utils';
 
 interface ToolbarProps {
-    formatState: FormatState | null;
-    onFormatToggle: (format: string) => void;
+    editor: LexicalEditor;
+    formatState: {
+        bold: boolean;
+        italic: boolean;
+        underline: boolean;
+        strikethrough: boolean;
+        code: boolean;
+        highlight: boolean;
+        subscript: boolean;
+        superscript: boolean;
+    } | null;
     className?: string;
 }
 
@@ -14,9 +24,8 @@ interface ToolbarProps {
  * 提供文本格式控制按钮
  * 包括粗体、斜体、下划线等常用格式
  */
-export function Toolbar({ formatState, onFormatToggle, className }: ToolbarProps) {
-    // TODO: 从 formatState 读取实际状态
-    const formats = [
+export function Toolbar({ editor, formatState, className }: ToolbarProps) {
+    const formats: { name: TextFormatType; label: string; title: string }[] = [
         { name: 'bold', label: 'B', title: 'Bold (Ctrl+B)' },
         { name: 'italic', label: 'I', title: 'Italic (Ctrl+I)' },
         { name: 'underline', label: 'U', title: 'Underline (Ctrl+U)' },
@@ -24,6 +33,10 @@ export function Toolbar({ formatState, onFormatToggle, className }: ToolbarProps
         { name: 'code', label: '</>', title: 'Code' },
         { name: 'highlight', label: 'A', title: 'Highlight' },
     ];
+
+    const handleFormatToggle = (format: TextFormatType) => {
+        editor.dispatchCommand(FORMAT_TEXT_COMMAND, format);
+    };
 
     return (
         <div
@@ -33,13 +46,13 @@ export function Toolbar({ formatState, onFormatToggle, className }: ToolbarProps
             )}
         >
             {formats.map(format => {
-                const isActive = formatState?.[format.name as keyof FormatState] ?? false;
+                const isActive = formatState?.[format.name as keyof typeof formatState] ?? false;
                 return (
                     <button
                         key={format.name}
                         type="button"
                         title={format.title}
-                        onClick={() => onFormatToggle(format.name)}
+                        onClick={() => handleFormatToggle(format.name)}
                         className={cn(
                             'flex h-7 min-w-[28px] items-center justify-center rounded px-1.5 text-sm transition-colors',
                             isActive

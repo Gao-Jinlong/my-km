@@ -5,11 +5,16 @@
  */
 
 import type { LexicalEditor } from 'lexical';
-import { createEditor } from 'lexical';
+import { $getRoot } from 'lexical';
 import type { BlockRegistry } from '../registry/BlockRegistry';
 import type { EditorStoreApi } from '../store/editor-store';
 import { createEditorStore } from '../store/editor-store';
 import type { Block, Document, FormatState, Selection } from '../types';
+import { blocksToLexical, lexicalToBlocks } from '../converter/block-lexical-converter';
+import { parseMarkdown } from '../converter/markdown-parser';
+import { serializeToMarkdown } from '../converter/markdown-serializer';
+import { FileSystemService } from '@/platform/file-system/service';
+import { container } from '@/platform/bootstrap';
 
 /**
  * 文档保存结果
@@ -26,8 +31,13 @@ export interface SaveResult {
 export interface EditorService {
     // 属性
     documentId: string;
-    editor: LexicalEditor;
+    filePath: string;
     store: EditorStoreApi;
+    readonly isDisposed: boolean;
+
+    // 编辑器实例（从 React 组件注入）
+    setEditor(editor: LexicalEditor): void;
+    getEditor(): LexicalEditor | null;
 
     // 文档操作
     loadDocument(doc: Document): void;
@@ -39,11 +49,6 @@ export interface EditorService {
     getFullContent(): string;
     getFormatState(): FormatState;
 
-    // 命令执行
-    insertBlock(block: Block): void;
-    updateBlock(blockId: string, content: Record<string, any>): void;
-    deleteBlock(blockId: string): void;
-
     // 生命周期
     destroy(): void;
 }
@@ -53,13 +58,18 @@ export interface EditorService {
  */
 class EditorServiceImpl implements EditorService {
     documentId: string;
-    editor: LexicalEditor;
+    filePath: string;
     store: EditorStoreApi;
+    private editor: LexicalEditor | null = null;
     private disposed: boolean = false;
 
-    constructor(documentId: string, editor: LexicalEditor, store: EditorStoreApi) {
+    get isDisposed(): boolean {
+        return this.disposed;
+    }
+
+    constructor(documentId: string, filePath: string, store: EditorStoreApi) {
         this.documentId = documentId;
-        this.editor = editor;
+        this.filePath = filePath;
         this.store = store;
 
         // 初始化编辑器事件监听
@@ -67,19 +77,24 @@ class EditorServiceImpl implements EditorService {
     }
 
     /**
+     * 设置 Lexical 编辑器实例（从 React 组件注入）
+     */
+    setEditor(editor: LexicalEditor): void {
+        this.editor = editor;
+    }
+
+    /**
+     * 获取 Lexical 编辑器实例
+     */
+    getEditor(): LexicalEditor | null {
+        return this.editor;
+    }
+
+    /**
      * 设置编辑器事件监听
      */
     private setupEditorListeners(): void {
-        // 监听选区变化
-        this.editor.registerUpdateListener(({ editorState }) => {
-            editorState.read(() => {
-                const selection = this.getSelection();
-                this.store.setSelection(selection);
-
-                const formatState = this.getFormatState();
-                this.store.setFormatState(formatState);
-            });
-        });
+        // 监听选区变化 - 通过 UpdateListener 在 React 组件中注册
     }
 
     /**
@@ -97,10 +112,9 @@ class EditorServiceImpl implements EditorService {
             this.store.clearError();
 
             // 将文档内容加载到 Lexical 编辑器
-            this.editor.update(() => {
-                // TODO: 实现将 Block[] 转换为 Lexical 节点的逻辑
-                // 这需要在后续实现 Lexical 自定义节点
-            });
+            if (this.editor) {
+                blocksToLexical(doc.content, this.editor);
+            }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Failed to load document';
             this.store.setError(errorMessage);
@@ -121,11 +135,22 @@ class EditorServiceImpl implements EditorService {
         }
 
         try {
+            if (!this.editor) {
+                return {
+                    success: false,
+                    error: 'Editor not initialized',
+                };
+            }
+
             // 从 Lexical 编辑器获取当前内容
-            const content = this.editor.getEditorState().read(() => {
-                // TODO: 实现从 Lexical 节点转换为 Block[] 的逻辑
-                return [] as Block[];
-            });
+            const blocks = lexicalToBlocks(this.editor);
+
+            // 序列化为 Markdown
+            const markdown = serializeToMarkdown(blocks);
+
+            // 写入文件
+            const fileSystem = container.get(FileSystemService);
+            await fileSystem.writeFile(this.filePath, markdown);
 
             // 更新文档内容
             const currentDoc = this.store.document;
@@ -138,16 +163,13 @@ class EditorServiceImpl implements EditorService {
 
             const updatedDoc: Document = {
                 ...currentDoc,
-                content,
+                content: blocks,
                 version: currentDoc.version + 1,
                 updatedAt: new Date().toISOString(),
             };
 
             this.store.setDocument(updatedDoc);
             this.store.markClean();
-
-            // TODO: 调用实际的保存 API
-            // await saveDocumentToStorage(updatedDoc);
 
             return {
                 success: true,
@@ -168,9 +190,14 @@ class EditorServiceImpl implements EditorService {
      * @returns 当前选区，如果没有选区则返回 null
      */
     getSelection(): Selection | null {
-        const lexicalSelection = this.editor.getEditorState().read(() => {
-            // TODO: 使用 @lexical/selection 获取选区
+        if (!this.editor) {
             return null;
+        }
+
+        let lexicalSelection: any = null;
+        this.editor.getEditorState().read(() => {
+            // TODO: 使用 @lexical/selection 获取选区
+            lexicalSelection = null;
         });
 
         if (!lexicalSelection) {
@@ -195,9 +222,12 @@ class EditorServiceImpl implements EditorService {
      * @returns 编辑器中的完整文本内容
      */
     getFullContent(): string {
-        return this.editor.getEditorState().read(() => {
-            // TODO: 从 Lexical 编辑器提取纯文本
+        if (!this.editor) {
             return '';
+        }
+
+        return this.editor.getEditorState().read(() => {
+            return $getRoot().getTextContent();
         });
     }
 
@@ -206,6 +236,19 @@ class EditorServiceImpl implements EditorService {
      * @returns 当前格式状态
      */
     getFormatState(): FormatState {
+        if (!this.editor) {
+            return {
+                bold: false,
+                italic: false,
+                underline: false,
+                code: false,
+                strikethrough: false,
+                subscript: false,
+                superscript: false,
+                highlight: false,
+            };
+        }
+
         return this.editor.getEditorState().read(() => {
             // TODO: 使用 @lexical/selection 获取格式状态
             return {
@@ -218,52 +261,6 @@ class EditorServiceImpl implements EditorService {
                 superscript: false,
                 highlight: false,
             };
-        });
-    }
-
-    /**
-     * 插入块
-     * @param _block 要插入的块
-     */
-    insertBlock(_block: Block): void {
-        if (this.disposed) {
-            throw new Error('EditorService has been destroyed');
-        }
-
-        this.editor.update(() => {
-            // TODO: 实现将 Block 插入到 Lexical 编辑器的逻辑
-            this.store.markDirty();
-        });
-    }
-
-    /**
-     * 更新块内容
-     * @param _blockId 块 ID
-     * @param _content 新的内容
-     */
-    updateBlock(_blockId: string, _content: Record<string, any>): void {
-        if (this.disposed) {
-            throw new Error('EditorService has been destroyed');
-        }
-
-        this.editor.update(() => {
-            // TODO: 实现根据 blockId 查找并更新块的逻辑
-            this.store.markDirty();
-        });
-    }
-
-    /**
-     * 删除块
-     * @param _blockId 要删除的块 ID
-     */
-    deleteBlock(_blockId: string): void {
-        if (this.disposed) {
-            throw new Error('EditorService has been destroyed');
-        }
-
-        this.editor.update(() => {
-            // TODO: 实现根据 blockId 删除块的逻辑
-            this.store.markDirty();
         });
     }
 
@@ -284,32 +281,16 @@ class EditorServiceImpl implements EditorService {
 /**
  * 创建 EditorService 的工厂函数
  * @param documentId 文档 ID
- * @param blockRegistry 块注册中心
+ * @param filePath 文件路径
  * @returns EditorService 实例
  */
 export function createEditorService(
     documentId: string,
-    _blockRegistry: BlockRegistry,
+    filePath: string,
 ): EditorService {
-    // 创建 Lexical 编辑器实例
-    const editor = createLexicalEditor();
-
     // 创建 Zustand store
     const store = createEditorStore();
 
     // 创建并返回 EditorService 实例
-    return new EditorServiceImpl(documentId, editor, store);
-}
-
-/**
- * 创建 Lexical 编辑器实例
- * @returns Lexical 编辑器实例
- */
-function createLexicalEditor(): LexicalEditor {
-    return createEditor({
-        namespace: 'EditorService',
-        onError: error => {
-            console.error('Lexical editor error:', error);
-        },
-    });
+    return new EditorServiceImpl(documentId, filePath, store);
 }

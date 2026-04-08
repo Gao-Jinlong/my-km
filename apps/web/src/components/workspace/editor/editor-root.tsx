@@ -1,6 +1,5 @@
 import { ContentArea } from './content-area';
 import { EditorShell } from './editor-shell';
-import { Toolbar } from './toolbar';
 
 interface EditorRootProps {
     documentId: string;
@@ -18,14 +17,10 @@ export function EditorRoot({ documentId, className }: EditorRootProps) {
     // const { formatState, onFormatToggle } = useEditorService(documentId);
 
     // 临时占位实现
-    const formatState = null;
-    const onFormatToggle = (_format: string) => {
-        console.log('Toggle format:', _format);
-    };
 
     return (
         <EditorShell className={className}>
-            <Toolbar formatState={formatState} onFormatToggle={onFormatToggle} />
+            {/* TODO: 集成 Toolbar */}
             <ContentArea documentId={documentId} />
         </EditorShell>
     );
