@@ -10,16 +10,9 @@ export { EditorContainer } from './container';
 export type { BlockCategory, BlockTypeConfig } from './registry';
 // Registry
 export { BlockRegistry, blockRegistry, builtinBlockTypes, registerBuiltinBlocks } from './registry';
-export type { EditorService, SaveResult } from './service';
-// Service
+export type { EditorService, EditorState, SaveResult } from './service';
 export { createEditorService } from './service';
-export type { EditorStoreApi } from './store';
 // Store
-export {
-    createEditorStore,
-    createEmptyFormatState,
-    createEmptySelection,
-} from './store';
 // Core types
 export type {
     BaseBlock,

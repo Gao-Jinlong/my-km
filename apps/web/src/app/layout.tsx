@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import { AuthProvider } from '@/components/auth/auth-provider';
 import { ShortcutProvider } from '@/components/workspace/shortcut-provider';
 import { ContextMenuProvider } from '@/platform/context-menu';
+import { BootstrapProvider } from './bootstrap-provider';
 import './globals.css';
 
 const geistSans = Geist({
@@ -28,11 +29,13 @@ export default function RootLayout({
     return (
         <html lang="zh-CN">
             <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-                <AuthProvider>
-                    <ShortcutProvider>
-                        <ContextMenuProvider>{children}</ContextMenuProvider>
-                    </ShortcutProvider>
-                </AuthProvider>
+                <BootstrapProvider>
+                    <AuthProvider>
+                        <ShortcutProvider>
+                            <ContextMenuProvider>{children}</ContextMenuProvider>
+                        </ShortcutProvider>
+                    </AuthProvider>
+                </BootstrapProvider>
             </body>
         </html>
     );

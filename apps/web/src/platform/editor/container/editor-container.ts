@@ -23,6 +23,9 @@ export interface IEditorService {
     /** 是否已销毁 */
     readonly isDisposed: boolean;
 
+    /** 订阅状态变化事件 */
+    readonly onChange: (listener: (state: any) => void) => any;
+
     /** 设置 Lexical 编辑器实例 */
     setEditor(editor: any): void;
     /** 获取 Lexical 编辑器实例 */
@@ -34,8 +37,8 @@ export interface IEditorService {
     /** 销毁编辑器 */
     destroy(): void;
 
-    /** 获取 store */
-    readonly store: any;
+    /** 获取状态 */
+    getState(): any;
     /** 获取选区 */
     getSelection(): any | null;
     /** 获取选中文本 */

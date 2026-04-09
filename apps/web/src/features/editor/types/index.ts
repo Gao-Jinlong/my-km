@@ -19,6 +19,8 @@ export type {
     HeadingContent,
     ImageBlock,
     ImageContent,
+    Inline,
+    InlineMark,
     ListBlock,
     ListContent,
     ListItem,

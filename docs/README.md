@@ -25,16 +25,9 @@
 
 ## 📝 其他文档
 
-### 开发记录
-- [implementation-summary-2026-03-30.md](./implementation-summary-2026-03-30.md) - 前端迭代总结
-- [development/2026-03-25-rich-text-editor.md](./development/2026-03-25-rich-text-editor.md) - 富文本编辑器开发记录
-
-### 实施计划
-- [superpowers/plans/](./superpowers/plans/) - Superpowers 实施计划
-
-### 变更档案
-- [../openspec/changes/archive/](../openspec/changes/archive/) - OpenSpec 归档变更
-
+| 目录 | 说明 |
+|------|------|
+| [plan/](./plan/) | 开发记录 |
 ---
 
-**最后更新**: 2026-03-30
+**最后更新**: 2026-04-09

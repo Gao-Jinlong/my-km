@@ -4,7 +4,6 @@
 
 export type { ShortcutHandler } from './shortcut.service';
 export { KeyboardShortcutService } from './shortcut.service';
-
-// 导出枚举类型和配置
-export { ModifierKey, Key, ShortcutScope, KeyBinding } from './types';
 export type { ShortcutConfig, ShortcutHandler as KeyboardShortcutHandler } from './types';
+// 导出枚举类型和配置
+export { Key, KeyBinding, ModifierKey, ShortcutScope } from './types';

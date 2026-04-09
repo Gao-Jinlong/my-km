@@ -20,18 +20,18 @@ describe('EditorService', () => {
 
         expect(service.documentId).toBe('doc-123');
         expect(service.filePath).toBe('/test/doc.md');
-        expect(service.store).toBeDefined();
         expect(service.getEditor()).toBeNull(); // Editor not injected yet
     });
 
-    it('should have correct initial store state', () => {
+    it('should have correct initial state', () => {
         const service = createEditorService('doc-123', '/test/doc.md');
 
-        expect(service.store.document).toBeNull();
-        expect(service.store.selection).toBeNull();
-        expect(service.store.formatState).toBeNull();
-        expect(service.store.isDirty).toBe(false);
-        expect(service.store.error).toBeNull();
+        const state = service.getState();
+        expect(state.isDirty).toBe(false);
+        expect(state.isSaving).toBe(false);
+        expect(state.hasError).toBe(false);
+        expect(state.error).toBeNull();
+        expect(state.isReadonly).toBe(false);
     });
 
     it('should load a document', () => {
@@ -49,9 +49,9 @@ describe('EditorService', () => {
 
         service.loadDocument(mockDoc);
 
-        expect(service.store.document).toEqual(mockDoc);
-        expect(service.store.isDirty).toBe(false);
-        expect(service.store.error).toBeNull();
+        const state = service.getState();
+        expect(state.isDirty).toBe(false);
+        expect(state.error).toBeNull();
     });
 
     it('should return null for getSelection when no editor', () => {

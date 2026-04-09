@@ -115,43 +115,43 @@ export function WorkspaceContent() {
                         <Group orientation="horizontal">
                             {/* Left Sidebar Content */}
                             <Panel
-                            id="sidebar-panel"
-                            defaultSize={PANEL_SIZES.SIDEBAR.DEFAULT}
-                            minSize={PANEL_SIZES.SIDEBAR.MIN}
-                            maxSize={PANEL_SIZES.SIDEBAR.MAX}
-                            collapsible={true}
-                            collapsedSize={PANEL_SIZES.SIDEBAR.COLLAPSED}
-                            onResize={handleSidebarResize}
-                        >
-                            <Sidebar collapsed={sidebarCollapsed} />
-                        </Panel>
+                                id="sidebar-panel"
+                                defaultSize={PANEL_SIZES.SIDEBAR.DEFAULT}
+                                minSize={PANEL_SIZES.SIDEBAR.MIN}
+                                maxSize={PANEL_SIZES.SIDEBAR.MAX}
+                                collapsible={true}
+                                collapsedSize={PANEL_SIZES.SIDEBAR.COLLAPSED}
+                                onResize={handleSidebarResize}
+                            >
+                                <Sidebar collapsed={sidebarCollapsed} />
+                            </Panel>
 
-                        <Separator className="w-px bg-ws-border transition-colors hover:bg-ws-accent/50" />
+                            <Separator className="w-px bg-ws-border transition-colors hover:bg-ws-accent/50" />
 
-                        {/* Editor Area */}
-                        <Panel
-                            id="editor-panel"
-                            defaultSize={PANEL_SIZES.EDITOR.DEFAULT}
-                            minSize={PANEL_SIZES.EDITOR.MIN}
-                        >
-                            <EditorArea />
-                        </Panel>
+                            {/* Editor Area */}
+                            <Panel
+                                id="editor-panel"
+                                defaultSize={PANEL_SIZES.EDITOR.DEFAULT}
+                                minSize={PANEL_SIZES.EDITOR.MIN}
+                            >
+                                <EditorArea />
+                            </Panel>
 
-                        <Separator className="w-px bg-ws-border transition-colors hover:bg-ws-accent/50" />
+                            <Separator className="w-px bg-ws-border transition-colors hover:bg-ws-accent/50" />
 
-                        {/* Right AI Panel */}
-                        <Panel
-                            id="ai-panel"
-                            defaultSize={PANEL_SIZES.AI_PANEL.DEFAULT}
-                            minSize={PANEL_SIZES.AI_PANEL.MIN}
-                            maxSize={PANEL_SIZES.AI_PANEL.MAX}
-                            collapsible={true}
-                            collapsedSize={PANEL_SIZES.AI_PANEL.COLLAPSED}
-                            onResize={handleAIPanelResize}
-                        >
-                            <AIPanel />
-                        </Panel>
-                    </Group>
+                            {/* Right AI Panel */}
+                            <Panel
+                                id="ai-panel"
+                                defaultSize={PANEL_SIZES.AI_PANEL.DEFAULT}
+                                minSize={PANEL_SIZES.AI_PANEL.MIN}
+                                maxSize={PANEL_SIZES.AI_PANEL.MAX}
+                                collapsible={true}
+                                collapsedSize={PANEL_SIZES.AI_PANEL.COLLAPSED}
+                                onResize={handleAIPanelResize}
+                            >
+                                <AIPanel />
+                            </Panel>
+                        </Group>
                     </div>
                 </div>
 

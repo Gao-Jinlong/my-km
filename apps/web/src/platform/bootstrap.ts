@@ -88,18 +88,15 @@ export function bootstrap(): ServiceContainer {
         throw new Error(`Service container validation failed: ${validation.errors.join(', ')}`);
     }
 
-    // 注册条件评估器
+    // 注册条件评估器（必须在 KeyboardShortcutService 初始化之前调用）
     registerConditionEvaluators();
 
-    // 打印依赖图（开发模式）
-    if (process.env.NODE_ENV === 'development') {
-        console.log('Dependency Graph:', container.getDependencyGraph());
-    }
+    // 初始化快捷键服务（此时条件评估器已注册）
+    const keyboardShortcutService = container.get(KeyboardShortcutService);
+    keyboardShortcutService.initialize();
 
     return container;
 }
 
-// 自动执行引导
-if (typeof window !== 'undefined') {
-    bootstrap();
-}
+// 注意：bootstrap() 现在在 BootstrapProvider 中调用
+// 不要在模块加载时自动执行，因为 Next.js 的模块打包可能导致时序问题

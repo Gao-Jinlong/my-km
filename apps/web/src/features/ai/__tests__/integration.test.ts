@@ -7,6 +7,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { EditorService } from '../../editor/service';
 import type { Document, Selection } from '../../editor/types';
 import type { AIContext, AIContextService } from '../service/AIContextService';
 import { createAIContextService } from '../service/AIContextService';
@@ -33,7 +34,7 @@ function createTestDocument(overrides?: Partial<Document>): Document {
  */
 function createEnhancedMockEditorService(
     documentId: string,
-    document?: Document,
+    _document?: Document,
 ): {
     service: EditorService;
     mocks: Record<string, unknown>;
@@ -70,35 +71,24 @@ function createEnhancedMockEditorService(
 
     const service: EditorService = {
         documentId,
-        editor: {} as unknown as EditorService['editor'],
-        store: {
-            document: document || null,
-            setDocument: vi.fn(),
-            setSelection: vi.fn(selection => {
-                currentSelection = selection;
-                selectionChangeCallbacks.forEach(cb => {
-                    cb(selection);
-                });
-            }),
-            setFormatState: vi.fn(format => {
-                currentFormatState = { ...currentFormatState, ...format };
-                formatChangeCallbacks.forEach(cb => {
-                    cb(currentFormatState);
-                });
-            }),
-            markDirty: vi.fn(),
-            markClean: vi.fn(),
-            reset: vi.fn(),
-        } as unknown as EditorService['store'],
+        filePath: `/test/${documentId}`,
+        isDisposed: false,
+        onChange: vi.fn(() => ({ dispose: vi.fn() })),
+        setEditor: vi.fn(),
+        getEditor: vi.fn(() => null),
         loadDocument: mocks.loadDocument,
         saveDocument: mocks.saveDocument,
         getSelection: mocks.getSelection,
         getSelectedText: mocks.getSelectedText,
         getFullContent: mocks.getFullContent,
         getFormatState: mocks.getFormatState,
-        insertBlock: mocks.insertBlock,
-        updateBlock: mocks.updateBlock,
-        deleteBlock: mocks.deleteBlock,
+        getState: vi.fn(() => ({
+            isDirty: false,
+            isSaving: false,
+            hasError: false,
+            isReadonly: false,
+            error: null,
+        })),
         destroy: mocks.destroy,
     };
 

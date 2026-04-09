@@ -21,12 +21,13 @@ import { HeadingNode, QuoteNode } from '@lexical/rich-text';
 import type { EditorThemeClasses } from 'lexical';
 import { useEffect, useRef } from 'react';
 import { EditorContainer } from '@/features/editor/container/EditorContainer';
-import { blocksToLexical } from '@/features/editor/converter/block-lexical-converter';
+import type { EditorService } from '@/features/editor/service/EditorService';
 import type { Document } from '@/features/editor/types';
 import { cn } from '@/lib/utils';
 import { container } from '@/platform/bootstrap';
 import { ContextMenuService } from '@/platform/context-menu/service';
 import type { ContextMenuContext } from '@/platform/context-menu/types';
+import { EditorTabService } from '@/platform/editor-tab/service';
 import { registerEditorService, unregisterEditorService } from './document-status-indicator';
 
 /**
@@ -85,31 +86,46 @@ const theme: EditorThemeClasses = {
 
 /**
  * EditorBridgePlugin - 将 Lexical 实例注入 EditorService
+ *
+ * 每个文档有独立的 LexicalComposer（通过 key={doc.id} 隔离），
+ * 此插件在挂载时创建/复用 EditorService 并注入 Lexical 实例。
+ * 清理时只取消订阅，不销毁 EditorService（由 FileOpenService 在关闭文档时销毁）。
  */
 function EditorBridgePlugin({ documentId, filePath }: { documentId: string; filePath: string }) {
     const [editor] = useLexicalComposerContext();
-    const editorServiceRef = useRef<ReturnType<
-        typeof EditorContainer.prototype.createInstance
-    > | null>(null);
+    const disposableRef = useRef<ReturnType<EditorService['onChange']> | null>(null);
 
     useEffect(() => {
         // 获取 EditorContainer 并创建服务实例
         const editorContainer = container.get(EditorContainer);
-        editorServiceRef.current = editorContainer.createInstance(documentId, filePath);
+        const editorTabService = container.get(EditorTabService);
 
-        // 将 Lexical 实例注入 EditorService
-        if (editorServiceRef.current) {
-            editorServiceRef.current.setEditor(editor);
-            // 注册服务用于状态监听
-            registerEditorService(documentId, editorServiceRef.current);
+        // 复用或创建 EditorService 实例
+        let editorService = editorContainer.getService(documentId);
+        if (!editorService) {
+            editorService = editorContainer.createInstance(documentId, filePath);
         }
 
-        // 清理时在容器上调用 disposeInstance
+        // 将 Lexical 实例注入 EditorService
+        editorService.setEditor(editor);
+        registerEditorService(documentId, editorService);
+
+        // 订阅 EditorService 状态变化，同步 isDirty 到 EditorTabService
+        disposableRef.current = editorService.onChange(state => {
+            editorTabService.updateDocument(documentId, { isDirty: state.isDirty });
+        });
+
+        // 初始同步一次
+        const initialState = editorService.getState();
+        editorTabService.updateDocument(documentId, { isDirty: initialState.isDirty });
+
+        // 清理时取消订阅，但不销毁 EditorService 实例
+        // EditorService 只在关闭文档时由 FileOpenService 销毁
         return () => {
-            if (editorServiceRef.current) {
-                unregisterEditorService(documentId);
-                editorContainer.disposeInstance(documentId);
+            if (disposableRef.current) {
+                disposableRef.current.dispose();
             }
+            unregisterEditorService(documentId);
         };
     }, [documentId, filePath, editor]);
 
@@ -117,25 +133,30 @@ function EditorBridgePlugin({ documentId, filePath }: { documentId: string; file
 }
 
 /**
- * EditorContentPlugin - 监听 document prop 变化并加载内容
+ * EditorContentPlugin - 挂载时通过 EditorService.loadDocument 加载文档内容
+ *
+ * 必须通过 EditorService.loadDocument 加载（而非直接调用 blocksToLexical），
+ * 这样 EditorService 才能记录 currentDocument，saveDocument 才能正常工作。
  */
-function EditorContentPlugin({ document: doc }: { document: Document | null }) {
-    const [editor] = useLexicalComposerContext();
-    const lastLoadedContentRef = useRef<string | null>(null);
+function EditorContentPlugin({
+    document: doc,
+    documentId,
+}: {
+    document: Document | null;
+    documentId: string;
+}) {
+    const loadedRef = useRef(false);
 
     useEffect(() => {
-        if (!doc || !editor) return;
+        if (!doc || loadedRef.current) return;
 
-        // 计算当前内容的 hash，防止重复加载
-        const contentHash = JSON.stringify(doc.content);
-        if (contentHash === lastLoadedContentRef.current) {
-            return;
+        const editorContainer = container.get(EditorContainer);
+        const editorService = editorContainer.getService(documentId);
+        if (editorService) {
+            loadedRef.current = true;
+            editorService.loadDocument(doc);
         }
-        lastLoadedContentRef.current = contentHash;
-
-        // 使用 BlockLexicalConverter 将 Block[] 渲染到编辑器
-        blocksToLexical(doc.content, editor);
-    }, [doc, editor]);
+    }, [doc, documentId]);
 
     return null;
 }
@@ -229,11 +250,11 @@ function LexicalEditorImpl({
             <div className={cn('relative flex h-full flex-col', className)}>
                 {/* 编辑区域 */}
                 <div className="flex-1 overflow-y-auto">
-                    <div className="mx-auto max-w-[800px] px-4 py-6">
+                    <div className="mx-auto max-w-200 px-4 py-6">
                         <RichTextPlugin
                             contentEditable={
                                 <ContentEditable
-                                    className="prose prose-ws min-h-[500px] max-w-none outline-none"
+                                    className="prose prose-ws min-h-125 max-w-none outline-none"
                                     onContextMenu={e => {
                                         // 触发编辑器右键菜单
                                         const contextMenuService =
@@ -269,7 +290,7 @@ function LexicalEditorImpl({
             <EditorBridgePlugin documentId={documentId} filePath={filePath} />
 
             {/* EditorContentPlugin - 监听 document 变化并加载内容 */}
-            <EditorContentPlugin document={document} />
+            <EditorContentPlugin document={document} documentId={documentId} />
         </LexicalComposer>
     );
 }

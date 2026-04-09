@@ -8,6 +8,9 @@
  */
 
 import 'reflect-metadata';
+import { deserializeFromKmFile } from '@/features/editor/converter/km-serializer';
+import { parseMarkdown } from '@/features/editor/converter/markdown-parser';
+import type { Document } from '@/features/editor/types';
 import { ServiceBase } from '@/platform/base/service-base';
 import { container } from '@/platform/bootstrap';
 import { Service } from '@/platform/di';
@@ -15,8 +18,6 @@ import { EditorContainer } from '@/platform/editor/container';
 import { EditorTabService } from '@/platform/editor-tab/service';
 import type { OpenDocument } from '@/platform/editor-tab/types';
 import { FileSystemService } from '@/platform/file-system/service';
-import { parseMarkdown } from '@/features/editor/converter/markdown-parser';
-import type { Document } from '@/features/editor/types';
 
 /**
  * 文件打开服务
@@ -146,7 +147,7 @@ export class FileOpenService extends ServiceBase {
     /**
      * 推断文档类型
      */
-    private inferDocumentType(path: string): 'rich-text' | 'markdown' {
+    private inferDocumentType(path: string): 'rich-text' | 'markdown' | 'km' {
         const ext = path.split('.').pop()?.toLowerCase();
 
         switch (ext) {
@@ -154,6 +155,8 @@ export class FileOpenService extends ServiceBase {
             case 'mdx':
             case 'markdown':
                 return 'markdown';
+            case 'km':
+                return 'km';
             default:
                 return 'rich-text';
         }
@@ -167,7 +170,7 @@ export class FileOpenService extends ServiceBase {
     private createDocument(
         path: string,
         content: unknown,
-        type: 'rich-text' | 'markdown',
+        type: 'rich-text' | 'markdown' | 'km',
     ): OpenDocument {
         // 使用文件路径作为文档 ID（确保唯一性）
         const id = `file:${path}`;
@@ -187,10 +190,12 @@ export class FileOpenService extends ServiceBase {
         }
 
         // 对于 Markdown 文件，解析为 Block[] 并序列化存储
-        let storedContent: string;
+        let storedContent: string = '';
+        let document: Document | undefined;
+
         if (type === 'markdown') {
             const blocks = parseMarkdown(contentString);
-            const document: Document = {
+            document = {
                 id,
                 path,
                 title,
@@ -201,28 +206,32 @@ export class FileOpenService extends ServiceBase {
                 updatedAt: new Date().toISOString(),
             };
             storedContent = JSON.stringify(blocks);
-
-            // 同时返回 Document 对象用于编辑器
-            return {
+        } else if (type === 'km') {
+            // 对于.km 文件，使用专有格式解析
+            const { blocks, metadata } = deserializeFromKmFile(contentString);
+            document = {
                 id,
                 path,
-                title,
-                type,
-                isDirty: false,
-                openedAt: new Date().toISOString(),
-                content: storedContent,
-                document,
-            } as OpenDocument;
+                title: metadata.title || title,
+                type: 'km',
+                content: blocks,
+                version: 1,
+                createdAt: metadata.createdAt,
+                updatedAt: metadata.updatedAt,
+            };
+            storedContent = contentString; // .km 文件直接存储原始 JSON
         }
 
+        // 同时返回 Document 对象用于编辑器
         return {
             id,
             path,
-            title,
+            title: document?.title || title,
             type,
             isDirty: false,
             openedAt: new Date().toISOString(),
-            content: contentString,
+            content: storedContent,
+            document,
         } as OpenDocument;
     }
 

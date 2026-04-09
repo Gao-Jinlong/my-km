@@ -7,6 +7,7 @@
 import { container } from '@/platform/bootstrap';
 import { ConditionalService } from '@/platform/conditional/service';
 import { ConditionId } from '@/platform/conditional/types';
+import { EditorTabService } from '@/platform/editor-tab/service';
 import { PanelService } from '@/platform/panel/service';
 
 /**
@@ -17,6 +18,7 @@ import { PanelService } from '@/platform/panel/service';
 export function registerConditionEvaluators(): void {
     const conditionalService = container.get(ConditionalService);
     const panelService = container.get(PanelService);
+    const editorTabService = container.get(EditorTabService);
 
     conditionalService.registerBatch([
         {
@@ -38,7 +40,6 @@ export function registerConditionEvaluators(): void {
             id: ConditionId.IS_EDITOR_ACTIVE,
             description: '编辑器有激活的文档',
             evaluate: () => {
-                // 通过上下文判断，不直接依赖 EditorTabService
                 const ctx = conditionalService.getContext();
                 return ctx.activeDocumentId !== null && ctx.activeDocumentId !== undefined;
             },
@@ -57,6 +58,13 @@ export function registerConditionEvaluators(): void {
     panelService.onDidChangePanel(state => {
         conditionalService.updateContext({
             activePanelId: state.expanded && state.size > 0 ? state.id : null,
+        });
+    });
+
+    // 监听编辑器激活状态变化，更新上下文
+    editorTabService.onDidChangeActive(documentId => {
+        conditionalService.updateContext({
+            activeDocumentId: documentId,
         });
     });
 

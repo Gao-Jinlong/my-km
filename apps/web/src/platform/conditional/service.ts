@@ -171,7 +171,9 @@ export class ConditionalService extends ServiceBase implements IConditionalServi
 
         return {
             dispose: () => {
-                disposables.forEach(d => d.dispose());
+                for (const d of disposables) {
+                    d.dispose();
+                }
             },
         };
     }

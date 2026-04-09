@@ -132,13 +132,18 @@ class AIContextServiceImpl extends ServiceBase implements AIContextService {
         }
 
         try {
-            // 获取文档信息
-            const store = editorService.store;
-            const document = store.document;
+            // 获取文档信息 - 从 EditorService 内部状态获取
+            // 注意：EditorService 不再暴露 store，需要通过 getFullContent 等方式获取信息
+            const fullContent = editorService.getFullContent();
 
-            if (!document) {
-                return null;
-            }
+            // 由于无法直接获取 Document 对象，这里从服务内部获取基本信息
+            // 在实际使用中，AI Panel 应该通过 EditorContainer 或 EditorTabService 获取文档元数据
+            const document: DocumentInfo = {
+                id: editorService.documentId,
+                path: '', // 路径信息需要从外部获取
+                title: '', // 标题信息需要从外部获取
+                type: 'rich-text',
+            };
 
             // 获取选区信息
             const selection = editorService.getSelection();
@@ -151,9 +156,6 @@ class AIContextServiceImpl extends ServiceBase implements AIContextService {
                   }
                 : null;
 
-            // 获取完整内容
-            const fullContent = editorService.getFullContent();
-
             // 获取光标位置（如果有选区，使用选区结束位置作为光标位置）
             const cursorPosition: Position | null = selection ? selection.head : null;
 
@@ -161,12 +163,7 @@ class AIContextServiceImpl extends ServiceBase implements AIContextService {
             const formatState = editorService.getFormatState();
 
             const context: AIContext = {
-                document: {
-                    id: document.id,
-                    path: document.path,
-                    title: document.title,
-                    type: document.type,
-                },
+                document,
                 selection: selectionInfo,
                 fullContent: fullContent || null,
                 cursorPosition,

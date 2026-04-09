@@ -13,7 +13,12 @@ import { ServiceBase } from '@/platform/base/service-base';
 import { container } from '@/platform/bootstrap';
 import { ConditionalService } from '@/platform/conditional/service';
 import { Service } from '@/platform/di';
-import type { ShortcutHandler, ShortcutConfig as KeyboardShortcutConfig, KeyBinding, ShortcutScope } from './types';
+import type {
+    KeyBinding,
+    ShortcutConfig as KeyboardShortcutConfig,
+    ShortcutHandler,
+    ShortcutScope,
+} from './types';
 
 // 重新导出类型以便现有代码使用
 export type { ShortcutHandler };
@@ -51,6 +56,7 @@ interface RegisteredShortcut {
 export class KeyboardShortcutService extends ServiceBase {
     private shortcuts = new Map<string, RegisteredShortcut>();
     private keyDownListener: ((e: KeyboardEvent) => void) | null = null;
+    private isInitialized = false;
 
     // 注入条件服务
     private readonly conditionalService = container.get(ConditionalService);
@@ -69,8 +75,14 @@ export class KeyboardShortcutService extends ServiceBase {
      */
     readonly onShortcutFailed = this._onShortcutFailed.event;
 
-    constructor() {
-        super();
+    /**
+     * 初始化服务 - 必须在 registerConditionEvaluators 之后调用
+     */
+    initialize(): void {
+        if (this.isInitialized) {
+            return;
+        }
+        this.isInitialized = true;
         this.setupKeyboardListener();
     }
 
@@ -211,7 +223,14 @@ export class KeyboardShortcutService extends ServiceBase {
      * }, ShortcutScope.GLOBAL);
      * ```
      */
-    register(keybinding: KeyBinding | string, handler: ShortcutHandler, scope: ShortcutScope | string = 'global'): IDisposable {
+    register(
+        keybinding: KeyBinding | string,
+        handler: ShortcutHandler,
+        scope: ShortcutScope | string = 'global',
+    ): IDisposable {
+        // 确保服务已初始化
+        this.initialize();
+
         const normalizedKeybinding = keybinding.toLowerCase();
         const existing = this.shortcuts.get(normalizedKeybinding);
 

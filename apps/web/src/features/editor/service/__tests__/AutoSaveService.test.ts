@@ -14,7 +14,10 @@ import type { EditorService, SaveResult } from '../EditorService';
 function createMockEditorService(
     documentId: string,
     initialDoc?: Partial<Document>,
-): { service: EditorService; mocks: Record<string, unknown> } {
+): {
+    service: EditorService;
+    mocks: { saveDocument: ReturnType<typeof vi.fn<() => Promise<SaveResult>>> };
+} {
     const mockDoc: Document = {
         id: documentId,
         path: `/test/${documentId}.md`,
@@ -47,27 +50,8 @@ function createMockEditorService(
     const service: EditorService = {
         documentId,
         filePath: `/test/${documentId}.md`,
-        store: {
-            document: mockDoc,
-            isDirty,
-            selection: null,
-            formatState: null,
-            error: null,
-            isLoading: false,
-            markDirty: () => {
-                isDirty = true;
-            },
-            markClean: () => {
-                isDirty = false;
-            },
-            setDocument: vi.fn(),
-            setSelection: vi.fn(),
-            setFormatState: vi.fn(),
-            setError: vi.fn(),
-            clearError: vi.fn(),
-            reset: vi.fn(),
-        },
         isDisposed: false,
+        onChange: vi.fn(() => ({ dispose: vi.fn() })),
         setEditor: vi.fn(),
         getEditor: vi.fn(() => null),
         loadDocument: vi.fn(),
@@ -84,6 +68,13 @@ function createMockEditorService(
             subscript: false,
             superscript: false,
             highlight: false,
+        })),
+        getState: vi.fn(() => ({
+            isDirty,
+            isSaving: false,
+            hasError: false,
+            isReadonly: false,
+            error: null,
         })),
         destroy: vi.fn(() => {
             _disposed = true;

@@ -10,5 +10,5 @@ export {
     createAutoSaveService,
     SaveStatus,
 } from './AutoSaveService';
-export type { EditorService, SaveResult } from './EditorService';
+export type { EditorService, EditorState, SaveResult } from './EditorService';
 export { createEditorService } from './EditorService';

@@ -50,18 +50,17 @@ describe('Editor Integration', () => {
             expect(service).toBeDefined();
             expect(service.documentId).toBe('doc-123');
             expect(service.filePath).toBe('/test/doc.md');
-            expect(service.store).toBeDefined();
 
             // 初始状态
-            expect(service.store.document).toBeNull();
-            expect(service.store.isDirty).toBe(false);
+            const initialState = service.getState();
+            expect(initialState.isDirty).toBe(false);
 
             // 加载文档
             const testDoc = createTestDocument();
             service.loadDocument(testDoc);
 
-            expect(service.store.document).toEqual(testDoc);
-            expect(service.store.isDirty).toBe(false);
+            const state = service.getState();
+            expect(state.isDirty).toBe(false);
         });
 
         it('应该注入 Lexical 编辑器实例', () => {
@@ -71,7 +70,7 @@ describe('Editor Integration', () => {
                 update: vi.fn(),
                 getEditorState: vi.fn(),
                 registerUpdateListener: vi.fn(),
-            } as any;
+            } as unknown as Parameters<typeof service.setEditor>[0];
 
             service.setEditor(mockEditor);
             expect(service.getEditor()).toBe(mockEditor);
@@ -107,6 +106,7 @@ describe('Editor Integration', () => {
                         mtime: Date.now(),
                     }),
                 ),
+                // biome-ignore lint/suspicious/noExplicitAny: mock object for testing
             } as any;
 
             const autoSaveService = createAutoSaveService(mockFileSystemService, {
@@ -147,16 +147,22 @@ describe('Editor Integration', () => {
             // 收集 AI 上下文 - 注意：getFullContent() 需要 Lexical 编辑器
             // 在没有注入编辑器的情况下返回空字符串，这是预期行为
             const context: AIContext = {
-                documentId: 'doc-123',
-                content: JSON.stringify(testDoc.content),
-                title: testDoc.title,
-                path: testDoc.path,
+                document: {
+                    id: 'doc-123',
+                    path: '/test/document.md',
+                    title: 'Test Document',
+                    type: 'markdown',
+                },
+                selection: null,
+                fullContent: JSON.stringify(testDoc.content),
+                cursorPosition: null,
+                formatState: null,
             };
 
-            expect(context.documentId).toBe('doc-123');
-            expect(context.content).toContain('Hello');
-            expect(context.title).toBe('Test Document');
-            expect(context.path).toBe('/test/document.md');
+            expect(context.document.id).toBe('doc-123');
+            expect(context.fullContent).toContain('Hello');
+            expect(context.document.title).toBe('Test Document');
+            expect(context.document.path).toBe('/test/document.md');
         });
     });
 });

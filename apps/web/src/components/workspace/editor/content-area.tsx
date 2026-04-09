@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import type { Document } from '@/features/editor/types';
 import { cn } from '@/lib/utils';
 import { useEditorTabs } from '@/platform/editor-tab/use-editor-tabs';
@@ -15,29 +16,34 @@ interface ContentAreaProps {
  */
 export function ContentArea({ documentId, className }: ContentAreaProps) {
     const { openDocuments } = useEditorTabs();
-    const openDoc = openDocuments.find(d => d.id === documentId);
 
-    const document: Document | null = openDoc
-        ? {
-              id: openDoc.id,
-              path: openDoc.path,
-              title: openDoc.title,
-              type: openDoc.type,
-              content: openDoc.content ? JSON.parse(openDoc.content) || [] : [],
-              version: 1,
-              createdAt: openDoc.openedAt,
-              updatedAt: openDoc.openedAt,
-          }
-        : null;
+    const document = useMemo<Document | null>(() => {
+        const openDoc = openDocuments.find(d => d.id === documentId);
+        if (!openDoc) return null;
+        return {
+            id: openDoc.id,
+            path: openDoc.path,
+            title: openDoc.title,
+            type: openDoc.type,
+            content: openDoc.content ? JSON.parse(openDoc.content) || [] : [],
+            version: 1,
+            createdAt: openDoc.openedAt,
+            updatedAt: openDoc.openedAt,
+        };
+    }, [openDocuments, documentId]);
+
+    const filePath = useMemo(() => {
+        const openDoc = openDocuments.find(d => d.id === documentId);
+        return openDoc?.path || '';
+    }, [openDocuments, documentId]);
 
     return (
         <div className={cn('flex-1 overflow-y-auto bg-ws-bg-primary', className)}>
             <LexicalEditor
                 documentId={documentId}
                 document={document}
-                filePath={openDoc?.path || ''}
+                filePath={filePath}
                 className="h-full"
-                placeholder="开始编写内容..."
             />
         </div>
     );

@@ -5,12 +5,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EditorService } from '../../../editor/service';
 import type { Document, FormatState, Selection } from '../../../editor/types';
+import type { AIContext } from '../AIContextService';
 import {
     type AIContextService,
     type AIContextSubscriber,
     createAIContextService,
 } from '../AIContextService';
-import type { AIContext } from '../types';
 
 /**
  * 创建模拟的 EditorService
@@ -23,16 +23,11 @@ function createMockEditorService(
 ): EditorService {
     return {
         documentId: document?.id || 'test-doc-id',
-        editor: {} as unknown as EditorService,
-        store: {
-            document: document || null,
-            setDocument: vi.fn(),
-            setSelection: vi.fn(),
-            setFormatState: vi.fn(),
-            markDirty: vi.fn(),
-            markClean: vi.fn(),
-            reset: vi.fn(),
-        } as unknown as EditorService['store'],
+        filePath: '/test/document',
+        isDisposed: false,
+        onChange: vi.fn(() => ({ dispose: vi.fn() })),
+        setEditor: vi.fn(),
+        getEditor: vi.fn(() => null),
         loadDocument: vi.fn(),
         saveDocument: vi.fn().mockResolvedValue({ success: true }),
         getSelection: vi.fn().mockReturnValue(selection ?? null),
@@ -50,11 +45,15 @@ function createMockEditorService(
                 highlight: false,
             },
         ),
-        insertBlock: vi.fn(),
-        updateBlock: vi.fn(),
-        deleteBlock: vi.fn(),
+        getState: vi.fn(() => ({
+            isDirty: false,
+            isSaving: false,
+            hasError: false,
+            isReadonly: false,
+            error: null,
+        })),
         destroy: vi.fn(),
-    };
+    } as unknown as EditorService;
 }
 
 /**

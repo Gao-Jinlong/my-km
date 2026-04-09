@@ -5,16 +5,8 @@
  */
 
 import MarkdownIt from 'markdown-it';
-import type {
-    Block,
-    HeadingBlock,
-    ParagraphBlock,
-    ListBlock,
-    QuoteBlock,
-    CodeBlock,
-    Inline,
-} from '../types/block';
 import { nanoid } from 'nanoid';
+import type { Block, Inline } from '../types/block';
 
 const md = new MarkdownIt({
     html: true,
@@ -140,11 +132,12 @@ export function parseMarkdown(markdown: string): Block[] {
 
         switch (token.type) {
             case 'heading_open': {
-                const level = parseInt(token.tag.slice(1)) as 1 | 2 | 3 | 4 | 5 | 6;
+                const level = parseInt(token.tag.slice(1), 10) as 1 | 2 | 3 | 4 | 5 | 6;
                 i++; // 移动到 inline 内容
-                const inlineTokens = i < tokens.length && tokens[i].type === 'inline'
-                    ? tokens[i].children || []
-                    : [];
+                const inlineTokens =
+                    i < tokens.length && tokens[i].type === 'inline'
+                        ? tokens[i].children || []
+                        : [];
                 blocks.push({
                     id: nanoid(),
                     type: 'heading',
@@ -159,9 +152,10 @@ export function parseMarkdown(markdown: string): Block[] {
 
             case 'paragraph_open': {
                 i++; // 移动到 inline 内容
-                const inlineTokens = i < tokens.length && tokens[i].type === 'inline'
-                    ? tokens[i].children || []
-                    : [];
+                const inlineTokens =
+                    i < tokens.length && tokens[i].type === 'inline'
+                        ? tokens[i].children || []
+                        : [];
                 blocks.push({
                     id: nanoid(),
                     type: 'paragraph',

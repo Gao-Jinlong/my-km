@@ -2,18 +2,18 @@
  * ShortcutProvider - 快捷键提供者组件
  *
  * 在应用启动时注册全局快捷键
+ * Handler 从服务层读取状态（非闭包），只注册一次
  */
 
 'use client';
 
 import { useEffect, useRef } from 'react';
 import { container } from '@/platform/bootstrap';
-import { EditorTabService } from '@/platform/editor-tab/service';
-import { EditorContainer } from '@/platform/editor/container/editor-container';
-import { useEditorTabs } from '@/platform/editor-tab/use-editor-tabs';
-import { EventBusService } from '@/platform/event-bus/service';
-import { KeyboardShortcutService, KeyBinding, ShortcutScope } from '@/platform/keyboard';
 import { ConditionId } from '@/platform/conditional';
+import { EditorContainer } from '@/platform/editor/container/editor-container';
+import { EditorTabService } from '@/platform/editor-tab/service';
+import { EventBusService } from '@/platform/event-bus/service';
+import { KeyBinding, KeyboardShortcutService, ShortcutScope } from '@/platform/keyboard';
 
 /**
  * 文件搜索聚焦事件类型
@@ -25,7 +25,6 @@ const FILE_SEARCH_FOCUS_EVENT = 'file-search.focus';
  */
 export function ShortcutProvider({ children }: { children: React.ReactNode }) {
     const shortcutServiceRef = useRef<KeyboardShortcutService | null>(null);
-    const { openDocuments, activeDocumentId, closeDocument } = useEditorTabs();
 
     useEffect(() => {
         // 获取快捷键服务实例
@@ -33,15 +32,17 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
         const eventBus = container.get(EventBusService);
         shortcutServiceRef.current = shortcutService;
 
-        // 注册默认快捷键
+        // 注册默认快捷键（只注册一次，handler 从服务读取状态）
         const disposables = shortcutService.registerBatch([
             {
                 keybinding: KeyBinding.CTRL_W,
                 handler: {
                     handle: () => {
                         // 关闭当前活动文档
-                        if (activeDocumentId) {
-                            closeDocument(activeDocumentId);
+                        const tabService = container.get(EditorTabService);
+                        const activeId = tabService.getActiveDocumentId();
+                        if (activeId) {
+                            tabService.closeDocument(activeId);
                         }
                     },
                     description: '关闭当前标签页',
@@ -52,16 +53,18 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
                 keybinding: KeyBinding.CTRL_S,
                 handler: {
                     handle: () => {
-                        // 获取当前活动文档的编辑器服务并保存
-                        if (activeDocumentId) {
+                        const tabService = container.get(EditorTabService);
+                        const activeId = tabService.getActiveDocumentId();
+                        if (activeId) {
                             const editorContainer = container.get(EditorContainer);
-                            const editorService = editorContainer.getService(activeDocumentId);
+                            const editorService = editorContainer.getService(activeId);
                             if (editorService) {
                                 editorService.saveDocument().catch(console.error);
                             }
                         }
                     },
                     description: '保存当前文档',
+                    condition: ConditionId.IS_EDITOR_ACTIVE,
                 },
                 scope: ShortcutScope.EDITOR,
             },
@@ -70,7 +73,11 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
                 handler: {
                     handle: () => {
                         // TODO: 另存为功能
-                        console.log('[Shortcut] Save As triggered for:', activeDocumentId);
+                        const tabService = container.get(EditorTabService);
+                        console.log(
+                            '[Shortcut] Save As triggered for:',
+                            tabService.getActiveDocumentId(),
+                        );
                     },
                     description: '另存为',
                 },
@@ -103,15 +110,14 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
                 handler: {
                     handle: () => {
                         // 切换到下一个标签页
-                        const currentIndex = openDocuments.findIndex(
-                            d => d.id === activeDocumentId,
-                        );
-                        if (currentIndex !== -1 && openDocuments.length > 1) {
-                            const nextIndex = (currentIndex + 1) % openDocuments.length;
-                            const nextDoc = openDocuments[nextIndex];
+                        const tabService = container.get(EditorTabService);
+                        const docs = tabService.getOpenDocuments();
+                        const activeId = tabService.getActiveDocumentId();
+                        const currentIndex = docs.findIndex(d => d.id === activeId);
+                        if (currentIndex !== -1 && docs.length > 1) {
+                            const nextIndex = (currentIndex + 1) % docs.length;
+                            const nextDoc = docs[nextIndex];
                             if (nextDoc) {
-                                // 激活下一个文档
-                                const tabService = container.get(EditorTabService);
                                 tabService.activateDocument(nextDoc.id);
                             }
                         }
@@ -125,16 +131,14 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
                 handler: {
                     handle: () => {
                         // 切换到上一个标签页
-                        const currentIndex = openDocuments.findIndex(
-                            d => d.id === activeDocumentId,
-                        );
-                        if (currentIndex !== -1 && openDocuments.length > 1) {
-                            const prevIndex =
-                                (currentIndex - 1 + openDocuments.length) % openDocuments.length;
-                            const prevDoc = openDocuments[prevIndex];
+                        const tabService = container.get(EditorTabService);
+                        const docs = tabService.getOpenDocuments();
+                        const activeId = tabService.getActiveDocumentId();
+                        const currentIndex = docs.findIndex(d => d.id === activeId);
+                        if (currentIndex !== -1 && docs.length > 1) {
+                            const prevIndex = (currentIndex - 1 + docs.length) % docs.length;
+                            const prevDoc = docs[prevIndex];
                             if (prevDoc) {
-                                // 激活上一个文档
-                                const tabService = container.get(EditorTabService);
                                 tabService.activateDocument(prevDoc.id);
                             }
                         }
@@ -165,7 +169,7 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
         return () => {
             disposables.dispose();
         };
-    }, [activeDocumentId, closeDocument, openDocuments]);
+    }, []);
 
     return <>{children}</>;
 }

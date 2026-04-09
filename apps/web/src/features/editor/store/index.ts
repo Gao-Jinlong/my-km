@@ -1,8 +1,7 @@
 /**
  * Editor Store Module
  *
- * Zustand store for editor state management
+ * Re-export EditorState from EditorService
  */
 
-export type { EditorStoreApi } from './editor-store';
-export { createEditorStore, createEmptyFormatState, createEmptySelection } from './editor-store';
+export type { EditorState } from '../service/EditorService';

@@ -127,6 +127,19 @@ export class EditorTabService extends ServiceBase {
     }
 
     /**
+     * 更新文档属性
+     */
+    updateDocument(id: string, updates: Partial<OpenDocument>): void {
+        const doc = this._openDocuments.find(d => d.id === id);
+        if (!doc) {
+            return;
+        }
+
+        Object.assign(doc, updates);
+        this._onDidChangeDocuments.fire();
+    }
+
+    /**
      * 关闭除指定文档外的所有文档
      */
     closeOtherDocuments(keepId: string): void {

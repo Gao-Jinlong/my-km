@@ -1,4 +1,5 @@
 import { ContentArea } from './content-area';
+import { DocumentStatusIndicator } from './document-status-indicator';
 import { EditorShell } from './editor-shell';
 
 interface EditorRootProps {
@@ -20,7 +21,15 @@ export function EditorRoot({ documentId, className }: EditorRootProps) {
 
     return (
         <EditorShell className={className}>
-            {/* TODO: 集成 Toolbar */}
+            {/* 工具栏区域 */}
+            <div className="border-ws-border border-b bg-ws-bg-secondary px-3 py-2">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <span className="text-ws-fg-placeholder text-xs">工具栏</span>
+                    </div>
+                    <DocumentStatusIndicator documentId={documentId} />
+                </div>
+            </div>
             <ContentArea documentId={documentId} />
         </EditorShell>
     );

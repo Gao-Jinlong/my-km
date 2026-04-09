@@ -1,20 +1,17 @@
 /**
  * EditorService - 单个编辑器的业务逻辑服务
- *
- * 负责管理单个 Lexical Editor 实例，提供文档操作、选区管理、命令执行等功能
  */
 
 import type { LexicalEditor } from 'lexical';
-import { $getRoot } from 'lexical';
-import type { BlockRegistry } from '../registry/BlockRegistry';
-import type { EditorStoreApi } from '../store/editor-store';
-import { createEditorStore } from '../store/editor-store';
-import type { Block, Document, FormatState, Selection } from '../types';
-import { blocksToLexical, lexicalToBlocks } from '../converter/block-lexical-converter';
-import { parseMarkdown } from '../converter/markdown-parser';
-import { serializeToMarkdown } from '../converter/markdown-serializer';
-import { FileSystemService } from '@/platform/file-system/service';
+import { $getRoot, $getSelection, $isRangeSelection } from 'lexical';
+import { Emitter } from '@/base/common/event';
+import type { IDisposable } from '@/base/common/lifecycle';
 import { container } from '@/platform/bootstrap';
+import { FileSystemService } from '@/platform/file-system/service';
+import { blocksToLexical, lexicalToBlocks } from '../converter/block-lexical-converter';
+import { serializeToKmFile } from '../converter/km-serializer';
+import { serializeToMarkdown } from '../converter/markdown-serializer';
+import type { Document, FormatState, Selection } from '../types';
 
 /**
  * 文档保存结果
@@ -26,14 +23,28 @@ export interface SaveResult {
 }
 
 /**
+ * 编辑器状态
+ */
+export interface EditorState {
+    isDirty: boolean;
+    isSaving: boolean;
+    isSaved: boolean;
+    hasError: boolean;
+    isReadonly: boolean;
+    error: string | null;
+}
+
+/**
  * EditorService 接口定义
  */
 export interface EditorService {
     // 属性
-    documentId: string;
-    filePath: string;
-    store: EditorStoreApi;
+    readonly documentId: string;
+    readonly filePath: string;
     readonly isDisposed: boolean;
+
+    // 事件
+    readonly onChange: (listener: (state: EditorState) => void) => IDisposable;
 
     // 编辑器实例（从 React 组件注入）
     setEditor(editor: LexicalEditor): void;
@@ -43,7 +54,8 @@ export interface EditorService {
     loadDocument(doc: Document): void;
     saveDocument(): Promise<SaveResult>;
 
-    // 选区与内容
+    // 状态获取
+    getState(): EditorState;
     getSelection(): Selection | null;
     getSelectedText(): string | null;
     getFullContent(): string;
@@ -54,62 +66,139 @@ export interface EditorService {
 }
 
 /**
+ * 创建空格式状态
+ */
+function createEmptyFormatState(): FormatState {
+    return {
+        bold: false,
+        italic: false,
+        underline: false,
+        code: false,
+        strikethrough: false,
+        subscript: false,
+        superscript: false,
+        highlight: false,
+    };
+}
+
+/**
  * EditorService 实现类
  */
 class EditorServiceImpl implements EditorService {
-    documentId: string;
-    filePath: string;
-    store: EditorStoreApi;
+    readonly documentId: string;
+    readonly filePath: string;
+
+    // 事件发射器
+    private readonly _onChange = new Emitter<EditorState>();
+
+    // 内部状态
     private editor: LexicalEditor | null = null;
+    private updateListenerCleanup: (() => void) | null = null;
     private disposed: boolean = false;
+    private isDirty = false;
+    private isSaving = false;
+    private isSaved = false;
+    private savedTimer: ReturnType<typeof setTimeout> | null = null;
+    private error: string | null = null;
+    private isReadonly = false;
+    private currentDocument: Document | null = null;
 
     get isDisposed(): boolean {
         return this.disposed;
     }
 
-    constructor(documentId: string, filePath: string, store: EditorStoreApi) {
+    constructor(documentId: string, filePath: string) {
         this.documentId = documentId;
         this.filePath = filePath;
-        this.store = store;
-
-        // 初始化编辑器事件监听
-        this.setupEditorListeners();
     }
 
-    /**
-     * 设置 Lexical 编辑器实例（从 React 组件注入）
-     */
+    // ========== 事件 ==========
+
+    get onChange() {
+        return this._onChange.event;
+    }
+
+    // ========== 状态 getter ==========
+
+    getState(): EditorState {
+        return {
+            isDirty: this.isDirty,
+            isSaving: this.isSaving,
+            isSaved: this.isSaved,
+            hasError: this.error !== null,
+            isReadonly: this.isReadonly,
+            error: this.error,
+        };
+    }
+
+    getFormatState(): FormatState {
+        if (!this.editor) {
+            return createEmptyFormatState();
+        }
+
+        return this.editor.getEditorState().read(() => {
+            const selection = $getSelection();
+            if (!$isRangeSelection(selection)) {
+                return createEmptyFormatState();
+            }
+            return {
+                bold: selection.hasFormat('bold'),
+                italic: selection.hasFormat('italic'),
+                underline: selection.hasFormat('underline'),
+                code: selection.hasFormat('code'),
+                strikethrough: selection.hasFormat('strikethrough'),
+                subscript: selection.hasFormat('subscript'),
+                superscript: selection.hasFormat('superscript'),
+                highlight: selection.hasFormat('highlight'),
+            };
+        });
+    }
+
+    // ========== 状态 setter ==========
+
+    private setState(newState: Partial<EditorState>): void {
+        if (newState.isDirty !== undefined) this.isDirty = newState.isDirty;
+        if (newState.isSaving !== undefined) this.isSaving = newState.isSaving;
+        if (newState.isSaved !== undefined) this.isSaved = newState.isSaved;
+        if (newState.error !== undefined) this.error = newState.error;
+        if (newState.isReadonly !== undefined) this.isReadonly = newState.isReadonly;
+        this._onChange.fire(this.getState());
+    }
+
+    // ========== 编辑器实例 ==========
+
     setEditor(editor: LexicalEditor): void {
         this.editor = editor;
+
+        // 注册 Lexical 更新监听器，内容变化时标记为 dirty
+        this.updateListenerCleanup = editor.registerUpdateListener(
+            ({ dirtyElements, dirtyLeaves }) => {
+                // 只有在内容实际变化时才标记为 dirty（排除初始化时的触发）
+                if ((dirtyElements?.size ?? 0) > 0 || (dirtyLeaves?.size ?? 0) > 0) {
+                    this.setState({ isDirty: true });
+                }
+            },
+        );
     }
 
-    /**
-     * 获取 Lexical 编辑器实例
-     */
     getEditor(): LexicalEditor | null {
         return this.editor;
     }
 
-    /**
-     * 设置编辑器事件监听
-     */
-    private setupEditorListeners(): void {
-        // 监听选区变化 - 通过 UpdateListener 在 React 组件中注册
-    }
+    // ========== 文档操作 ==========
 
-    /**
-     * 加载文档
-     * @param doc 要加载的文档
-     */
     loadDocument(doc: Document): void {
         if (this.disposed) {
             throw new Error('EditorService has been destroyed');
         }
 
         try {
-            this.store.setDocument(doc);
-            this.store.markClean();
-            this.store.clearError();
+            this.currentDocument = doc;
+            this.setState({
+                isReadonly: false,
+                isDirty: false,
+                error: null,
+            });
 
             // 将文档内容加载到 Lexical 编辑器
             if (this.editor) {
@@ -117,20 +206,23 @@ class EditorServiceImpl implements EditorService {
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Failed to load document';
-            this.store.setError(errorMessage);
+            this.setState({ error: errorMessage });
             throw error;
         }
     }
 
-    /**
-     * 保存文档
-     * @returns 保存结果
-     */
     async saveDocument(): Promise<SaveResult> {
         if (this.disposed) {
             return {
                 success: false,
                 error: 'EditorService has been destroyed',
+            };
+        }
+
+        if (this.isReadonly) {
+            return {
+                success: false,
+                error: 'Document is in readonly mode',
             };
         }
 
@@ -142,19 +234,13 @@ class EditorServiceImpl implements EditorService {
                 };
             }
 
-            // 从 Lexical 编辑器获取当前内容
+            this.setState({ isSaving: true });
+
+            // 从 Lexical 获取当前内容
             const blocks = lexicalToBlocks(this.editor);
 
-            // 序列化为 Markdown
-            const markdown = serializeToMarkdown(blocks);
-
-            // 写入文件
-            const fileSystem = container.get(FileSystemService);
-            await fileSystem.writeFile(this.filePath, markdown);
-
-            // 更新文档内容
-            const currentDoc = this.store.document;
-            if (!currentDoc) {
+            // 获取当前文档
+            if (!this.currentDocument) {
                 return {
                     success: false,
                     error: 'No document loaded',
@@ -162,14 +248,35 @@ class EditorServiceImpl implements EditorService {
             }
 
             const updatedDoc: Document = {
-                ...currentDoc,
+                ...this.currentDocument,
                 content: blocks,
-                version: currentDoc.version + 1,
+                version: this.currentDocument.version + 1,
                 updatedAt: new Date().toISOString(),
             };
 
-            this.store.setDocument(updatedDoc);
-            this.store.markClean();
+            // 根据文档类型选择序列化方式
+            let fileContent: string;
+            if (updatedDoc.type === 'km') {
+                fileContent = serializeToKmFile(blocks, {
+                    title: updatedDoc.title,
+                    createdAt: updatedDoc.createdAt,
+                    updatedAt: updatedDoc.updatedAt,
+                });
+            } else {
+                fileContent = serializeToMarkdown(blocks);
+            }
+
+            // 写入文件
+            const fileSystem = container.get(FileSystemService);
+            await fileSystem.writeFile(this.filePath, fileContent);
+
+            this.setState({ isDirty: false, isSaved: true });
+
+            // 2 秒后清除"已保存"状态
+            if (this.savedTimer) clearTimeout(this.savedTimer);
+            this.savedTimer = setTimeout(() => {
+                this.setState({ isSaved: false });
+            }, 2000);
 
             return {
                 success: true,
@@ -177,18 +284,18 @@ class EditorServiceImpl implements EditorService {
             };
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Failed to save document';
-            this.store.setError(errorMessage);
+            this.setState({ error: errorMessage });
             return {
                 success: false,
                 error: errorMessage,
             };
+        } finally {
+            this.setState({ isSaving: false });
         }
     }
 
-    /**
-     * 获取当前选区
-     * @returns 当前选区，如果没有选区则返回 null
-     */
+    // ========== 其他方法 ==========
+
     getSelection(): Selection | null {
         if (!this.editor) {
             return null;
@@ -208,19 +315,11 @@ class EditorServiceImpl implements EditorService {
         return null;
     }
 
-    /**
-     * 获取选中的文本
-     * @returns 选中的文本，如果没有选区则返回 null
-     */
     getSelectedText(): string | null {
         const selection = this.getSelection();
         return selection?.text ?? null;
     }
 
-    /**
-     * 获取完整内容
-     * @returns 编辑器中的完整文本内容
-     */
     getFullContent(): string {
         if (!this.editor) {
             return '';
@@ -231,50 +330,24 @@ class EditorServiceImpl implements EditorService {
         });
     }
 
-    /**
-     * 获取当前格式状态
-     * @returns 当前格式状态
-     */
-    getFormatState(): FormatState {
-        if (!this.editor) {
-            return {
-                bold: false,
-                italic: false,
-                underline: false,
-                code: false,
-                strikethrough: false,
-                subscript: false,
-                superscript: false,
-                highlight: false,
-            };
-        }
-
-        return this.editor.getEditorState().read(() => {
-            // TODO: 使用 @lexical/selection 获取格式状态
-            return {
-                bold: false,
-                italic: false,
-                underline: false,
-                code: false,
-                strikethrough: false,
-                subscript: false,
-                superscript: false,
-                highlight: false,
-            };
-        });
-    }
-
-    /**
-     * 销毁服务
-     */
     destroy(): void {
         if (this.disposed) {
             return;
         }
 
+        // 清理 Lexical 更新监听器
+        if (this.updateListenerCleanup) {
+            this.updateListenerCleanup();
+            this.updateListenerCleanup = null;
+        }
+
+        if (this.savedTimer) {
+            clearTimeout(this.savedTimer);
+            this.savedTimer = null;
+        }
+
         this.disposed = true;
-        this.store.reset();
-        // 清理编辑器资源
+        this._onChange.dispose();
     }
 }
 
@@ -284,13 +357,6 @@ class EditorServiceImpl implements EditorService {
  * @param filePath 文件路径
  * @returns EditorService 实例
  */
-export function createEditorService(
-    documentId: string,
-    filePath: string,
-): EditorService {
-    // 创建 Zustand store
-    const store = createEditorStore();
-
-    // 创建并返回 EditorService 实例
-    return new EditorServiceImpl(documentId, filePath, store);
+export function createEditorService(documentId: string, filePath: string): EditorService {
+    return new EditorServiceImpl(documentId, filePath);
 }

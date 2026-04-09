@@ -4,6 +4,23 @@
  * 负责在 Block[] 内容模型和 Lexical 节点树之间进行转换
  */
 
+import { $createCodeNode, $isCodeNode, type CodeNode } from '@lexical/code';
+import {
+    $createListItemNode,
+    $createListNode,
+    $isListItemNode,
+    $isListNode,
+    type ListItemNode,
+    type ListNode,
+} from '@lexical/list';
+import {
+    $createHeadingNode,
+    $createQuoteNode,
+    $isHeadingNode,
+    $isQuoteNode,
+    type HeadingNode,
+    type QuoteNode,
+} from '@lexical/rich-text';
 import type { LexicalEditor } from 'lexical';
 import {
     $createParagraphNode,
@@ -13,28 +30,16 @@ import {
     $isTextNode,
     type TextNode,
 } from 'lexical';
-import { $createHeadingNode, $isHeadingNode, type HeadingNode } from '@lexical/rich-text';
-import {
-    $createListItemNode,
-    $createListNode,
-    $isListItemNode,
-    $isListNode,
-    type ListItemNode,
-    type ListNode,
-} from '@lexical/list';
-import { $createQuoteNode, $isQuoteNode, type QuoteNode } from '@lexical/rich-text';
-import { $createCodeNode, $isCodeNode, type CodeNode } from '@lexical/code';
-
+import { nanoid } from 'nanoid';
 import type {
     Block,
-    Inline,
-    ParagraphBlock,
-    HeadingBlock,
-    ListBlock,
-    QuoteBlock,
     CodeBlock,
+    HeadingBlock,
+    Inline,
+    ListBlock,
+    ParagraphBlock,
+    QuoteBlock,
 } from '../types/block';
-import { nanoid } from 'nanoid';
 
 /**
  * 将 Inline[] 转换为带格式的 TextNode
@@ -82,7 +87,9 @@ function textNodeToInline(textNode: TextNode): Inline {
 /**
  * 将单个 Block 转换为 Lexical 节点
  */
-function blockToLexical(block: Block, editor: LexicalEditor): any[] {
+// biome-ignore lint/suspicious/noExplicitAny: Lexical 节点类型不统一
+function blockToLexical(block: Block, _editor: LexicalEditor): any[] {
+    // biome-ignore lint/suspicious/noExplicitAny: Lexical 节点类型不统一
     const nodes: any[] = [];
 
     switch (block.type) {
@@ -167,7 +174,9 @@ export function blocksToLexical(blocks: Block[], editor: LexicalEditor): void {
 
         blocks.forEach(block => {
             const nodes = blockToLexical(block, editor);
-            nodes.forEach(node => root.append(node));
+            for (const node of nodes) {
+                root.append(node);
+            }
         });
     });
 }
@@ -175,6 +184,7 @@ export function blocksToLexical(blocks: Block[], editor: LexicalEditor): void {
 /**
  * 将 Lexical 节点转换为 Inline[]
  */
+// biome-ignore lint/suspicious/noExplicitAny: Lexical 节点类型不统一，需要灵活处理
 function extractInlineFromNodes(nodes: any[]): Inline[] {
     const inline: Inline[] = [];
 
@@ -193,6 +203,7 @@ function extractInlineFromNodes(nodes: any[]): Inline[] {
 /**
  * 将单个 Lexical 节点转换为 Block
  */
+// biome-ignore lint/suspicious/noExplicitAny: Lexical 节点类型不统一
 function lexicalNodeToBlock(node: any): Block | null {
     if ($isParagraphNode(node)) {
         const inline = extractInlineFromNodes(node.getChildren());
@@ -205,7 +216,7 @@ function lexicalNodeToBlock(node: any): Block | null {
 
     if ($isHeadingNode(node)) {
         const headingNode = node as HeadingNode;
-        const level = parseInt(headingNode.getTag().slice(1)) as 1 | 2 | 3 | 4 | 5 | 6;
+        const level = parseInt(headingNode.getTag().slice(1), 10) as 1 | 2 | 3 | 4 | 5 | 6;
         const inline = extractInlineFromNodes(node.getChildren());
         return {
             id: nanoid(),
