@@ -28,8 +28,10 @@ function getSnapshot(): EditorTabsState {
     return currentState;
 }
 
+const serverSnapshot: EditorTabsState = { openDocuments: [], activeDocumentId: null };
+
 function getServerSnapshot(): EditorTabsState {
-    return { openDocuments: [], activeDocumentId: null };
+    return serverSnapshot;
 }
 
 // Subscribe to service events once

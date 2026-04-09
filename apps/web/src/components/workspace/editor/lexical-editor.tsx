@@ -21,11 +21,13 @@ import { HeadingNode, QuoteNode } from '@lexical/rich-text';
 import type { EditorThemeClasses } from 'lexical';
 import { useEffect, useRef } from 'react';
 import { EditorContainer } from '@/features/editor/container/EditorContainer';
+import { blocksToLexical } from '@/features/editor/converter/block-lexical-converter';
 import type { Document } from '@/features/editor/types';
 import { cn } from '@/lib/utils';
 import { container } from '@/platform/bootstrap';
 import { ContextMenuService } from '@/platform/context-menu/service';
 import type { ContextMenuContext } from '@/platform/context-menu/types';
+import { registerEditorService, unregisterEditorService } from './document-status-indicator';
 
 /**
  * 编辑器主题配置
@@ -98,11 +100,14 @@ function EditorBridgePlugin({ documentId, filePath }: { documentId: string; file
         // 将 Lexical 实例注入 EditorService
         if (editorServiceRef.current) {
             editorServiceRef.current.setEditor(editor);
+            // 注册服务用于状态监听
+            registerEditorService(documentId, editorServiceRef.current);
         }
 
         // 清理时在容器上调用 disposeInstance
         return () => {
             if (editorServiceRef.current) {
+                unregisterEditorService(documentId);
                 editorContainer.disposeInstance(documentId);
             }
         };
@@ -222,14 +227,6 @@ function LexicalEditorImpl({
     return (
         <LexicalComposer initialConfig={initialConfig}>
             <div className={cn('relative flex h-full flex-col', className)}>
-                {/* 工具栏区域 - 预留 */}
-                <div className="border-ws-border border-b bg-ws-bg-secondary px-3 py-2">
-                    <div className="flex items-center gap-2">
-                        {/* TODO: 集成 Toolbar */}
-                        <span className="text-ws-fg-placeholder text-xs">工具栏</span>
-                    </div>
-                </div>
-
                 {/* 编辑区域 */}
                 <div className="flex-1 overflow-y-auto">
                     <div className="mx-auto max-w-[800px] px-4 py-6">
@@ -288,7 +285,7 @@ export function LexicalEditor({
     document,
     filePath,
     className,
-    placeholder = '开始输入...',
+    placeholder,
 }: LexicalEditorProps) {
     return (
         <LexicalEditorImpl
