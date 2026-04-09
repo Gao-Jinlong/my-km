@@ -35,6 +35,9 @@ interface DialogProviderProps {
 export function DialogProvider({ children }: DialogProviderProps) {
     const { dialogs, dismissDialog } = useDialogs();
 
+    console.log('[DialogProvider] render, dialogs count:', dialogs.size);
+    console.log('[DialogProvider] dialog IDs:', Array.from(dialogs.keys()));
+
     return (
         <>
             {children}
@@ -43,6 +46,7 @@ export function DialogProvider({ children }: DialogProviderProps) {
                     key={id}
                     open
                     onOpenChange={open => {
+                        console.log('[DialogProvider] onOpenChange:', open);
                         if (!open) {
                             dismissDialog(request);
                         }
