@@ -62,21 +62,32 @@ export function useDialogs() {
     const state = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
     const dismissDialog = React.useCallback((request: DialogRequest) => {
+        console.log('[useDialogs] dismissDialog called:', request.id);
+        console.log('[useDialogs] dialogs before delete:', currentState.dialogs.size);
+
         const id = request.id;
         // 创建新的 Map 对象而不是直接修改
         currentState = {
             dialogs: new Map(currentState.dialogs),
         };
         currentState.dialogs.delete(id);
+
+        console.log('[useDialogs] dialogs after delete:', currentState.dialogs.size);
+        console.log('[useDialogs] notifying listeners');
+
         // 通知所有监听器状态已变更
         for (const l of listeners) {
             l();
         }
+
         // Resolve the promise to prevent leaks (null = cancelled, false = dismissed)
+        console.log('[useDialogs] resolving promise');
         request.resolve(
             request.type === 'input' ? null : request.type === 'confirm' ? false : undefined,
         );
     }, []);
+
+    console.log('[useDialogs] render, dialogs count:', state.dialogs.size);
 
     return {
         dialogs: state.dialogs,
