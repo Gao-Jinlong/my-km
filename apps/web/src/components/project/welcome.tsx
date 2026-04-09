@@ -59,7 +59,7 @@ export function Welcome({ onOpenProject }: WelcomeProps) {
                         My Knowledge Manager
                     </h1>
                 </div>
-                <p className="mb-10 max-w-xl text-center text-ws-fg-muted text-lg">
+                <p className="mb-10 max-w-xl text-center text-lg text-ws-fg-muted">
                     新一代知识管理工具，为您打造专属的第二大脑
                 </p>
                 <div className="flex items-center gap-3">
@@ -101,7 +101,7 @@ export function Welcome({ onOpenProject }: WelcomeProps) {
                                 <h3 className="mb-1.5 font-medium text-base text-ws-fg-primary">
                                     {feature.title}
                                 </h3>
-                                <p className="text-sm leading-relaxed text-ws-fg-muted">
+                                <p className="text-sm text-ws-fg-muted leading-relaxed">
                                     {feature.description}
                                 </p>
                             </div>
