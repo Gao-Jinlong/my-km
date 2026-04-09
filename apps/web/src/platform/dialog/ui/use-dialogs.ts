@@ -63,7 +63,10 @@ export function useDialogs() {
 
     const dismissDialog = React.useCallback((request: DialogRequest) => {
         const id = request.id;
-        // 从状态中移除
+        // 创建新的 Map 对象而不是直接修改
+        currentState = {
+            dialogs: new Map(currentState.dialogs),
+        };
         currentState.dialogs.delete(id);
         // 通知所有监听器状态已变更
         for (const l of listeners) {
