@@ -1,19 +1,26 @@
 // apps/web/src/platform/logger/service.ts
 
+import { Emitter } from '@/base/common/event';
 import { ServiceBase } from '@/platform/base/service-base';
+import { Service } from '@/platform/di';
 import { SimpleLogger } from './logger';
 import type { ILoggerService, LogEntry, Logger, LogWriter } from './types';
 import { LogLevel } from './types';
 import { ConsoleWriter } from './writers/console';
 
+@Service({ singleton: true })
 export class LoggerService extends ServiceBase implements ILoggerService {
     private globalLevel: LogLevel = LogLevel.INFO;
     private categoryLevels = new Map<string, LogLevel>();
     private writers: LogWriter[] = [];
     private loggers = new Map<string, SimpleLogger>();
     private history: LogEntry[] = [];
-    private readonly historyLimit = 1000;
+    private readonly historyLimit = 2000;
     private includeLocation = false;
+
+    private readonly _onLogChange = new Emitter<void>();
+    readonly onLogChange = this._onLogChange.event;
+    private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
     constructor() {
         super();
@@ -105,6 +112,7 @@ export class LoggerService extends ServiceBase implements ILoggerService {
      */
     clearHistory(): void {
         this.history = [];
+        this._onLogChange.fire();
     }
 
     /**
@@ -115,7 +123,19 @@ export class LoggerService extends ServiceBase implements ILoggerService {
         this.loggers.clear(); // 需要重新创建所有 logger
     }
 
+    /**
+     * 获取所有已知分类
+     */
+    getCategories(): string[] {
+        return Array.from(this.loggers.keys());
+    }
+
     override dispose(): void {
+        if (this._debounceTimer) {
+            clearTimeout(this._debounceTimer);
+            this._debounceTimer = null;
+        }
+        this._onLogChange.dispose();
         for (const writer of this.writers) {
             writer.dispose();
         }
@@ -131,5 +151,14 @@ export class LoggerService extends ServiceBase implements ILoggerService {
         if (this.history.length > this.historyLimit) {
             this.history.shift();
         }
+        this.notifyChange();
+    }
+
+    private notifyChange(): void {
+        if (this._debounceTimer) clearTimeout(this._debounceTimer);
+        this._debounceTimer = setTimeout(() => {
+            this._onLogChange.fire();
+            this._debounceTimer = null;
+        }, 100);
     }
 }

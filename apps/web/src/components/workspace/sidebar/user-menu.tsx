@@ -9,6 +9,10 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { container } from '@/platform/bootstrap';
+import { LoggerService } from '@/platform/logger/service';
+
+const logger = container.get(LoggerService).getLogger('sidebar');
 
 export function UserMenu({
     children,
@@ -20,17 +24,17 @@ export function UserMenu({
     onOpenChange: (open: boolean) => void;
 }) {
     const handleProfile = () => {
-        console.log('打开个人资料');
+        logger.debug('打开个人资料');
         onOpenChange(false);
     };
 
     const handlePreferences = () => {
-        console.log('打开偏好设置');
+        logger.debug('打开偏好设置');
         onOpenChange(false);
     };
 
     const handleLogout = () => {
-        console.log('退出登录');
+        logger.debug('退出登录');
         onOpenChange(false);
     };
 

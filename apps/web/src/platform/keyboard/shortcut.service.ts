@@ -13,6 +13,7 @@ import { ServiceBase } from '@/platform/base/service-base';
 import { container } from '@/platform/bootstrap';
 import { ConditionalService } from '@/platform/conditional/service';
 import { Service } from '@/platform/di';
+import { LoggerService } from '@/platform/logger/service';
 import type {
     KeyBinding,
     ShortcutConfig as KeyboardShortcutConfig,
@@ -60,6 +61,7 @@ export class KeyboardShortcutService extends ServiceBase {
 
     // 注入条件服务
     private readonly conditionalService = container.get(ConditionalService);
+    private readonly logger = container.get(LoggerService).getLogger('keyboard');
 
     // 事件发射器
     private readonly _onShortcutExecuted = new Emitter<{ keybinding: string; scope: string }>();
@@ -235,7 +237,7 @@ export class KeyboardShortcutService extends ServiceBase {
         const existing = this.shortcuts.get(normalizedKeybinding);
 
         if (existing) {
-            console.warn(
+            this.logger.warn(
                 `快捷键 "${normalizedKeybinding}" 已被注册（作用域：${existing.scope}），正在覆盖`,
             );
         }

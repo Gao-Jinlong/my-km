@@ -6,9 +6,13 @@
  */
 
 import { ServiceBase } from '@/platform/base/service-base';
+import { container } from '@/platform/bootstrap';
+import { LoggerService } from '@/platform/logger/service';
 import { Emitter } from '../../../base/common/event';
 import type { EditorService } from '../../editor/service';
 import type { FormatState, Position } from '../../editor/types';
+
+const logger = container.get(LoggerService).getLogger('ai-context');
 
 /**
  * 文档信息接口
@@ -172,7 +176,7 @@ class AIContextServiceImpl extends ServiceBase implements AIContextService {
 
             return context;
         } catch (error) {
-            console.error(`Failed to get context for document ${documentId}:`, error);
+            logger.error(`Failed to get context for document ${documentId}:`, error);
             return null;
         }
     }
@@ -250,7 +254,7 @@ class AIContextServiceImpl extends ServiceBase implements AIContextService {
                     try {
                         subscriber.onContextChange(context);
                     } catch (error) {
-                        console.error(
+                        logger.error(
                             `Error in subscriber ${subscriber.id} for document ${documentId}:`,
                             error,
                         );
@@ -261,7 +265,7 @@ class AIContextServiceImpl extends ServiceBase implements AIContextService {
                 this._contextChangeEmitter.fire({ documentId, context });
             })
             .catch(error => {
-                console.error(`Failed to notify context change for document ${documentId}:`, error);
+                logger.error(`Failed to notify context change for document ${documentId}:`, error);
             });
     }
 

@@ -7,7 +7,10 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { bootstrap } from '@/platform/bootstrap';
+import { bootstrap, container } from '@/platform/bootstrap';
+import { LoggerService } from '@/platform/logger/service';
+
+const logger = container.get(LoggerService).getLogger('bootstrap');
 
 export function BootstrapProvider({ children }: { children: React.ReactNode }) {
     const initialized = useRef(false);
@@ -18,9 +21,9 @@ export function BootstrapProvider({ children }: { children: React.ReactNode }) {
         }
         initialized.current = true;
 
-        console.log('[BootstrapProvider] Starting bootstrap...');
+        logger.info('[BootstrapProvider] Starting bootstrap...');
         bootstrap();
-        console.log('[BootstrapProvider] Bootstrap completed');
+        logger.info('[BootstrapProvider] Bootstrap completed');
     }, []);
 
     return <>{children}</>;

@@ -14,6 +14,9 @@ import { EditorContainer } from '@/platform/editor/container/editor-container';
 import { EditorTabService } from '@/platform/editor-tab/service';
 import { EventBusService } from '@/platform/event-bus/service';
 import { KeyBinding, KeyboardShortcutService, ShortcutScope } from '@/platform/keyboard';
+import { LoggerService } from '@/platform/logger/service';
+
+const logger = container.get(LoggerService).getLogger('shortcut');
 
 /**
  * 文件搜索聚焦事件类型
@@ -59,7 +62,9 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
                             const editorContainer = container.get(EditorContainer);
                             const editorService = editorContainer.getService(activeId);
                             if (editorService) {
-                                editorService.saveDocument().catch(console.error);
+                                editorService
+                                    .saveDocument()
+                                    .catch(err => logger.error('保存文档失败:', err));
                             }
                         }
                     },
@@ -74,7 +79,7 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
                     handle: () => {
                         // TODO: 另存为功能
                         const tabService = container.get(EditorTabService);
-                        console.log(
+                        logger.debug(
                             '[Shortcut] Save As triggered for:',
                             tabService.getActiveDocumentId(),
                         );
@@ -88,7 +93,7 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
                 handler: {
                     handle: () => {
                         // TODO: 快速打开文件
-                        console.log('[Shortcut] Quick Open triggered');
+                        logger.debug('[Shortcut] Quick Open triggered');
                     },
                     description: '快速打开文件',
                 },
@@ -99,7 +104,7 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
                 handler: {
                     handle: () => {
                         // TODO: 打开命令面板
-                        console.log('[Shortcut] Command Palette triggered');
+                        logger.debug('[Shortcut] Command Palette triggered');
                     },
                     description: '打开命令面板',
                 },

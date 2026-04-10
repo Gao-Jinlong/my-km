@@ -3,8 +3,12 @@
 import { useEffect, useState } from 'react';
 import { ProjectPicker, Welcome } from '@/components/project';
 import { WorkspaceContent } from '@/components/workspace/workspace-content';
+import { container } from '@/platform/bootstrap';
 import { projectManager } from '@/platform/file-system/project-manager';
+import { LoggerService } from '@/platform/logger/service';
 import { useWorkspaceStore } from '@/stores/workspace-store';
+
+const logger = container.get(LoggerService).getLogger('workspace');
 
 export default function WorkspacePage() {
     const [showPicker, setShowPicker] = useState(false);
@@ -23,7 +27,7 @@ export default function WorkspacePage() {
         const stored = project.currentProject;
         // 句柄无法从持久化存储恢复，如果 rootHandle 为 null 则清除项目状态
         if (stored && !stored.rootHandle) {
-            console.log('检测到项目句柄失效，请重新选择目录');
+            logger.info('检测到项目句柄失效，请重新选择目录');
             clearProject();
         }
     }, [isClient, clearProject, project.currentProject]);
@@ -43,7 +47,7 @@ export default function WorkspacePage() {
             const projectInfo = await projectManager.openProject(handle);
             setCurrentProject(projectInfo);
         } catch (error) {
-            console.error('打开项目失败:', error);
+            logger.error('打开项目失败:', error);
             throw error;
         } finally {
             setLoading(false);

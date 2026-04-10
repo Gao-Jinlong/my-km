@@ -26,7 +26,9 @@
  */
 
 import { ServiceBase } from '@/platform/base/service-base';
+import { container } from '@/platform/bootstrap';
 import { Service } from '@/platform/di';
+import { LoggerService } from '@/platform/logger/service';
 import type {
     ConditionConfig,
     ConditionContext,
@@ -38,6 +40,8 @@ import type {
 
 @Service({ singleton: true })
 export class ConditionalService extends ServiceBase implements IConditionalService {
+    private readonly logger = container.get(LoggerService).getLogger('conditional');
+
     /** 条件注册表 */
     private readonly conditions = new Map<string, ConditionEvaluator>();
 
@@ -63,7 +67,7 @@ export class ConditionalService extends ServiceBase implements IConditionalServi
         const { id, description, evaluate } = config;
 
         if (this.conditions.has(id)) {
-            console.warn(`条件 "${id}" 已被注册，正在覆盖`);
+            this.logger.warn(`条件 "${id}" 已被注册，正在覆盖`);
         }
 
         const evaluator: ConditionEvaluator = {
@@ -103,7 +107,7 @@ export class ConditionalService extends ServiceBase implements IConditionalServi
         const evaluator = this.conditions.get(conditionId);
 
         if (!evaluator) {
-            console.warn(`条件 "${conditionId}" 未注册，返回 false`);
+            this.logger.warn(`条件 "${conditionId}" 未注册，返回 false`);
             return false;
         }
 
@@ -113,7 +117,7 @@ export class ConditionalService extends ServiceBase implements IConditionalServi
         try {
             return evaluator.evaluate(mergedContext);
         } catch (error) {
-            console.error(`条件 "${conditionId}" 评估失败:`, error);
+            this.logger.error(`条件 "${conditionId}" 评估失败:`, error);
             return false;
         }
     }

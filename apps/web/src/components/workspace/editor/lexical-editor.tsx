@@ -28,7 +28,10 @@ import { container } from '@/platform/bootstrap';
 import { ContextMenuService } from '@/platform/context-menu/service';
 import type { ContextMenuContext } from '@/platform/context-menu/types';
 import { EditorTabService } from '@/platform/editor-tab/service';
+import { LoggerService } from '@/platform/logger/service';
 import { registerEditorService, unregisterEditorService } from './document-status-indicator';
+
+const logger = container.get(LoggerService).getLogger('editor');
 
 /**
  * 编辑器主题配置
@@ -170,7 +173,7 @@ function getInitialConfig(documentId: string) {
         theme,
         nodes: [ListNode, ListItemNode, HeadingNode, QuoteNode, CodeNode, LinkNode],
         onError: (error: Error) => {
-            console.error('[LexicalEditor] Error:', error);
+            logger.error('LexicalEditor error:', error);
         },
     };
 }
@@ -212,7 +215,7 @@ function LexicalEditorImpl({
                                 label: '复制',
                                 action: async () => {
                                     // TODO: 复制选中文本
-                                    console.log('[Editor ContextMenu] Copy');
+                                    logger.debug('[Editor ContextMenu] Copy');
                                 },
                             },
                             {
@@ -220,7 +223,7 @@ function LexicalEditorImpl({
                                 label: '粘贴',
                                 action: async () => {
                                     // TODO: 粘贴文本
-                                    console.log('[Editor ContextMenu] Paste');
+                                    logger.debug('[Editor ContextMenu] Paste');
                                 },
                             },
                             { id: 'separator-1', type: 'separator' },
@@ -229,7 +232,7 @@ function LexicalEditorImpl({
                                 label: '全选',
                                 action: async () => {
                                     // TODO: 全选文本
-                                    console.log('[Editor ContextMenu] Select All');
+                                    logger.debug('[Editor ContextMenu] Select All');
                                 },
                             },
                         ],

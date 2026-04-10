@@ -6,7 +6,10 @@
 
 import { Emitter, type IDisposable, toDisposable } from '@/base/common/event';
 import { ServiceBase } from '@/platform/base/service-base';
+import { container } from '@/platform/bootstrap';
 import { Service } from '@/platform/di';
+import type { Logger } from '@/platform/logger';
+import { LoggerService } from '@/platform/logger/service';
 
 /**
  * 面板配置
@@ -86,6 +89,7 @@ export interface PanelServiceOptions {
 export class PanelService extends ServiceBase {
     private readonly _panels = new Map<string, PanelConfig>();
     private readonly _states = new Map<string, PanelState>();
+    private readonly logger: Logger = container.get(LoggerService).getLogger('panel');
 
     // 配置选项
     private readonly _options: Required<PanelServiceOptions>;
@@ -117,7 +121,7 @@ export class PanelService extends ServiceBase {
      */
     register(id: string, config: PanelConfig): IDisposable {
         if (this._panels.has(id)) {
-            console.warn(`Panel "${id}" already registered, overriding`);
+            this.logger.warn('Panel "{id}" already registered, overriding', id);
         }
 
         this._panels.set(id, config);
@@ -128,7 +132,10 @@ export class PanelService extends ServiceBase {
             registered: true,
         });
 
-        this._onDidChangePanel.fire(this._states.get(id)!);
+        const state = this._states.get(id);
+        if (state) {
+            this._onDidChangePanel.fire(state);
+        }
 
         return toDisposable(() => this.unregister(id));
     }
@@ -167,13 +174,13 @@ export class PanelService extends ServiceBase {
     toggle(id: string): void {
         const state = this._states.get(id);
         if (!state) {
-            console.warn(`Panel "${id}" not found`);
+            this.logger.warn('Panel "{id}" not found', id);
             return;
         }
 
         const config = this._panels.get(id);
         if (!config?.collapsible) {
-            console.warn(`Panel "${id}" is not collapsible`);
+            this.logger.warn('Panel "{id}" is not collapsible', id);
             return;
         }
 
@@ -194,13 +201,13 @@ export class PanelService extends ServiceBase {
     expand(id: string, size?: number): void {
         const state = this._states.get(id);
         if (!state) {
-            console.warn(`Panel "${id}" not found`);
+            this.logger.warn('Panel "{id}" not found', id);
             return;
         }
 
         const config = this._panels.get(id);
         if (!config?.collapsible) {
-            console.warn(`Panel "${id}" is not collapsible`);
+            this.logger.warn('Panel "{id}" is not collapsible', id);
             return;
         }
 
@@ -216,13 +223,13 @@ export class PanelService extends ServiceBase {
     collapse(id: string): void {
         const state = this._states.get(id);
         if (!state) {
-            console.warn(`Panel "${id}" not found`);
+            this.logger.warn('Panel "{id}" not found', id);
             return;
         }
 
         const config = this._panels.get(id);
         if (!config?.collapsible) {
-            console.warn(`Panel "${id}" is not collapsible`);
+            this.logger.warn('Panel "{id}" is not collapsible', id);
             return;
         }
 
@@ -238,13 +245,13 @@ export class PanelService extends ServiceBase {
     hide(id: string): void {
         const state = this._states.get(id);
         if (!state) {
-            console.warn(`Panel "${id}" not found`);
+            this.logger.warn('Panel "{id}" not found', id);
             return;
         }
 
         const config = this._panels.get(id);
         if (!config?.hideable) {
-            console.warn(`Panel "${id}" is not hideable`);
+            this.logger.warn('Panel "{id}" is not hideable', id);
             return;
         }
 
@@ -260,13 +267,13 @@ export class PanelService extends ServiceBase {
     show(id: string, size?: number): void {
         const state = this._states.get(id);
         if (!state) {
-            console.warn(`Panel "${id}" not found`);
+            this.logger.warn('Panel "{id}" not found', id);
             return;
         }
 
         const config = this._panels.get(id);
         if (!config) {
-            console.warn(`Panel "${id}" config not found`);
+            this.logger.warn('Panel "{id}" config not found', id);
             return;
         }
 

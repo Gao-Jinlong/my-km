@@ -1,5 +1,7 @@
 // apps/web/src/platform/command/service.ts
 
+import { container } from '@/platform/bootstrap';
+import { LoggerService } from '@/platform/logger/service';
 import { Emitter, type IDisposable } from '../../base/common/event';
 import { ServiceBase } from '../../platform/base/service-base';
 import { Service } from '../../platform/di';
@@ -18,6 +20,8 @@ import type {
 
 @Service({ singleton: true })
 export class CommandService extends ServiceBase implements ICommandService {
+    private readonly logger = container.get(LoggerService).getLogger('command');
+
     /** 命令注册表 */
     private readonly commands = new Map<string, CommandDefinition>();
 
@@ -43,7 +47,7 @@ export class CommandService extends ServiceBase implements ICommandService {
      */
     registerCommand(definition: CommandDefinition): IDisposable {
         if (this.commands.has(definition.id)) {
-            console.warn(`命令 ${definition.id} 已被注册，将被覆盖`);
+            this.logger.warn(`命令 ${definition.id} 已被注册，将被覆盖`);
         }
 
         this.commands.set(definition.id, definition);
@@ -140,7 +144,7 @@ export class CommandService extends ServiceBase implements ICommandService {
                         return undefined as T;
                     }
                 } catch (error) {
-                    console.warn(`拦截器 before 执行失败：${error}`);
+                    this.logger.warn(`拦截器 before 执行失败：${error}`);
                     // 继续执行
                 }
             }
@@ -167,7 +171,7 @@ export class CommandService extends ServiceBase implements ICommandService {
                     try {
                         interceptor.onError(fullContext, error);
                     } catch (e) {
-                        console.warn(`拦截器 onError 执行失败：${e}`);
+                        this.logger.warn(`拦截器 onError 执行失败：${e}`);
                     }
                 }
             }
@@ -196,7 +200,7 @@ export class CommandService extends ServiceBase implements ICommandService {
                 try {
                     interceptor.after(fullContext, result);
                 } catch (e) {
-                    console.warn(`拦截器 after 执行失败：${e}`);
+                    this.logger.warn(`拦截器 after 执行失败：${e}`);
                 }
             }
         }

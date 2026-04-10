@@ -5,8 +5,12 @@ import { Group, Panel, Separator } from 'react-resizable-panels';
 import { PANEL_SIZES } from '@/lib/workspace/constants';
 import { container } from '@/platform/bootstrap';
 import { DialogProvider } from '@/platform/dialog';
+import { LoggerService } from '@/platform/logger/service';
 import { PanelService } from '@/platform/panel/service';
 import { useWorkspaceStore } from '@/stores/workspace-store';
+
+const logger = container.get(LoggerService).getLogger('workspace');
+
 import { AIPanel } from './ai-panel/ai-panel';
 import { EditorArea } from './editor/editor-area';
 import { ActivityBar } from './sidebar/activity-bar';
@@ -98,7 +102,7 @@ export function WorkspaceContent() {
 
             // 设置新版本号
             localStorage.setItem(VERSION_KEY, LAYOUT_VERSION);
-            console.log(`已清理旧的布局数据并更新到版本 ${LAYOUT_VERSION}`);
+            logger.info(`已清理旧的布局数据并更新到版本 ${LAYOUT_VERSION}`);
         }
     }, []);
 

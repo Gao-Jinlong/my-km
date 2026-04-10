@@ -1,5 +1,8 @@
 // apps/web/src/platform/message-channel/service.ts
 
+import { container } from '@/platform/bootstrap';
+import type { Logger } from '@/platform/logger';
+import { LoggerService } from '@/platform/logger/service';
 import { Emitter, type IDisposable } from '../../base/common/event';
 import { ServiceBase } from '../../platform/base/service-base';
 import { Service } from '../../platform/di';
@@ -16,6 +19,7 @@ import { MessageChannelState } from './types';
 export class MessageChannelService extends ServiceBase {
     /** 通道注册表 */
     private readonly channels = new Map<string, IMessageChannel>();
+    private readonly logger = container.get(LoggerService).getLogger('message-channel');
 
     /** 通道配置 */
     private readonly channelConfigs = new Map<string, MessageChannelConfig>();
@@ -42,10 +46,14 @@ export class MessageChannelService extends ServiceBase {
             throw new Error(`通道 ${config.name} 已存在`);
         }
 
-        const channel = new MessageChannelImpl(config, {
-            ...this.defaultOptions,
-            ...options,
-        });
+        const channel = new MessageChannelImpl(
+            config,
+            {
+                ...this.defaultOptions,
+                ...options,
+            },
+            this.logger,
+        );
 
         this.channels.set(config.name, channel);
         this.channelConfigs.set(config.name, config);
@@ -163,11 +171,13 @@ class MessageChannelImpl implements IMessageChannel {
     private worker?: Worker;
     private readonly config: MessageChannelConfig;
     private readonly options: MessageChannelOptions;
+    private readonly logger: Logger;
 
-    constructor(config: MessageChannelConfig, options: MessageChannelOptions) {
+    constructor(config: MessageChannelConfig, options: MessageChannelOptions, logger: Logger) {
         this.config = config;
         this.options = options;
         this.name = config.name;
+        this.logger = logger;
     }
 
     get state(): MessageChannelState {
@@ -193,7 +203,7 @@ class MessageChannelImpl implements IMessageChannel {
             this._onConnect.fire();
 
             if (this.options.logging) {
-                console.log(`[MessageChannel] ${this.name} connected`);
+                this.logger.info('{name} connected', this.name);
             }
         } catch (error) {
             this.setState(MessageChannelState.Error);
@@ -229,7 +239,7 @@ class MessageChannelImpl implements IMessageChannel {
         this._onDisconnect.fire();
 
         if (this.options.logging) {
-            console.log(`[MessageChannel] ${this.name} disconnected`);
+            this.logger.info('{name} disconnected', this.name);
         }
     }
 
@@ -263,7 +273,7 @@ class MessageChannelImpl implements IMessageChannel {
         }
 
         if (this.options.logging) {
-            console.log(`[MessageChannel] ${this.name} sent:`, processedMessage);
+            this.logger.debug('{name} sent:', this.name, processedMessage);
         }
     }
 
@@ -392,30 +402,28 @@ class MessageChannelImpl implements IMessageChannel {
                     const result = handler(processedMessage);
                     if (result instanceof Promise) {
                         result.catch(error => {
-                            console.error(
-                                `[MessageChannel] Handler error for ${processedMessage.type}:`,
+                            this.logger.error(
+                                'Handler error for {type}:',
+                                processedMessage.type,
                                 error,
                             );
                         });
                     }
                 } catch (error) {
-                    console.error(
-                        `[MessageChannel] Handler error for ${processedMessage.type}:`,
-                        error,
-                    );
+                    this.logger.error('Handler error for {type}:', processedMessage.type, error);
                 }
             }
         }
 
         if (this.options.logging) {
-            console.log(`[MessageChannel] ${this.name} received:`, processedMessage);
+            this.logger.debug('{name} received:', this.name, processedMessage);
         }
     }
 
     private handleError(error: Error): void {
         this._onError.fire(error);
         if (this.options.logging) {
-            console.error(`[MessageChannel] ${this.name} error:`, error);
+            this.logger.error('{name} error:', this.name, error);
         }
     }
 

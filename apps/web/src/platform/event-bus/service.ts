@@ -1,3 +1,5 @@
+import { container } from '@/platform/bootstrap';
+import { LoggerService } from '@/platform/logger/service';
 import { Emitter } from '../../base/common/event';
 import { ServiceBase } from '../../platform/base/service-base';
 import { Service } from '../di';
@@ -20,6 +22,7 @@ interface Subscription {
  */
 @Service({ singleton: true })
 export class EventBusService extends ServiceBase {
+    private readonly logger = container.get(LoggerService).getLogger('event-bus');
     // 事件发射器
     private readonly _onEventPublished = new Emitter<EventDefinition>();
     private readonly _onEventHandled = new Emitter<{ event: EventDefinition; listeners: number }>();
@@ -124,11 +127,11 @@ export class EventBusService extends ServiceBase {
                 if (result instanceof Promise) {
                     // 异步监听器，不等待
                     result.catch(err => {
-                        console.error(`[EventBus] Listener error for ${processedEvent.type}:`, err);
+                        this.logger.error('Listener error for {type}:', processedEvent.type, err);
                     });
                 }
             } catch (err) {
-                console.error(`[EventBus] Listener error for ${processedEvent.type}:`, err);
+                this.logger.error('Listener error for {type}:', processedEvent.type, err);
             }
         }
 

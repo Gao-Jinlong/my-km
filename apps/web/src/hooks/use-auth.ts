@@ -4,8 +4,12 @@
  */
 import { useCallback } from 'react';
 import { authApi } from '@/api/auth';
+import { container } from '@/platform/bootstrap';
+import { LoggerService } from '@/platform/logger/service';
 import { useAuthStore } from '@/stores/auth-store';
 import type { LoginRequest, RegisterRequest } from '@/types/auth';
+
+const logger = container.get(LoggerService).getLogger('auth');
 
 export function useAuth() {
     const { user, isAuthenticated, isLoading, setAuth, setUser, setLoading, logout, clearAuth } =
@@ -61,7 +65,7 @@ export function useAuth() {
             try {
                 await authApi.logout(refreshToken);
             } catch (error) {
-                console.error('Logout API call failed:', error);
+                logger.error('Logout API call failed:', error);
             }
         }
         logout();
@@ -81,7 +85,7 @@ export function useAuth() {
             // eslint-disable-next-line no-unreachable
             throw new Error('Not implemented');
         } catch (error) {
-            console.error('Failed to refresh user:', error);
+            logger.error('Failed to refresh user:', error);
         } finally {
             setLoading(false);
         }

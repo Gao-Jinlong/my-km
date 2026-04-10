@@ -7,7 +7,9 @@
 
 import { Emitter, type IDisposable, toDisposable } from '@/base/common/event';
 import { ServiceBase } from '@/platform/base/service-base';
+import { container } from '@/platform/bootstrap';
 import { Service } from '@/platform/di';
+import { LoggerService } from '@/platform/logger/service';
 import type {
     ContextMenuContext,
     ContextMenuGroup,
@@ -37,6 +39,8 @@ import type {
  */
 @Service({ singleton: true })
 export class ContextMenuService extends ServiceBase {
+    private readonly logger = container.get(LoggerService).getLogger('context-menu');
+
     private providers = new Map<string, IContextMenuProvider>();
 
     // 事件发射器
@@ -78,7 +82,7 @@ export class ContextMenuService extends ServiceBase {
      */
     registerProvider(id: string, provider: IContextMenuProvider): IDisposable {
         if (this.providers.has(id)) {
-            console.warn(`ContextMenuProvider "${id}" already registered, overriding`);
+            this.logger.warn(`ContextMenuProvider "${id}" already registered, overriding`);
         }
 
         this.providers.set(id, provider);
@@ -133,7 +137,7 @@ export class ContextMenuService extends ServiceBase {
                 const groups = await provider(ctx);
                 allGroups.push(...groups);
             } catch (error) {
-                console.error(`ContextMenuProvider error:`, error);
+                this.logger.error(`ContextMenuProvider error:`, error);
             }
         }
 

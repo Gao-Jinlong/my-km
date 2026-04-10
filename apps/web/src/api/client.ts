@@ -1,7 +1,11 @@
 import ky, { type HTTPError } from 'ky';
+import { container } from '@/platform/bootstrap';
+import { LoggerService } from '@/platform/logger/service';
 import { useAuthStore } from '@/stores/auth-store';
 import type { ApiErrorResponse } from '@/types/api';
 import { shouldRefreshToken } from '@/utils/token';
+
+const logger = container.get(LoggerService).getLogger('api-client');
 
 interface EnhancedError extends Error {
     code?: string;
@@ -54,7 +58,7 @@ async function refreshAccessToken(): Promise<string | null> {
 
             return response.accessToken;
         } catch (error) {
-            console.error('Failed to refresh token:', error);
+            logger.error('Failed to refresh token:', error);
             // 刷新失败，清除认证信息
             useAuthStore.getState().logout();
             return null;
@@ -108,7 +112,7 @@ function createErrorHook() {
                 err.traceId = errorBody.traceId;
             }
         } catch (parseError) {
-            console.debug('Failed to parse error response:', parseError);
+            logger.debug('Failed to parse error response:', parseError);
         }
 
         return error;

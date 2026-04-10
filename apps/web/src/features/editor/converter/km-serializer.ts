@@ -5,7 +5,12 @@
  * 文件格式：JSON + 元数据
  */
 
+import { container } from '@/platform/bootstrap';
+import { LoggerService } from '@/platform/logger/service';
+
 import type { Block } from '../types/block';
+
+const logger = container.get(LoggerService).getLogger('km-serializer');
 
 /**
  * .km 文件元数据
@@ -97,7 +102,7 @@ export function deserializeFromKmFile(content: string): {
         const majorVersion = parsed.metadata.version.split('.')[0];
         const expectedMajor = KM_FILE_VERSION.split('.')[0];
         if (majorVersion !== expectedMajor) {
-            console.warn(
+            logger.warn(
                 `.km file version mismatch: expected ${KM_FILE_VERSION}, got ${parsed.metadata.version}`,
             );
         }

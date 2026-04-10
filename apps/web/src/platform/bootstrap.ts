@@ -26,6 +26,8 @@ import { EventBusService } from './event-bus/service';
 import { FileOpenService } from './file-open/service';
 import { FileSystemService } from './file-system/service';
 import { KeyboardShortcutService } from './keyboard/shortcut.service';
+import { LoggerService } from './logger/service';
+import { IndexedDBWriter } from './logger/writers/indexeddb';
 import { MessageChannelService } from './message-channel/service';
 import { PanelService } from './panel/service';
 
@@ -33,6 +35,7 @@ import { PanelService } from './panel/service';
  * 应用服务容器类型
  */
 export interface AppServices {
+    loggerService: LoggerService;
     fileSystemService: FileSystemService;
     contextMenuService: ContextMenuService;
     dialogService: DialogService;
@@ -53,7 +56,8 @@ export interface AppServices {
 function createServiceContainer(): ServiceContainer {
     const container = new ServiceContainer();
 
-    // 注册所有服务
+    // 注册所有服务（LoggerService 最先注册，无依赖）
+    container.register(LoggerService);
     container.register(FileSystemService);
     container.register(ContextMenuService);
     container.register(DialogService);
@@ -90,6 +94,10 @@ export function bootstrap(): ServiceContainer {
 
     // 注册条件评估器（必须在 KeyboardShortcutService 初始化之前调用）
     registerConditionEvaluators();
+
+    // 初始化日志服务（添加 IndexedDB 持久化）
+    const loggerService = container.get(LoggerService);
+    loggerService.addWriter(new IndexedDBWriter());
 
     // 初始化快捷键服务（此时条件评估器已注册）
     const keyboardShortcutService = container.get(KeyboardShortcutService);

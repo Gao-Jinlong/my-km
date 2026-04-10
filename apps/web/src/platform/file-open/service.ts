@@ -18,6 +18,7 @@ import { EditorContainer } from '@/platform/editor/container';
 import { EditorTabService } from '@/platform/editor-tab/service';
 import type { OpenDocument } from '@/platform/editor-tab/types';
 import { FileSystemService } from '@/platform/file-system/service';
+import { LoggerService } from '@/platform/logger/service';
 
 /**
  * 文件打开服务
@@ -38,6 +39,7 @@ export class FileOpenService extends ServiceBase {
     private fileService: FileSystemService;
     private editorContainer: EditorContainer;
     private editorTabService: EditorTabService;
+    private readonly logger = container.get(LoggerService).getLogger('file-open');
 
     constructor() {
         super();
@@ -76,9 +78,9 @@ export class FileOpenService extends ServiceBase {
             // const editor = this.editorContainer.createInstance(document.id);
             // editor.loadDocument(document);
 
-            console.log(`[FileOpenService] Opened file: ${path} (${docType})`);
+            this.logger.info(`Opened file: ${path} (${docType})`);
         } catch (error) {
-            console.error(`[FileOpenService] Failed to open file ${path}:`, error);
+            this.logger.error(`Failed to open file ${path}:`, error);
             throw error;
         }
     }
@@ -93,7 +95,7 @@ export class FileOpenService extends ServiceBase {
             try {
                 await this.openFile(path);
             } catch (error) {
-                console.error(`[FileOpenService] Failed to open file ${path}:`, error);
+                this.logger.error(`Failed to open file ${path}:`, error);
                 // 继续打开其他文件
             }
         }
@@ -116,7 +118,7 @@ export class FileOpenService extends ServiceBase {
             // 关闭文档
             this.editorTabService.closeDocument(openDoc.id);
 
-            console.log(`[FileOpenService] Closed file: ${path}`);
+            this.logger.info(`Closed file: ${path}`);
         }
     }
 
@@ -130,7 +132,7 @@ export class FileOpenService extends ServiceBase {
         // 关闭所有文档标签
         this.editorTabService.closeAllDocuments();
 
-        console.log('[FileOpenService] Closed all files');
+        this.logger.info('Closed all files');
     }
 
     /**
@@ -141,7 +143,7 @@ export class FileOpenService extends ServiceBase {
      */
     async saveFile(path: string, content: string): Promise<void> {
         await this.fileService.writeFile(path, new TextEncoder().encode(content));
-        console.log(`[FileOpenService] Saved file: ${path}`);
+        this.logger.info(`Saved file: ${path}`);
     }
 
     /**

@@ -3,7 +3,11 @@
  * 处理 JWT Token 的存储、验证和刷新
  */
 import Cookies from 'js-cookie';
+import { container } from '@/platform/bootstrap';
+import { LoggerService } from '@/platform/logger/service';
 import type { JwtPayload, Tokens } from '@/types/auth';
+
+const logger = container.get(LoggerService).getLogger('token');
 
 const ACCESS_TOKEN_KEY = 'access_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
@@ -73,7 +77,7 @@ export function parseJwt(token: string): JwtPayload | null {
         );
         return JSON.parse(jsonPayload) as JwtPayload;
     } catch (error) {
-        console.error('Failed to parse JWT:', error);
+        logger.error('Failed to parse JWT:', error);
         return null;
     }
 }

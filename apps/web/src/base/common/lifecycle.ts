@@ -1,4 +1,9 @@
+import { container } from '@/platform/bootstrap';
+import { LoggerService } from '@/platform/logger/service';
+
 import { isIterable } from './types';
+
+const logger = container.get(LoggerService).getLogger('lifecycle');
 
 export type IDisposable = {
     dispose(): void;
@@ -9,9 +14,11 @@ export function dispose<T extends IDisposable>(disposables: T | undefined): T | 
 export function dispose<T extends IDisposable, A extends Iterable<T>>(disposables: A): A;
 export function dispose<T extends IDisposable>(disposables: Array<T>): Array<T>;
 export function dispose<T extends IDisposable>(disposables: ReadonlyArray<T>): ReadonlyArray<T>;
-export function dispose<T extends IDisposable>(arg: T | Iterable<T> | undefined): any {
+export function dispose<T extends IDisposable>(
+    arg: T | Iterable<T> | undefined,
+): T | Iterable<T> | undefined {
     if (isIterable(arg)) {
-        const errors: any[] = [];
+        const errors: unknown[] = [];
 
         for (const disposable of arg) {
             try {
@@ -70,10 +77,10 @@ export class DisposableStore implements IDisposable {
 
         if (this._isDisposed) {
             if (!DisposableStore.DISABLE_DISPOSED_WARNING) {
-                console.warn(
+                logger.warn(
                     new Error(
                         'Trying to add a disposable to a DisposableStore that has already been disposed of. The added object will be leaked!',
-                    ).stack,
+                    ).stack ?? '',
                 );
             }
         } else {
