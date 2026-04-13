@@ -3,7 +3,7 @@
 import { Search } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { container } from '@/platform/bootstrap';
-import { EventBusService } from '@/platform/event-bus/service';
+import type { EventBusService } from '@/platform/event-bus/service';
 import { FileTree } from './file-tree';
 import type { PanelComponentProps } from './index';
 
@@ -31,7 +31,7 @@ export function FilesPanel({ state, onStateChange }: PanelComponentProps) {
 
     // 订阅事件总线，响应外部快捷键触发
     useEffect(() => {
-        const eventBus = container.get(EventBusService);
+        const eventBus = container.get('EventBusService') as EventBusService;
         eventBusRef.current = eventBus;
 
         // 订阅文件搜索聚焦事件

@@ -4,7 +4,7 @@ import * as Logger from '../index';
 describe('Logger Module Exports', () => {
     it('应导出所有类型和类', () => {
         expect(Logger.LogLevel).toBeDefined();
-        expect(Logger.LoggerService).toBeDefined();
+        expect(Logger.MonitorService).toBeDefined();
         expect(Logger.SimpleLogger).toBeDefined();
         expect(Logger.ConsoleWriter).toBeDefined();
         expect(Logger.LoggerError).toBeDefined();
@@ -14,7 +14,7 @@ describe('Logger Module Exports', () => {
     });
 
     it('应可实例化并正常工作', () => {
-        const service = new Logger.LoggerService();
+        const service = new Logger.MonitorService();
         const logger = service.getLogger('test');
         logger.info('test message');
         expect(service.getHistory().length).toBe(1);

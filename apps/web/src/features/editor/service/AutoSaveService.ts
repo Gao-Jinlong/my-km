@@ -7,13 +7,18 @@
  * - 与文件系统集成
  */
 
-import { container } from '@/platform/bootstrap';
-import { LoggerService } from '@/platform/logger/service';
+import { getContainer } from '@/platform/bootstrap';
+import { MonitorService } from '@/platform/monitor/service';
 
 import type { FileSystemService } from '../../../platform/file-system/service';
 import type { EditorService, SaveResult } from './EditorService';
 
-const logger = container.get(LoggerService).getLogger('auto-save');
+/**
+ * 惰性获取 logger，避免模块级循环依赖
+ */
+function getLogger() {
+    return getContainer().get(MonitorService).getLogger('auto-save');
+}
 
 /**
  * 保存状态枚举
@@ -264,7 +269,7 @@ export function createAutoSaveService(
     return {
         register(documentId: string, editorService: EditorService): void {
             if (editors.has(documentId)) {
-                logger.warn(`Editor already registered: ${documentId}`);
+                getLogger().warn(`Editor already registered: ${documentId}`);
                 return;
             }
 
@@ -322,7 +327,7 @@ export function createAutoSaveService(
             const editor = editors.get(documentId);
 
             if (!editor) {
-                logger.warn(`Editor not found: ${documentId}`);
+                getLogger().warn(`Editor not found: ${documentId}`);
                 return;
             }
 
@@ -333,7 +338,7 @@ export function createAutoSaveService(
             const editor = editors.get(documentId);
 
             if (!editor) {
-                logger.warn(`Editor not found: ${documentId}`);
+                getLogger().warn(`Editor not found: ${documentId}`);
                 return;
             }
 

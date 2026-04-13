@@ -108,7 +108,7 @@ export interface Logger {
     child(category: string): Logger;
 }
 
-export interface ILoggerService {
+export interface IMonitorService {
     /** 获取 logger */
     getLogger(category?: string): Logger;
     /** 设置全局日志级别 */

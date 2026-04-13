@@ -17,13 +17,18 @@ import {
 import { LoadingButton } from '@/components/ui/loading-button';
 import { useAuth } from '@/hooks/use-auth';
 import { Link as IntlLink } from '@/i18n/routing';
-import { container } from '@/platform/bootstrap';
-import { LoggerService } from '@/platform/logger/service';
+import { getContainer } from '@/platform/bootstrap';
+import { MonitorService } from '@/platform/monitor/service';
 import { getLastEmail, saveLastEmail } from '@/utils/email-storage';
 import { type RegisterFormValues, registerSchema } from '@/utils/validation';
 import { FormStatusAlert } from './form-status-alert';
 
-const logger = container.get(LoggerService).getLogger('auth');
+/**
+ * 惰性获取 logger，避免模块级循环依赖
+ */
+function getLogger() {
+    return getContainer().get(MonitorService).getLogger('auth');
+}
 
 export function RegisterForm() {
     const t = useTranslations('auth.register');
@@ -51,11 +56,11 @@ export function RegisterForm() {
     }, [form]);
 
     const onSubmit = async (data: RegisterFormValues) => {
-        logger.info('Form submitted with data:', data);
+        getLogger().info('Form submitted with data:', data);
         setError(null);
         try {
             const { confirmPassword, ...registerData } = data;
-            logger.info('Sending registration request:', registerData);
+            getLogger().info('Sending registration request:', registerData);
             await register(registerData);
 
             // Save email on successful registration
@@ -65,7 +70,7 @@ export function RegisterForm() {
             // 注册成功后，显示验证邮件提示
         } catch (err) {
             // 处理错误
-            logger.error('Registration error:', err);
+            getLogger().error('Registration error:', err);
             const errorMessage = (err as Error)?.message || tErrors('generic');
             setError(errorMessage);
         }

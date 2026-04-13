@@ -1,15 +1,10 @@
 import type { Metadata } from 'next';
-import dynamic from 'next/dynamic';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { AuthProvider } from '@/components/auth/auth-provider';
+import { LogPanel } from '@/components/debug/log-panel-wrapper';
 import { ShortcutProvider } from '@/components/workspace/shortcut-provider';
 import { ContextMenuProvider } from '@/platform/context-menu';
 import { BootstrapProvider } from './bootstrap-provider';
-
-const LogPanel = dynamic(
-    () => import('@/components/debug/log-panel').then(m => ({ default: m.LogPanel })),
-    { ssr: false },
-);
 import './globals.css';
 
 const geistSans = Geist({

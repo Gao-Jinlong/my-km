@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { LogLevel, LogLevelToString, parseLogLevel } from '../types';
 
-describe('LoggerService Types', () => {
+describe('MonitorService Types', () => {
     it('应正确定义日志级别', () => {
         expect(LogLevel.DEBUG).toBe(0);
         expect(LogLevel.INFO).toBe(1);

@@ -10,7 +10,7 @@ import { serializeToMarkdown } from '@/features/editor/converter/markdown-serial
 import { ServiceBase } from '@/platform/base/service-base';
 import { container } from '@/platform/bootstrap';
 import { Service } from '@/platform/di';
-import { FileSystemService } from '@/platform/file-system/service';
+import type { FileSystemService } from '@/platform/file-system/service';
 
 /**
  * 导出格式
@@ -38,7 +38,7 @@ export class DocumentExportService extends ServiceBase {
 
     constructor() {
         super();
-        this.fileService = container.get(FileSystemService);
+        this.fileService = container.get('FileSystemService') as FileSystemService;
     }
 
     /**

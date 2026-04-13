@@ -9,7 +9,8 @@ import { Emitter, type IDisposable, toDisposable } from '@/base/common/event';
 import { ServiceBase } from '@/platform/base/service-base';
 import { container } from '@/platform/bootstrap';
 import { Service } from '@/platform/di';
-import { LoggerService } from '@/platform/logger/service';
+import type { Logger } from '@/platform/monitor';
+import { MonitorService } from '@/platform/monitor/service';
 import type {
     ContextMenuContext,
     ContextMenuGroup,
@@ -39,7 +40,17 @@ import type {
  */
 @Service({ singleton: true })
 export class ContextMenuService extends ServiceBase {
-    private readonly logger = container.get(LoggerService).getLogger('context-menu');
+    private _logger?: Logger;
+
+    /**
+     * 惰性获取 logger（避免在容器初始化前访问）
+     */
+    protected get logger(): Logger {
+        if (!this._logger) {
+            this._logger = container.get(MonitorService).getLogger('context-menu');
+        }
+        return this._logger;
+    }
 
     private providers = new Map<string, IContextMenuProvider>();
 

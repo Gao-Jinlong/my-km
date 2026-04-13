@@ -1,16 +1,17 @@
-// apps/web/src/platform/logger/index.ts
+// apps/web/src/platform/monitor/index.ts
 
+// 访问工具
+export { getMonitor } from './accessor';
 // 错误
 export { LoggerError, LoggerNotInitializedError } from './errors';
-
 // Logger 实现
 export { SimpleLogger } from './logger';
 // 服务
-export { LoggerService } from './service';
+export { MonitorService } from './service';
 
 // 类型
 export type {
-    ILoggerService,
+    IMonitorService,
     LogEntry,
     Logger,
     LoggerConfig,

@@ -3,9 +3,9 @@
  *
  * 使用 TypeScript 装饰器实现类型安全的依赖注入
  * 基于类的类型自动推断服务 ID，无需手动指定字符串 ID
+ *
+ * 注意：reflect-metadata 由 bootstrap.ts 统一加载，确保在任何装饰器求值前可用
  */
-
-import 'reflect-metadata';
 
 const SERVICE_ID_KEY = Symbol('di:service_id');
 const SERVICE_DEPS_KEY = Symbol('di:service_deps');

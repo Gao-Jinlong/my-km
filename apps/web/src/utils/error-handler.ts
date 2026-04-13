@@ -1,15 +1,14 @@
 /**
  * 错误处理工具函数
  * 用于解析和处理 API 错误
+ *
+ * 注意：本文件是底层工具，不依赖上层服务
+ * 调试信息使用 console 输出
  */
 
 import { HTTPError } from 'ky';
-import { container } from '@/platform/bootstrap';
-import { LoggerService } from '@/platform/logger/service';
 import type { ApiErrorResponse } from '@/types/api';
 import { ApiError } from '@/types/api';
-
-const logger = container.get(LoggerService).getLogger('api');
 
 /**
  * 从 ky HTTPError 中提取后端错误信息
@@ -41,7 +40,7 @@ export async function parseApiError(error: unknown): Promise<Error> {
             }
         } catch (parseError) {
             // 无法解析响应体，返回原始错误
-            logger.warn('Failed to parse API error response:', parseError);
+            console.warn('[api] Failed to parse API error response:', parseError);
         }
     }
 

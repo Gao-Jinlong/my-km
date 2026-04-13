@@ -1,15 +1,13 @@
-// apps/web/src/platform/logger/service.ts
-
 import { Emitter } from '@/base/common/event';
 import { ServiceBase } from '@/platform/base/service-base';
 import { Service } from '@/platform/di';
 import { SimpleLogger } from './logger';
-import type { ILoggerService, LogEntry, Logger, LogWriter } from './types';
+import type { IMonitorService, LogEntry, Logger, LogWriter } from './types';
 import { LogLevel } from './types';
 import { ConsoleWriter } from './writers/console';
 
 @Service({ singleton: true })
-export class LoggerService extends ServiceBase implements ILoggerService {
+export class MonitorService extends ServiceBase implements IMonitorService {
     private globalLevel: LogLevel = LogLevel.INFO;
     private categoryLevels = new Map<string, LogLevel>();
     private writers: LogWriter[] = [];

@@ -2,17 +2,10 @@
  * 服务注册中心
  *
  * 统一管理所有平台服务的注册和访问
- *
- * @example
- * ```typescript
- * // 在应用启动时
- * import { bootstrap, container } from '@/platform/bootstrap';
- *
- * // 使用容器
- * const contextMenuService = container.get(ContextMenuService);
- * const fileSystemService = container.get(FileSystemService);
- * ```
  */
+
+// reflect-metadata 必须在所有装饰器被求值前加载
+import 'reflect-metadata';
 
 import { CommandService } from './command/service';
 import { registerConditionEvaluators } from './conditional/evaluators';
@@ -26,16 +19,16 @@ import { EventBusService } from './event-bus/service';
 import { FileOpenService } from './file-open/service';
 import { FileSystemService } from './file-system/service';
 import { KeyboardShortcutService } from './keyboard/shortcut.service';
-import { LoggerService } from './logger/service';
-import { IndexedDBWriter } from './logger/writers/indexeddb';
 import { MessageChannelService } from './message-channel/service';
+import { MonitorService } from './monitor/service';
+import { IndexedDBWriter } from './monitor/writers/indexeddb';
 import { PanelService } from './panel/service';
 
 /**
  * 应用服务容器类型
  */
 export interface AppServices {
-    loggerService: LoggerService;
+    monitorService: MonitorService;
     fileSystemService: FileSystemService;
     contextMenuService: ContextMenuService;
     dialogService: DialogService;
@@ -56,8 +49,8 @@ export interface AppServices {
 function createServiceContainer(): ServiceContainer {
     const container = new ServiceContainer();
 
-    // 注册所有服务（LoggerService 最先注册，无依赖）
-    container.register(LoggerService);
+    // 注册所有服务（MonitorService 最先注册，无依赖）
+    container.register(MonitorService);
     container.register(FileSystemService);
     container.register(ContextMenuService);
     container.register(DialogService);
@@ -75,9 +68,23 @@ function createServiceContainer(): ServiceContainer {
 }
 
 /**
- * 全局服务容器实例
+ * 全局服务容器实例（惰性初始化）
  */
-export const container = createServiceContainer();
+let _container: ServiceContainer | null = null;
+
+export function getContainer(): ServiceContainer {
+    if (!_container) {
+        _container = createServiceContainer();
+    }
+    return _container;
+}
+
+// 为了向后兼容，保留 container 导出但改为惰性 getter
+export const container = new Proxy<ServiceContainer>({} as ServiceContainer, {
+    get(_target, prop) {
+        return getContainer()[prop as keyof ServiceContainer];
+    },
+});
 
 /**
  * 引导函数 - 初始化所有服务（可选调用）
@@ -95,9 +102,9 @@ export function bootstrap(): ServiceContainer {
     // 注册条件评估器（必须在 KeyboardShortcutService 初始化之前调用）
     registerConditionEvaluators();
 
-    // 初始化日志服务（添加 IndexedDB 持久化）
-    const loggerService = container.get(LoggerService);
-    loggerService.addWriter(new IndexedDBWriter());
+    // 初始化监控服务（添加 IndexedDB 持久化）
+    const monitorService = container.get(MonitorService);
+    monitorService.addWriter(new IndexedDBWriter());
 
     // 初始化快捷键服务（此时条件评估器已注册）
     const keyboardShortcutService = container.get(KeyboardShortcutService);

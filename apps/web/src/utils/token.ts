@@ -1,13 +1,12 @@
 /**
  * Token 管理工具
  * 处理 JWT Token 的存储、验证和刷新
+ *
+ * 注意：本文件是底层工具，不依赖上层服务（如 LoggerService）
+ * 调试信息使用 console 输出
  */
 import Cookies from 'js-cookie';
-import { container } from '@/platform/bootstrap';
-import { LoggerService } from '@/platform/logger/service';
 import type { JwtPayload, Tokens } from '@/types/auth';
-
-const logger = container.get(LoggerService).getLogger('token');
 
 const ACCESS_TOKEN_KEY = 'access_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
@@ -77,7 +76,7 @@ export function parseJwt(token: string): JwtPayload | null {
         );
         return JSON.parse(jsonPayload) as JwtPayload;
     } catch (error) {
-        logger.error('Failed to parse JWT:', error);
+        console.error('[token] Failed to parse JWT:', error);
         return null;
     }
 }

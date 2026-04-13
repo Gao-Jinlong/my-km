@@ -13,7 +13,8 @@ import { ServiceBase } from '@/platform/base/service-base';
 import { container } from '@/platform/bootstrap';
 import { ConditionalService } from '@/platform/conditional/service';
 import { Service } from '@/platform/di';
-import { LoggerService } from '@/platform/logger/service';
+import type { Logger } from '@/platform/monitor';
+import { MonitorService } from '@/platform/monitor/service';
 import type {
     KeyBinding,
     ShortcutConfig as KeyboardShortcutConfig,
@@ -59,9 +60,28 @@ export class KeyboardShortcutService extends ServiceBase {
     private keyDownListener: ((e: KeyboardEvent) => void) | null = null;
     private isInitialized = false;
 
-    // 注入条件服务
-    private readonly conditionalService = container.get(ConditionalService);
-    private readonly logger = container.get(LoggerService).getLogger('keyboard');
+    private _conditionalService?: ConditionalService;
+    private _logger?: Logger;
+
+    /**
+     * 惰性获取条件服务（避免在容器初始化前访问）
+     */
+    private get conditionalService(): ConditionalService {
+        if (!this._conditionalService) {
+            this._conditionalService = container.get(ConditionalService);
+        }
+        return this._conditionalService;
+    }
+
+    /**
+     * 惰性获取 logger（避免在容器初始化前访问）
+     */
+    protected get logger(): Logger {
+        if (!this._logger) {
+            this._logger = container.get(MonitorService).getLogger('keyboard');
+        }
+        return this._logger;
+    }
 
     // 事件发射器
     private readonly _onShortcutExecuted = new Emitter<{ keybinding: string; scope: string }>();

@@ -1,10 +1,11 @@
 // apps/web/src/platform/command/service.ts
 
+import { Emitter, type IDisposable } from '@/base/common/event';
+import { ServiceBase } from '@/platform/base/service-base';
 import { container } from '@/platform/bootstrap';
-import { LoggerService } from '@/platform/logger/service';
-import { Emitter, type IDisposable } from '../../base/common/event';
-import { ServiceBase } from '../../platform/base/service-base';
-import { Service } from '../../platform/di';
+import { Service } from '@/platform/di';
+import type { Logger } from '@/platform/monitor';
+import { MonitorService } from '@/platform/monitor/service';
 import { CommandNotRegisteredError } from './errors';
 import type {
     CommandContext,
@@ -20,7 +21,17 @@ import type {
 
 @Service({ singleton: true })
 export class CommandService extends ServiceBase implements ICommandService {
-    private readonly logger = container.get(LoggerService).getLogger('command');
+    private _logger?: Logger;
+
+    /**
+     * 惰性获取 logger（避免在容器初始化前访问）
+     */
+    protected get logger(): Logger {
+        if (!this._logger) {
+            this._logger = container.get(MonitorService).getLogger('command');
+        }
+        return this._logger;
+    }
 
     /** 命令注册表 */
     private readonly commands = new Map<string, CommandDefinition>();

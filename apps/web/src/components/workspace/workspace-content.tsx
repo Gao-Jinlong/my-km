@@ -3,13 +3,18 @@
 import { useEffect, useRef } from 'react';
 import { Group, Panel, Separator } from 'react-resizable-panels';
 import { PANEL_SIZES } from '@/lib/workspace/constants';
-import { container } from '@/platform/bootstrap';
+import { getContainer } from '@/platform/bootstrap';
 import { DialogProvider } from '@/platform/dialog';
-import { LoggerService } from '@/platform/logger/service';
-import { PanelService } from '@/platform/panel/service';
+import { MonitorService } from '@/platform/monitor/service';
+import type { PanelService } from '@/platform/panel/service';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 
-const logger = container.get(LoggerService).getLogger('workspace');
+/**
+ * 惰性获取 logger，避免模块级循环依赖
+ */
+function getLogger() {
+    return getContainer().get(MonitorService).getLogger('workspace');
+}
 
 import { AIPanel } from './ai-panel/ai-panel';
 import { EditorArea } from './editor/editor-area';
@@ -27,7 +32,7 @@ export function WorkspaceContent() {
 
     // 初始化面板服务
     useEffect(() => {
-        const panelService = container.get(PanelService);
+        const panelService = getContainer().get('PanelService') as PanelService;
         panelServiceRef.current = panelService;
 
         // 注册侧边栏面板
@@ -102,7 +107,7 @@ export function WorkspaceContent() {
 
             // 设置新版本号
             localStorage.setItem(VERSION_KEY, LAYOUT_VERSION);
-            logger.info(`已清理旧的布局数据并更新到版本 ${LAYOUT_VERSION}`);
+            getLogger().info(`已清理旧的布局数据并更新到版本 ${LAYOUT_VERSION}`);
         }
     }, []);
 

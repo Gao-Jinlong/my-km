@@ -1,9 +1,11 @@
-import { container } from '@/platform/bootstrap';
-import { LoggerService } from '@/platform/logger/service';
-
 import { isIterable } from './types';
 
-const logger = container.get(LoggerService).getLogger('lifecycle');
+/**
+ * 生命周期管理基础设施
+ *
+ * 注意：本文件是最底层基础设施，不应依赖任何上层服务（如 LoggerService）
+ * 警告信息使用 console.error 而非 logger
+ */
 
 export type IDisposable = {
     dispose(): void;
@@ -76,8 +78,9 @@ export class DisposableStore implements IDisposable {
         }
 
         if (this._isDisposed) {
+            // 使用 console.error 替代 logger（避免循环依赖）
             if (!DisposableStore.DISABLE_DISPOSED_WARNING) {
-                logger.warn(
+                console.error(
                     new Error(
                         'Trying to add a disposable to a DisposableStore that has already been disposed of. The added object will be leaked!',
                     ).stack ?? '',

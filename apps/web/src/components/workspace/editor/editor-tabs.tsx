@@ -5,7 +5,7 @@ import { useCallback, useEffect } from 'react';
 import { getFileIconComponent } from '@/lib/file-icon';
 import { cn } from '@/lib/utils';
 import { container } from '@/platform/bootstrap';
-import { ContextMenuService } from '@/platform/context-menu/service';
+import type { ContextMenuService } from '@/platform/context-menu/service';
 import { useEditorTabs } from '@/platform/editor-tab/use-editor-tabs';
 
 /**
@@ -35,13 +35,13 @@ export function EditorTabs() {
     // 右键菜单处理
     const handleTabContextMenu = useCallback((e: React.MouseEvent, tabId: string) => {
         e.preventDefault();
-        const contextMenuService = container.get<ContextMenuService>(ContextMenuService);
+        const contextMenuService = container.get('ContextMenuService') as ContextMenuService;
         contextMenuService.show(e, { data: { tabId } });
     }, []);
 
     // 注册编辑器标签页右键菜单
     useEffect(() => {
-        const contextMenuService = container.get<ContextMenuService>(ContextMenuService);
+        const contextMenuService = container.get('ContextMenuService') as ContextMenuService;
         const dispose = contextMenuService.registerProvider('editorTab', async ctx => {
             const tabId = ctx.data?.tabId as string;
             const tab = openDocuments.find(d => d.id === tabId);

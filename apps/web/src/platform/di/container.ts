@@ -19,9 +19,14 @@ import { SERVICE_DEPS_KEY, SERVICE_ID_KEY, SINGLETON_KEY } from './decorators';
 
 export type ServiceConstructor<T = unknown> = new (...args: unknown[]) => T;
 
+/**
+ * 带依赖的 service constructor 类型（用于已注册的服务）
+ */
+export type AnyServiceConstructor<T = unknown> = abstract new (...args: unknown[]) => T;
+
 interface ServiceRegistration {
     id: string;
-    constructor: ServiceConstructor<unknown>;
+    constructor: any;
     dependencies: string[];
     singleton: boolean;
 }
@@ -64,7 +69,7 @@ export class ServiceContainer extends Disposable {
      * container.register(FileSystemService);
      * ```
      */
-    register<T>(ctor: ServiceConstructor<T>): IDisposable {
+    register<T>(ctor: AnyServiceConstructor<T>): IDisposable {
         const serviceId = Reflect.getMetadata(SERVICE_ID_KEY, ctor) || ctor.name;
         const singleton = Reflect.getMetadata(SINGLETON_KEY, ctor) ?? true;
         const depsMetadata = Reflect.getMetadata(SERVICE_DEPS_KEY, ctor) || {};
@@ -99,11 +104,13 @@ export class ServiceContainer extends Disposable {
      *
      * @example
      * ```typescript
-     * const service = container.get<FileOpenService>(FileOpenService);
+     * const service = container.get(FileOpenService);  // 类型推断为 FileOpenService
      * // 或
      * const service = container.get('fileOpenService');
      * ```
      */
+    get<T>(id: string): T;
+    get<T>(id: ServiceConstructor<T>): T;
     get<T>(id: string | ServiceConstructor<T>): T {
         const serviceId =
             typeof id === 'string' ? id : Reflect.getMetadata(SERVICE_ID_KEY, id) || id.name;

@@ -6,13 +6,18 @@
  */
 
 import { ServiceBase } from '@/platform/base/service-base';
-import { container } from '@/platform/bootstrap';
-import { LoggerService } from '@/platform/logger/service';
+import { getContainer } from '@/platform/bootstrap';
+import { MonitorService } from '@/platform/monitor/service';
 import { Emitter } from '../../../base/common/event';
 import type { EditorService } from '../../editor/service';
 import type { FormatState, Position } from '../../editor/types';
 
-const logger = container.get(LoggerService).getLogger('ai-context');
+/**
+ * 惰性获取 logger，避免模块级循环依赖
+ */
+function getLogger() {
+    return getContainer().get(MonitorService).getLogger('ai-context');
+}
 
 /**
  * 文档信息接口
@@ -176,7 +181,7 @@ class AIContextServiceImpl extends ServiceBase implements AIContextService {
 
             return context;
         } catch (error) {
-            logger.error(`Failed to get context for document ${documentId}:`, error);
+            getLogger().error(`Failed to get context for document ${documentId}:`, error);
             return null;
         }
     }
@@ -254,7 +259,7 @@ class AIContextServiceImpl extends ServiceBase implements AIContextService {
                     try {
                         subscriber.onContextChange(context);
                     } catch (error) {
-                        logger.error(
+                        getLogger().error(
                             `Error in subscriber ${subscriber.id} for document ${documentId}:`,
                             error,
                         );
@@ -265,7 +270,10 @@ class AIContextServiceImpl extends ServiceBase implements AIContextService {
                 this._contextChangeEmitter.fire({ documentId, context });
             })
             .catch(error => {
-                logger.error(`Failed to notify context change for document ${documentId}:`, error);
+                getLogger().error(
+                    `Failed to notify context change for document ${documentId}:`,
+                    error,
+                );
             });
     }
 

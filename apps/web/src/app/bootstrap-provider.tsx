@@ -7,10 +7,8 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { bootstrap, container } from '@/platform/bootstrap';
-import { LoggerService } from '@/platform/logger/service';
-
-const logger = container.get(LoggerService).getLogger('bootstrap');
+import { bootstrap, getContainer } from '@/platform/bootstrap';
+import { MonitorService } from '@/platform/monitor/service';
 
 export function BootstrapProvider({ children }: { children: React.ReactNode }) {
     const initialized = useRef(false);
@@ -21,6 +19,8 @@ export function BootstrapProvider({ children }: { children: React.ReactNode }) {
         }
         initialized.current = true;
 
+        // 惰性获取 logger，避免模块级循环依赖
+        const logger = getContainer().get(MonitorService).getLogger('bootstrap');
         logger.info('[BootstrapProvider] Starting bootstrap...');
         bootstrap();
         logger.info('[BootstrapProvider] Bootstrap completed');

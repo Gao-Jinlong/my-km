@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { container } from '@/platform/bootstrap';
-import { LoggerService } from '@/platform/logger/service';
-import type { LogEntry } from '@/platform/logger/types';
-import { LogLevel, LogLevelToString } from '@/platform/logger/types';
+import type { MonitorService } from '@/platform/monitor/service';
+import type { LogEntry } from '@/platform/monitor/types';
+import { LogLevel, LogLevelToString } from '@/platform/monitor/types';
 
 const LEVEL_COLORS: Record<number, string> = {
     [LogLevel.DEBUG]: '#6B7280',
@@ -29,7 +29,7 @@ export function LogPanel() {
     const [isPaused, setIsPaused] = useState(false);
     const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
-    const loggerService = useMemo(() => container.get(LoggerService), []);
+    const loggerService = useMemo(() => container.get('MonitorService') as MonitorService, []);
 
     // 加载日志
     const refreshLogs = useCallback(() => {

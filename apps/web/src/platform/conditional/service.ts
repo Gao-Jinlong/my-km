@@ -28,7 +28,8 @@
 import { ServiceBase } from '@/platform/base/service-base';
 import { container } from '@/platform/bootstrap';
 import { Service } from '@/platform/di';
-import { LoggerService } from '@/platform/logger/service';
+import type { Logger } from '@/platform/monitor';
+import { MonitorService } from '@/platform/monitor/service';
 import type {
     ConditionConfig,
     ConditionContext,
@@ -40,7 +41,17 @@ import type {
 
 @Service({ singleton: true })
 export class ConditionalService extends ServiceBase implements IConditionalService {
-    private readonly logger = container.get(LoggerService).getLogger('conditional');
+    private _logger?: Logger;
+
+    /**
+     * 惰性获取 logger（避免在容器初始化前访问）
+     */
+    protected get logger(): Logger {
+        if (!this._logger) {
+            this._logger = container.get(MonitorService).getLogger('conditional');
+        }
+        return this._logger;
+    }
 
     /** 条件注册表 */
     private readonly conditions = new Map<string, ConditionEvaluator>();

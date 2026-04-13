@@ -8,15 +8,20 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { container } from '@/platform/bootstrap';
+import { getContainer } from '@/platform/bootstrap';
 import { ConditionId } from '@/platform/conditional';
-import { EditorContainer } from '@/platform/editor/container/editor-container';
-import { EditorTabService } from '@/platform/editor-tab/service';
-import { EventBusService } from '@/platform/event-bus/service';
-import { KeyBinding, KeyboardShortcutService, ShortcutScope } from '@/platform/keyboard';
-import { LoggerService } from '@/platform/logger/service';
+import type { EditorContainer } from '@/platform/editor/container/editor-container';
+import type { EditorTabService } from '@/platform/editor-tab/service';
+import type { EventBusService } from '@/platform/event-bus/service';
+import { KeyBinding, type KeyboardShortcutService, ShortcutScope } from '@/platform/keyboard';
+import { MonitorService } from '@/platform/monitor/service';
 
-const logger = container.get(LoggerService).getLogger('shortcut');
+/**
+ * 惰性获取 logger，避免模块级循环依赖
+ */
+function getLogger() {
+    return getContainer().get(MonitorService).getLogger('shortcut');
+}
 
 /**
  * 文件搜索聚焦事件类型
@@ -30,9 +35,10 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
     const shortcutServiceRef = useRef<KeyboardShortcutService | null>(null);
 
     useEffect(() => {
-        // 获取快捷键服务实例
-        const shortcutService = container.get(KeyboardShortcutService);
-        const eventBus = container.get(EventBusService);
+        // 获取服务实例
+        const container = getContainer();
+        const shortcutService = container.get('KeyboardShortcutService') as KeyboardShortcutService;
+        const eventBus = container.get('EventBusService') as EventBusService;
         shortcutServiceRef.current = shortcutService;
 
         // 注册默认快捷键（只注册一次，handler 从服务读取状态）
@@ -42,7 +48,9 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
                 handler: {
                     handle: () => {
                         // 关闭当前活动文档
-                        const tabService = container.get(EditorTabService);
+                        const tabService = getContainer().get(
+                            'EditorTabService',
+                        ) as EditorTabService;
                         const activeId = tabService.getActiveDocumentId();
                         if (activeId) {
                             tabService.closeDocument(activeId);
@@ -56,15 +64,19 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
                 keybinding: KeyBinding.CTRL_S,
                 handler: {
                     handle: () => {
-                        const tabService = container.get(EditorTabService);
+                        const tabService = getContainer().get(
+                            'EditorTabService',
+                        ) as EditorTabService;
                         const activeId = tabService.getActiveDocumentId();
                         if (activeId) {
-                            const editorContainer = container.get(EditorContainer);
+                            const editorContainer = getContainer().get(
+                                'EditorContainer',
+                            ) as EditorContainer;
                             const editorService = editorContainer.getService(activeId);
                             if (editorService) {
                                 editorService
                                     .saveDocument()
-                                    .catch(err => logger.error('保存文档失败:', err));
+                                    .catch(err => getLogger().error('保存文档失败:', err));
                             }
                         }
                     },
@@ -78,8 +90,10 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
                 handler: {
                     handle: () => {
                         // TODO: 另存为功能
-                        const tabService = container.get(EditorTabService);
-                        logger.debug(
+                        const tabService = getContainer().get(
+                            'EditorTabService',
+                        ) as EditorTabService;
+                        getLogger().debug(
                             '[Shortcut] Save As triggered for:',
                             tabService.getActiveDocumentId(),
                         );
@@ -93,7 +107,7 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
                 handler: {
                     handle: () => {
                         // TODO: 快速打开文件
-                        logger.debug('[Shortcut] Quick Open triggered');
+                        getLogger().debug('[Shortcut] Quick Open triggered');
                     },
                     description: '快速打开文件',
                 },
@@ -104,7 +118,7 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
                 handler: {
                     handle: () => {
                         // TODO: 打开命令面板
-                        logger.debug('[Shortcut] Command Palette triggered');
+                        getLogger().debug('[Shortcut] Command Palette triggered');
                     },
                     description: '打开命令面板',
                 },
@@ -115,7 +129,9 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
                 handler: {
                     handle: () => {
                         // 切换到下一个标签页
-                        const tabService = container.get(EditorTabService);
+                        const tabService = getContainer().get(
+                            'EditorTabService',
+                        ) as EditorTabService;
                         const docs = tabService.getOpenDocuments();
                         const activeId = tabService.getActiveDocumentId();
                         const currentIndex = docs.findIndex(d => d.id === activeId);
@@ -136,7 +152,9 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
                 handler: {
                     handle: () => {
                         // 切换到上一个标签页
-                        const tabService = container.get(EditorTabService);
+                        const tabService = getContainer().get(
+                            'EditorTabService',
+                        ) as EditorTabService;
                         const docs = tabService.getOpenDocuments();
                         const activeId = tabService.getActiveDocumentId();
                         const currentIndex = docs.findIndex(d => d.id === activeId);

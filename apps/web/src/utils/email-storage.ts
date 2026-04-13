@@ -1,13 +1,11 @@
 /**
  * Email Storage Utility
  * Manages localStorage persistence for the last used email address
+ *
+ * 注意：本文件是底层工具，不依赖上层服务
  */
 
-import { container } from '@/platform/bootstrap';
-import { LoggerService } from '@/platform/logger/service';
-
 const STORAGE_KEY = 'auth-last-email';
-const logger = container.get(LoggerService).getLogger('email-storage');
 
 /**
  * Save the last used email address to localStorage
@@ -18,8 +16,7 @@ export function saveLastEmail(email: string): void {
         try {
             localStorage.setItem(STORAGE_KEY, email);
         } catch (error) {
-            // Silently fail if localStorage is not available
-            logger.warn('Failed to save last email:', error);
+            console.warn('[email-storage] Failed to save last email:', error);
         }
     }
 }
@@ -33,7 +30,7 @@ export function getLastEmail(): string | null {
         try {
             return localStorage.getItem(STORAGE_KEY);
         } catch (error) {
-            logger.warn('Failed to retrieve last email:', error);
+            console.warn('[email-storage] Failed to retrieve last email:', error);
             return null;
         }
     }
@@ -48,7 +45,7 @@ export function clearLastEmail(): void {
         try {
             localStorage.removeItem(STORAGE_KEY);
         } catch (error) {
-            logger.warn('Failed to clear last email:', error);
+            console.warn('[email-storage] Failed to clear last email:', error);
         }
     }
 }

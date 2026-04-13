@@ -18,7 +18,8 @@ import { EditorContainer } from '@/platform/editor/container';
 import { EditorTabService } from '@/platform/editor-tab/service';
 import type { OpenDocument } from '@/platform/editor-tab/types';
 import { FileSystemService } from '@/platform/file-system/service';
-import { LoggerService } from '@/platform/logger/service';
+import type { Logger } from '@/platform/monitor';
+import { MonitorService } from '@/platform/monitor/service';
 
 /**
  * 文件打开服务
@@ -36,16 +37,49 @@ import { LoggerService } from '@/platform/logger/service';
  */
 @Service({ singleton: true })
 export class FileOpenService extends ServiceBase {
-    private fileService: FileSystemService;
-    private editorContainer: EditorContainer;
-    private editorTabService: EditorTabService;
-    private readonly logger = container.get(LoggerService).getLogger('file-open');
+    private _fileService?: FileSystemService;
+    private _editorContainer?: EditorContainer;
+    private _editorTabService?: EditorTabService;
+    private _logger?: Logger;
 
-    constructor() {
-        super();
-        this.fileService = container.get(FileSystemService);
-        this.editorContainer = container.get(EditorContainer);
-        this.editorTabService = container.get(EditorTabService);
+    /**
+     * 惰性获取文件系统服务（避免在容器初始化前访问）
+     */
+    private get fileService(): FileSystemService {
+        if (!this._fileService) {
+            this._fileService = container.get(FileSystemService);
+        }
+        return this._fileService;
+    }
+
+    /**
+     * 惰性获取编辑器容器（避免在容器初始化前访问）
+     */
+    private get editorContainer(): EditorContainer {
+        if (!this._editorContainer) {
+            this._editorContainer = container.get(EditorContainer);
+        }
+        return this._editorContainer;
+    }
+
+    /**
+     * 惰性获取编辑器标签服务（避免在容器初始化前访问）
+     */
+    private get editorTabService(): EditorTabService {
+        if (!this._editorTabService) {
+            this._editorTabService = container.get(EditorTabService);
+        }
+        return this._editorTabService;
+    }
+
+    /**
+     * 惰性获取 logger（避免在容器初始化前访问）
+     */
+    protected get logger(): Logger {
+        if (!this._logger) {
+            this._logger = container.get(MonitorService).getLogger('file-open');
+        }
+        return this._logger;
     }
 
     /**

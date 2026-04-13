@@ -7,7 +7,7 @@ import { $getRoot, $getSelection, $isRangeSelection } from 'lexical';
 import { Emitter } from '@/base/common/event';
 import type { IDisposable } from '@/base/common/lifecycle';
 import { container } from '@/platform/bootstrap';
-import { FileSystemService } from '@/platform/file-system/service';
+import type { FileSystemService } from '@/platform/file-system/service';
 import { blocksToLexical, lexicalToBlocks } from '../converter/block-lexical-converter';
 import { serializeToKmFile } from '../converter/km-serializer';
 import { serializeToMarkdown } from '../converter/markdown-serializer';
@@ -267,7 +267,7 @@ class EditorServiceImpl implements EditorService {
             }
 
             // 写入文件
-            const fileSystem = container.get(FileSystemService);
+            const fileSystem = container.get('FileSystemService') as FileSystemService;
             await fileSystem.writeFile(this.filePath, fileContent);
 
             this.setState({ isDirty: false, isSaved: true });

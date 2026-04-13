@@ -1,8 +1,9 @@
 import { container } from '@/platform/bootstrap';
-import { LoggerService } from '@/platform/logger/service';
+import { Service } from '@/platform/di';
+import type { Logger } from '@/platform/monitor';
+import { MonitorService } from '@/platform/monitor/service';
 import { Emitter } from '../../base/common/event';
 import { ServiceBase } from '../../platform/base/service-base';
-import { Service } from '../di';
 import type {
     EventDefinition,
     EventHistoryOptions,
@@ -22,7 +23,18 @@ interface Subscription {
  */
 @Service({ singleton: true })
 export class EventBusService extends ServiceBase {
-    private readonly logger = container.get(LoggerService).getLogger('event-bus');
+    private _logger?: Logger;
+
+    /**
+     * 惰性获取 logger（避免在容器初始化前访问）
+     */
+    protected get logger(): Logger {
+        if (!this._logger) {
+            this._logger = container.get(MonitorService).getLogger('event-bus');
+        }
+        return this._logger;
+    }
+
     // 事件发射器
     private readonly _onEventPublished = new Emitter<EventDefinition>();
     private readonly _onEventHandled = new Emitter<{ event: EventDefinition; listeners: number }>();

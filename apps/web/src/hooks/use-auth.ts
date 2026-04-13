@@ -4,12 +4,17 @@
  */
 import { useCallback } from 'react';
 import { authApi } from '@/api/auth';
-import { container } from '@/platform/bootstrap';
-import { LoggerService } from '@/platform/logger/service';
+import { getContainer } from '@/platform/bootstrap';
+import { MonitorService } from '@/platform/monitor/service';
 import { useAuthStore } from '@/stores/auth-store';
 import type { LoginRequest, RegisterRequest } from '@/types/auth';
 
-const logger = container.get(LoggerService).getLogger('auth');
+/**
+ * 惰性获取 logger，避免模块级循环依赖
+ */
+function getLogger() {
+    return getContainer().get(MonitorService).getLogger('auth');
+}
 
 export function useAuth() {
     const { user, isAuthenticated, isLoading, setAuth, setUser, setLoading, logout, clearAuth } =
@@ -65,7 +70,7 @@ export function useAuth() {
             try {
                 await authApi.logout(refreshToken);
             } catch (error) {
-                logger.error('Logout API call failed:', error);
+                getLogger().error('Logout API call failed:', error);
             }
         }
         logout();
@@ -85,7 +90,7 @@ export function useAuth() {
             // eslint-disable-next-line no-unreachable
             throw new Error('Not implemented');
         } catch (error) {
-            logger.error('Failed to refresh user:', error);
+            getLogger().error('Failed to refresh user:', error);
         } finally {
             setLoading(false);
         }

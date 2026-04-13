@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { LoggerService } from '../service';
+import { MonitorService } from '../service';
 import { LogLevel } from '../types';
 
-describe('LoggerService', () => {
-    let service: LoggerService;
+describe('MonitorService', () => {
+    let service: MonitorService;
 
     beforeEach(() => {
-        service = new LoggerService();
+        service = new MonitorService();
     });
 
     afterEach(() => {

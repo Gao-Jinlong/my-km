@@ -20,18 +20,23 @@ import { TabIndentationPlugin } from '@lexical/react/LexicalTabIndentationPlugin
 import { HeadingNode, QuoteNode } from '@lexical/rich-text';
 import type { EditorThemeClasses } from 'lexical';
 import { useEffect, useRef } from 'react';
-import { EditorContainer } from '@/features/editor/container/EditorContainer';
+import type { EditorContainer } from '@/features/editor/container/EditorContainer';
 import type { EditorService } from '@/features/editor/service/EditorService';
 import type { Document } from '@/features/editor/types';
 import { cn } from '@/lib/utils';
-import { container } from '@/platform/bootstrap';
-import { ContextMenuService } from '@/platform/context-menu/service';
+import { getContainer } from '@/platform/bootstrap';
+import type { ContextMenuService } from '@/platform/context-menu/service';
 import type { ContextMenuContext } from '@/platform/context-menu/types';
-import { EditorTabService } from '@/platform/editor-tab/service';
-import { LoggerService } from '@/platform/logger/service';
+import type { EditorTabService } from '@/platform/editor-tab/service';
+import { MonitorService } from '@/platform/monitor/service';
 import { registerEditorService, unregisterEditorService } from './document-status-indicator';
 
-const logger = container.get(LoggerService).getLogger('editor');
+/**
+ * 惰性获取 logger，避免模块级循环依赖
+ */
+function getLogger() {
+    return getContainer().get(MonitorService).getLogger('editor');
+}
 
 /**
  * 编辑器主题配置
@@ -99,9 +104,10 @@ function EditorBridgePlugin({ documentId, filePath }: { documentId: string; file
     const disposableRef = useRef<ReturnType<EditorService['onChange']> | null>(null);
 
     useEffect(() => {
-        // 获取 EditorContainer 并创建服务实例
-        const editorContainer = container.get(EditorContainer);
-        const editorTabService = container.get(EditorTabService);
+        // 获取服务实例
+        const container = getContainer();
+        const editorContainer = container.get('EditorContainer') as EditorContainer;
+        const editorTabService = container.get('EditorTabService') as EditorTabService;
 
         // 复用或创建 EditorService 实例
         let editorService = editorContainer.getService(documentId);
@@ -153,7 +159,8 @@ function EditorContentPlugin({
     useEffect(() => {
         if (!doc || loadedRef.current) return;
 
-        const editorContainer = container.get(EditorContainer);
+        const container = getContainer();
+        const editorContainer = container.get('EditorContainer') as EditorContainer;
         const editorService = editorContainer.getService(documentId);
         if (editorService) {
             loadedRef.current = true;
@@ -173,7 +180,7 @@ function getInitialConfig(documentId: string) {
         theme,
         nodes: [ListNode, ListItemNode, HeadingNode, QuoteNode, CodeNode, LinkNode],
         onError: (error: Error) => {
-            logger.error('LexicalEditor error:', error);
+            getLogger().error('LexicalEditor error:', error);
         },
     };
 }
@@ -200,7 +207,7 @@ function LexicalEditorImpl({
 
     // 注册编辑器右键菜单提供者
     useEffect(() => {
-        const contextMenuService = container.get(ContextMenuService);
+        const contextMenuService = getContainer().get('ContextMenuService') as ContextMenuService;
         contextMenuServiceRef.current = contextMenuService;
 
         const dispose = contextMenuService.registerProvider(
@@ -215,7 +222,7 @@ function LexicalEditorImpl({
                                 label: '复制',
                                 action: async () => {
                                     // TODO: 复制选中文本
-                                    logger.debug('[Editor ContextMenu] Copy');
+                                    getLogger().debug('[Editor ContextMenu] Copy');
                                 },
                             },
                             {
@@ -223,7 +230,7 @@ function LexicalEditorImpl({
                                 label: '粘贴',
                                 action: async () => {
                                     // TODO: 粘贴文本
-                                    logger.debug('[Editor ContextMenu] Paste');
+                                    getLogger().debug('[Editor ContextMenu] Paste');
                                 },
                             },
                             { id: 'separator-1', type: 'separator' },
@@ -232,7 +239,7 @@ function LexicalEditorImpl({
                                 label: '全选',
                                 action: async () => {
                                     // TODO: 全选文本
-                                    logger.debug('[Editor ContextMenu] Select All');
+                                    getLogger().debug('[Editor ContextMenu] Select All');
                                 },
                             },
                         ],
@@ -260,8 +267,9 @@ function LexicalEditorImpl({
                                     className="prose prose-ws min-h-125 max-w-none outline-none"
                                     onContextMenu={e => {
                                         // 触发编辑器右键菜单
-                                        const contextMenuService =
-                                            container.get(ContextMenuService);
+                                        const contextMenuService = getContainer().get(
+                                            'ContextMenuService',
+                                        ) as ContextMenuService;
                                         contextMenuService.show(e, {
                                             target: e.currentTarget,
                                             data: {

@@ -8,8 +8,8 @@ import { Emitter, type IDisposable, toDisposable } from '@/base/common/event';
 import { ServiceBase } from '@/platform/base/service-base';
 import { container } from '@/platform/bootstrap';
 import { Service } from '@/platform/di';
-import type { Logger } from '@/platform/logger';
-import { LoggerService } from '@/platform/logger/service';
+import type { Logger } from '@/platform/monitor';
+import { MonitorService } from '@/platform/monitor/service';
 
 /**
  * 面板配置
@@ -89,7 +89,17 @@ export interface PanelServiceOptions {
 export class PanelService extends ServiceBase {
     private readonly _panels = new Map<string, PanelConfig>();
     private readonly _states = new Map<string, PanelState>();
-    private readonly logger: Logger = container.get(LoggerService).getLogger('panel');
+    private _logger?: Logger;
+
+    /**
+     * 惰性获取 logger（避免在容器初始化前访问）
+     */
+    protected get logger(): Logger {
+        if (!this._logger) {
+            this._logger = container.get(MonitorService).getLogger('panel');
+        }
+        return this._logger;
+    }
 
     // 配置选项
     private readonly _options: Required<PanelServiceOptions>;

@@ -11,18 +11,23 @@ import { ChevronRight, Folder, FolderOpen } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getFileIconComponent } from '@/lib/file-icon';
 import { cn } from '@/lib/utils';
-import { container } from '@/platform/bootstrap';
-import { ContextMenuService } from '@/platform/context-menu/service';
+import { getContainer } from '@/platform/bootstrap';
+import type { ContextMenuService } from '@/platform/context-menu/service';
 import type { ContextMenuContext } from '@/platform/context-menu/types';
-import { DialogService } from '@/platform/dialog/service';
+import type { DialogService } from '@/platform/dialog/service';
 import { useEditorTabs } from '@/platform/editor-tab/use-editor-tabs';
-import { FileOpenService } from '@/platform/file-open/service';
+import type { FileOpenService } from '@/platform/file-open/service';
 import { projectManager } from '@/platform/file-system/project-manager';
 import { FileSystemService } from '@/platform/file-system/service';
 import type { FileStat } from '@/platform/file-system/types';
-import { LoggerService } from '@/platform/logger/service';
+import { MonitorService } from '@/platform/monitor/service';
 
-const logger = container.get(LoggerService).getLogger('file-tree');
+/**
+ * 惰性获取 logger，避免模块级循环依赖
+ */
+function getLogger() {
+    return getContainer().get(MonitorService).getLogger('file-tree');
+}
 
 /**
  * 文件图标组件 - 根据文件类型显示对应图标
@@ -179,10 +184,10 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
     const { activeDocumentId, closeDocument, openDocuments } = useEditorTabs();
 
     // 获取服务实例
-    const fileSystemService = container.get<FileSystemService>(FileSystemService);
-    const fileOpenService = container.get<FileOpenService>(FileOpenService);
-    const contextMenuService = container.get<ContextMenuService>(ContextMenuService);
-    const dialogService = container.get<DialogService>(DialogService);
+    const fileSystemService = getContainer().get<FileSystemService>('FileSystemService');
+    const fileOpenService = getContainer().get<FileOpenService>('FileOpenService');
+    const contextMenuService = getContainer().get<ContextMenuService>('ContextMenuService');
+    const dialogService = getContainer().get<DialogService>('DialogService');
 
     // 清除失效的缓存（当文件/文件夹被重命名或删除后）
     const clearStaleCache = useCallback((affectedPath: string, isDirectory: boolean) => {
@@ -242,7 +247,7 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                 const childFiles = await fileSystemService.listFiles(folderPath);
                 setLoadedChildren(prevMap => new Map(prevMap).set(folderPath, childFiles));
             } catch (err) {
-                logger.error('刷新目录失败:', folderPath, err);
+                getLogger().error('刷新目录失败:', folderPath, err);
             }
         }
     }, [loadFiles, fileSystemService]);
@@ -295,9 +300,9 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                                         );
                                         clearStaleCache(targetDir, true);
                                         await refreshTree();
-                                        logger.info('新建文件成功:', newFilePath);
+                                        getLogger().info('新建文件成功:', newFilePath);
                                     } catch (err) {
-                                        logger.error('新建文件失败:', err);
+                                        getLogger().error('新建文件失败:', err);
                                         await dialogService.alert(
                                             `新建文件失败：${(err as Error).message}`,
                                         );
@@ -317,9 +322,9 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                                         await fileSystemService.createDirectory(newFolderPath);
                                         clearStaleCache(targetDir, true);
                                         await refreshTree();
-                                        logger.info('新建文件夹成功:', newFolderPath);
+                                        getLogger().info('新建文件夹成功:', newFolderPath);
                                     } catch (err) {
-                                        logger.error('新建文件夹失败:', err);
+                                        getLogger().error('新建文件夹失败:', err);
                                         await dialogService.alert(
                                             `新建文件夹失败：${(err as Error).message}`,
                                         );
@@ -366,9 +371,14 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                                         }
                                         clearStaleCache(oldPath, isDirectory);
                                         await refreshTree();
-                                        logger.info('重命名成功:', fileData.path, '->', newName);
+                                        getLogger().info(
+                                            '重命名成功:',
+                                            fileData.path,
+                                            '->',
+                                            newName,
+                                        );
                                     } catch (err) {
-                                        logger.error('重命名失败:', err);
+                                        getLogger().error('重命名失败:', err);
                                         await dialogService.alert(
                                             `重命名失败：${(err as Error).message}`,
                                         );
@@ -408,9 +418,9 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                                             closeDocument(`file:${fileData.path}`);
                                         }
                                         await refreshTree();
-                                        logger.info('删除成功:', fileData.path);
+                                        getLogger().info('删除成功:', fileData.path);
                                     } catch (err) {
-                                        logger.error('删除失败:', err);
+                                        getLogger().error('删除失败:', err);
                                         await dialogService.alert(
                                             `删除失败：${(err as Error).message}`,
                                         );
@@ -451,13 +461,13 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                         setTimeout(async () => {
                             try {
                                 const fileSystemService =
-                                    container.get<FileSystemService>(FileSystemService);
+                                    getContainer().get<FileSystemService>(FileSystemService);
                                 const childFiles = await fileSystemService.listFiles(folderPath);
                                 setLoadedChildren(prevMap =>
                                     new Map(prevMap).set(folderPath, childFiles),
                                 );
                             } catch (err) {
-                                logger.error('加载子目录失败:', err);
+                                getLogger().error('加载子目录失败:', err);
                             }
                         }, 0);
                     }
@@ -482,7 +492,7 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
             try {
                 await fileOpenService.openFile(filePath);
             } catch (err) {
-                logger.error('打开文件失败:', err);
+                getLogger().error('打开文件失败:', err);
             }
         },
         [fileOpenService],
