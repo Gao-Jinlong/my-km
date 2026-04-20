@@ -27,7 +27,7 @@ import type { OpenDocument } from './types';
  *     id: 'doc-1',
  *     path: '/notes/hello.md',
  *     title: 'Hello',
- *     type: 'markdown',
+ *     type: 'km',
  *     openedAt: new Date().toISOString(),
  * });
  * ```

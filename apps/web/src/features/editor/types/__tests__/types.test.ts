@@ -68,7 +68,7 @@ describe('Editor Types', () => {
             id: 'doc-test123',
             path: '/documents/test.md',
             title: '测试文档',
-            type: 'markdown',
+            type: 'km',
             content: [],
             version: 1,
             createdAt: '2026-03-25T10:00:00Z',
@@ -77,6 +77,6 @@ describe('Editor Types', () => {
         };
 
         expect(testDocument.content).toEqual([]);
-        expect(testDocument.type).toBe('markdown');
+        expect(testDocument.type).toBe('km');
     });
 });

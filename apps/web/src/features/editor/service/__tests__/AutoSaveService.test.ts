@@ -22,7 +22,7 @@ function createMockEditorService(
         id: documentId,
         path: `/test/${documentId}.md`,
         title: 'Test Document',
-        type: 'markdown',
+        type: 'km',
         content: [],
         version: 1,
         createdAt: new Date().toISOString(),

@@ -6,7 +6,7 @@ export interface OpenDocument {
     id: string;
     path: string;
     title: string;
-    type: 'rich-text' | 'markdown';
+    type: 'km';
     isDirty?: boolean;
     openedAt: string;
     content?: string;

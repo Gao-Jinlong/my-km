@@ -19,7 +19,7 @@ export interface Operation {
 /**
  * 文档类型
  */
-export type DocumentType = 'rich-text' | 'markdown' | 'km';
+export type DocumentType = 'km';
 
 /**
  * 文档接口

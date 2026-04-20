@@ -151,7 +151,7 @@ class AIContextServiceImpl extends ServiceBase implements AIContextService {
                 id: editorService.documentId,
                 path: '', // 路径信息需要从外部获取
                 title: '', // 标题信息需要从外部获取
-                type: 'rich-text',
+                type: 'km',
             };
 
             // 获取选区信息

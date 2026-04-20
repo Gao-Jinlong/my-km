@@ -10,7 +10,6 @@ import { container } from '@/platform/bootstrap';
 import type { FileSystemService } from '@/platform/file-system/service';
 import { blocksToLexical, lexicalToBlocks } from '../converter/block-lexical-converter';
 import { serializeToKmFile } from '../converter/km-serializer';
-import { serializeToMarkdown } from '../converter/markdown-serializer';
 import type { Document, FormatState, Selection } from '../types';
 
 /**
@@ -254,17 +253,11 @@ class EditorServiceImpl implements EditorService {
                 updatedAt: new Date().toISOString(),
             };
 
-            // 根据文档类型选择序列化方式
-            let fileContent: string;
-            if (updatedDoc.type === 'km') {
-                fileContent = serializeToKmFile(blocks, {
-                    title: updatedDoc.title,
-                    createdAt: updatedDoc.createdAt,
-                    updatedAt: updatedDoc.updatedAt,
-                });
-            } else {
-                fileContent = serializeToMarkdown(blocks);
-            }
+            const fileContent = serializeToKmFile(blocks, {
+                title: updatedDoc.title,
+                createdAt: updatedDoc.createdAt,
+                updatedAt: updatedDoc.updatedAt,
+            });
 
             // 写入文件
             const fileSystem = container.get('FileSystemService') as FileSystemService;

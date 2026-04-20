@@ -64,7 +64,7 @@ function createTestDocument(overrides?: Partial<Document>): Document {
         id: 'test-doc-123',
         path: '/test/document',
         title: 'Test Document',
-        type: 'rich-text',
+        type: 'km',
         content: [],
         version: 1,
         createdAt: '2024-01-01T00:00:00.000Z',

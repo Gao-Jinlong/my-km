@@ -5,10 +5,14 @@
  * - 处理文件打开的完整流程
  * - 文档加载和管理
  * - 与编辑器容器的集成
+ * - .md 文件自动转换为 .km 格式
  */
 
 import 'reflect-metadata';
-import { deserializeFromKmFile } from '@/features/editor/converter/km-serializer';
+import {
+    deserializeFromKmFile,
+    serializeToKmFile,
+} from '@/features/editor/converter/km-serializer';
 import { parseMarkdown } from '@/features/editor/converter/markdown-parser';
 import type { Document } from '@/features/editor/types';
 import { ServiceBase } from '@/platform/base/service-base';
@@ -23,17 +27,6 @@ import { MonitorService } from '@/platform/monitor/service';
 
 /**
  * 文件打开服务
- *
- * @example
- * ```typescript
- * const fileOpenService = container.get(FileOpenService);
- *
- * // 打开文件
- * await fileOpenService.openFile('/path/to/file.md');
- *
- * // 关闭文件
- * fileOpenService.closeFile('/path/to/file.md');
- * ```
  */
 @Service({ singleton: true })
 export class FileOpenService extends ServiceBase {
@@ -42,9 +35,6 @@ export class FileOpenService extends ServiceBase {
     private _editorTabService?: EditorTabService;
     private _logger?: Logger;
 
-    /**
-     * 惰性获取文件系统服务（避免在容器初始化前访问）
-     */
     private get fileService(): FileSystemService {
         if (!this._fileService) {
             this._fileService = container.get(FileSystemService);
@@ -52,9 +42,6 @@ export class FileOpenService extends ServiceBase {
         return this._fileService;
     }
 
-    /**
-     * 惰性获取编辑器容器（避免在容器初始化前访问）
-     */
     private get editorContainer(): EditorContainer {
         if (!this._editorContainer) {
             this._editorContainer = container.get(EditorContainer);
@@ -62,9 +49,6 @@ export class FileOpenService extends ServiceBase {
         return this._editorContainer;
     }
 
-    /**
-     * 惰性获取编辑器标签服务（避免在容器初始化前访问）
-     */
     private get editorTabService(): EditorTabService {
         if (!this._editorTabService) {
             this._editorTabService = container.get(EditorTabService);
@@ -72,9 +56,6 @@ export class FileOpenService extends ServiceBase {
         return this._editorTabService;
     }
 
-    /**
-     * 惰性获取 logger（避免在容器初始化前访问）
-     */
     protected get logger(): Logger {
         if (!this._logger) {
             this._logger = container.get(MonitorService).getLogger('file-open');
@@ -85,34 +66,38 @@ export class FileOpenService extends ServiceBase {
     /**
      * 打开文件
      *
-     * @param path 文件路径
-     * @param type 文档类型（可选，默认从扩展名推断）
-     *
-     * @example
-     * ```typescript
-     * await fileOpenService.openFile('/docs/guide.md');
-     * await fileOpenService.openFile('/docs/notes.mdx', 'markdown');
-     * ```
+     * - .km 文件：直接打开编辑
+     * - .md/.mdx/.markdown 文件：自动转换为 .km 格式后打开
+     * - 其他类型：不支持
      */
-    async openFile(path: string, type?: 'rich-text' | 'markdown'): Promise<void> {
+    async openFile(path: string): Promise<void> {
         try {
+            const ext = path.split('.').pop()?.toLowerCase();
+
+            // .md 文件：自动转换为 .km
+            if (ext === 'md' || ext === 'mdx' || ext === 'markdown') {
+                const kmPath = await this.convertMdToKm(path);
+                await this.openFile(kmPath);
+                return;
+            }
+
+            // 只支持 .km 文件编辑
+            if (ext !== 'km') {
+                this.logger.warn(`不支持的文件类型: ${ext}，仅支持 .km 文件`);
+                return;
+            }
+
             // 读取文件内容
             const content = await this.fileService.readFile(path);
-
-            // 推断文档类型
-            const docType = type || this.inferDocumentType(path);
+            const contentString = this.decodeContent(content);
 
             // 创建文档对象
-            const document = this.createDocument(path, content, docType);
+            const document = this.createDocument(path, contentString);
 
             // 打开文档标签
             this.editorTabService.openDocument(document);
 
-            // TODO: 创建/获取编辑器实例并加载文档
-            // const editor = this.editorContainer.createInstance(document.id);
-            // editor.loadDocument(document);
-
-            this.logger.info(`Opened file: ${path} (${docType})`);
+            this.logger.info(`Opened file: ${path}`);
         } catch (error) {
             this.logger.error(`Failed to open file ${path}:`, error);
             throw error;
@@ -121,8 +106,6 @@ export class FileOpenService extends ServiceBase {
 
     /**
      * 打开多个文件
-     *
-     * @param paths 文件路径数组
      */
     async openFiles(paths: string[]): Promise<void> {
         for (const path of paths) {
@@ -130,28 +113,20 @@ export class FileOpenService extends ServiceBase {
                 await this.openFile(path);
             } catch (error) {
                 this.logger.error(`Failed to open file ${path}:`, error);
-                // 继续打开其他文件
             }
         }
     }
 
     /**
      * 关闭文件
-     *
-     * @param path 文件路径
      */
     closeFile(path: string): void {
-        // 从标签服务中查找文档
         const openDocuments = this.editorTabService.getOpenDocuments();
         const openDoc = openDocuments.find(doc => doc.path === path);
 
         if (openDoc) {
-            // 销毁编辑器实例
             this.editorContainer.disposeInstance(openDoc.id);
-
-            // 关闭文档
             this.editorTabService.closeDocument(openDoc.id);
-
             this.logger.info(`Closed file: ${path}`);
         }
     }
@@ -160,20 +135,13 @@ export class FileOpenService extends ServiceBase {
      * 关闭所有文件
      */
     closeAll(): void {
-        // 销毁所有编辑器实例
         this.editorContainer.disposeAll();
-
-        // 关闭所有文档标签
         this.editorTabService.closeAllDocuments();
-
         this.logger.info('Closed all files');
     }
 
     /**
      * 保存文件
-     *
-     * @param path 文件路径
-     * @param content 文件内容
      */
     async saveFile(path: string, content: string): Promise<void> {
         await this.fileService.writeFile(path, new TextEncoder().encode(content));
@@ -181,94 +149,72 @@ export class FileOpenService extends ServiceBase {
     }
 
     /**
-     * 推断文档类型
+     * 将 .md 文件转换为 .km 格式
+     *
+     * 读取 .md → 解析为 Block[] → 序列化为 .km → 写入同名 .km 文件 → 返回 .km 路径
      */
-    private inferDocumentType(path: string): 'rich-text' | 'markdown' | 'km' {
-        const ext = path.split('.').pop()?.toLowerCase();
+    private async convertMdToKm(mdPath: string): Promise<string> {
+        const content = await this.fileService.readFile(mdPath);
+        const contentString = this.decodeContent(content);
 
-        switch (ext) {
-            case 'md':
-            case 'mdx':
-            case 'markdown':
-                return 'markdown';
-            case 'km':
-                return 'km';
-            default:
-                return 'rich-text';
-        }
+        const blocks = parseMarkdown(contentString);
+
+        const kmContent = serializeToKmFile(blocks, {
+            title: mdPath.split('/').pop() || '未命名文档',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        });
+
+        const kmPath = mdPath.replace(/\.(md|mdx|markdown)$/, '.km');
+        await this.fileService.writeFile(kmPath, new TextEncoder().encode(kmContent));
+
+        this.logger.info(`Converted ${mdPath} → ${kmPath}`);
+        return kmPath;
     }
 
     /**
-     * 创建文档对象
-     *
-     * 使用文件路径作为文档 ID，确保同一文件不会打开多个标签页
+     * 创建文档对象（仅处理 .km 格式）
      */
-    private createDocument(
-        path: string,
-        content: unknown,
-        type: 'rich-text' | 'markdown' | 'km',
-    ): OpenDocument {
-        // 使用文件路径作为文档 ID（确保唯一性）
+    private createDocument(path: string, content: string): OpenDocument {
         const id = `file:${path}`;
-
-        // 从路径提取标题（保留扩展名）
         const fileName = path.split('/').pop() || '未命名文档';
-        const title = fileName;
 
-        // 将内容转换为字符串存储
-        let contentString: string;
-        if (content instanceof Uint8Array) {
-            contentString = new TextDecoder().decode(content);
-        } else if (typeof content === 'string') {
-            contentString = content;
-        } else {
-            contentString = '';
-        }
+        const { blocks, metadata } = deserializeFromKmFile(content);
 
-        // 对于 Markdown 文件，解析为 Block[] 并序列化存储
-        let storedContent: string = '';
-        let document: Document | undefined;
+        const document: Document = {
+            id,
+            path,
+            title: metadata.title || fileName,
+            type: 'km',
+            content: blocks,
+            version: 1,
+            createdAt: metadata.createdAt,
+            updatedAt: metadata.updatedAt,
+        };
 
-        if (type === 'markdown') {
-            const blocks = parseMarkdown(contentString);
-            document = {
-                id,
-                path,
-                title,
-                type,
-                content: blocks,
-                version: 1,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            };
-            storedContent = JSON.stringify(blocks);
-        } else if (type === 'km') {
-            // 对于.km 文件，使用专有格式解析
-            const { blocks, metadata } = deserializeFromKmFile(contentString);
-            document = {
-                id,
-                path,
-                title: metadata.title || title,
-                type: 'km',
-                content: blocks,
-                version: 1,
-                createdAt: metadata.createdAt,
-                updatedAt: metadata.updatedAt,
-            };
-            storedContent = contentString; // .km 文件直接存储原始 JSON
-        }
-
-        // 同时返回 Document 对象用于编辑器
         return {
             id,
             path,
-            title: document?.title || title,
-            type,
+            title: document.title,
+            type: 'km',
             isDirty: false,
             openedAt: new Date().toISOString(),
-            content: storedContent,
+            content: JSON.stringify(blocks),
             document,
-        } as OpenDocument;
+        };
+    }
+
+    /**
+     * 解码文件内容为字符串
+     */
+    private decodeContent(content: unknown): string {
+        if (content instanceof Uint8Array) {
+            return new TextDecoder().decode(content);
+        }
+        if (typeof content === 'string') {
+            return content;
+        }
+        return '';
     }
 
     override dispose(): void {
