@@ -100,6 +100,7 @@ class EditorServiceImpl implements EditorService {
     private savedTimer: ReturnType<typeof setTimeout> | null = null;
     private error: string | null = null;
     private isReadonly = false;
+    private suppressDirty = false;
     private currentDocument: Document | null = null;
 
     get isDisposed(): boolean {
@@ -172,7 +173,7 @@ class EditorServiceImpl implements EditorService {
         // 注册 Lexical 更新监听器，内容变化时标记为 dirty
         this.updateListenerCleanup = editor.registerUpdateListener(
             ({ dirtyElements, dirtyLeaves }) => {
-                // 只有在内容实际变化时才标记为 dirty（排除初始化时的触发）
+                if (this.suppressDirty) return;
                 if ((dirtyElements?.size ?? 0) > 0 || (dirtyLeaves?.size ?? 0) > 0) {
                     this.setState({ isDirty: true });
                 }
@@ -201,7 +202,13 @@ class EditorServiceImpl implements EditorService {
 
             // 将文档内容加载到 Lexical 编辑器
             if (this.editor) {
+                this.suppressDirty = true;
                 blocksToLexical(doc.content, this.editor);
+                // 等 Lexical 所有级联更新（如 AutoFocusPlugin）结束后再恢复 dirty 检测
+                // onUpdate 哨兵不够：AutoFocusPlugin 的 focus 更新可能在哨兵之后排队
+                setTimeout(() => {
+                    this.suppressDirty = false;
+                }, 0);
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Failed to load document';

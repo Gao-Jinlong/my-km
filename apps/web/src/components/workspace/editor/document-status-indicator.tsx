@@ -2,13 +2,13 @@
  * DocumentStatusIndicator - 文档状态指示器组件
  *
  * 显示文档的当前状态（只读、编辑未保存、已保存、保存中等）
+ * 所有状态统一从 EditorService 获取
  */
 
 'use client';
 
-import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { useEditorTabs } from '@/platform/editor-tab/use-editor-tabs';
+import { useEditorServiceState } from '@/platform/editor/use-editor-service-state';
 
 interface DocumentStatusIndicatorProps {
     documentId: string;
@@ -77,51 +77,13 @@ function getStatusDisplay(
 }
 
 export function DocumentStatusIndicator({ documentId, className }: DocumentStatusIndicatorProps) {
-    const { openDocuments } = useEditorTabs();
-    const openDoc = openDocuments.find(d => d.id === documentId);
+    const state = useEditorServiceState(documentId);
 
-    // 从标签获取状态
-    const isDirty = openDoc?.isDirty ?? false;
-
-    // 从 EditorService 获取实时状态
-    const [isReadonly, setIsReadonly] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
-    const [isSaved, setIsSaved] = useState(false);
-    const [hasError, setHasError] = useState(false);
-
-    useEffect(() => {
-        const editorService = editorServiceMap.get(documentId);
-
-        if (!editorService) {
-            return;
-        }
-
-        // 订阅状态变化事件
-        const unsubscribe = editorService.onChange(
-            (state: {
-                isReadonly: boolean;
-                isSaving: boolean;
-                isSaved: boolean;
-                hasError: boolean;
-            }) => {
-                setIsReadonly(state.isReadonly);
-                setIsSaving(state.isSaving);
-                setIsSaved(state.isSaved);
-                setHasError(state.hasError);
-            },
-        );
-
-        // 初始同步一次
-        const initialState = editorService.getState();
-        setIsReadonly(initialState.isReadonly);
-        setIsSaving(initialState.isSaving);
-        setIsSaved(initialState.isSaved);
-        setHasError(initialState.hasError);
-
-        return () => {
-            unsubscribe();
-        };
-    }, [documentId]);
+    const isDirty = state?.isDirty ?? false;
+    const isReadonly = state?.isReadonly ?? false;
+    const isSaving = state?.isSaving ?? false;
+    const isSaved = state?.isSaved ?? false;
+    const hasError = state?.hasError ?? false;
 
     const status = getStatusDisplay(isDirty, isReadonly, isSaving, isSaved, hasError);
 
@@ -140,23 +102,4 @@ export function DocumentStatusIndicator({ documentId, className }: DocumentStatu
             <span>{status.text}</span>
         </div>
     );
-}
-
-// 简单的服务实例映射（用于获取 EditorService 状态）
-// biome-ignore lint/suspicious/noExplicitAny: 需要存储不同类型的 EditorService
-const editorServiceMap = new Map<string, any>();
-
-/**
- * 注册 EditorService 实例用于状态监听
- */
-// biome-ignore lint/suspicious/noExplicitAny: 需要接受不同类型的 EditorService
-export function registerEditorService(documentId: string, service: any): void {
-    editorServiceMap.set(documentId, service);
-}
-
-/**
- * 注销 EditorService 实例
- */
-export function unregisterEditorService(documentId: string): void {
-    editorServiceMap.delete(documentId);
 }

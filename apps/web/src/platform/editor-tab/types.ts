@@ -7,7 +7,6 @@ export interface OpenDocument {
     path: string;
     title: string;
     type: 'km';
-    isDirty?: boolean;
     openedAt: string;
     content?: string;
 }

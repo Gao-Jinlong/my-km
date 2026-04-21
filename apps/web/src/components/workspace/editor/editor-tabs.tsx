@@ -6,6 +6,7 @@ import { getFileIconComponent } from '@/lib/file-icon';
 import { cn } from '@/lib/utils';
 import { container } from '@/platform/bootstrap';
 import type { ContextMenuService } from '@/platform/context-menu/service';
+import { useAllEditorServiceStates } from '@/platform/editor/use-editor-service-state';
 import { useEditorTabs } from '@/platform/editor-tab/use-editor-tabs';
 
 /**
@@ -16,6 +17,7 @@ import { useEditorTabs } from '@/platform/editor-tab/use-editor-tabs';
  */
 export function EditorTabs() {
     const { openDocuments, activeDocumentId, activateDocument, closeDocument } = useEditorTabs();
+    const editorStates = useAllEditorServiceStates();
 
     const handleTabClick = useCallback(
         (documentId: string) => {
@@ -140,7 +142,9 @@ export function EditorTabs() {
 
                         <span className="text-[12px]">{tab.title}</span>
 
-                        {tab.isDirty && <span className="h-1.5 w-1.5 rounded-full bg-ws-accent" />}
+                        {(editorStates.get(tab.id)?.isDirty ?? false) && (
+                            <span className="h-1.5 w-1.5 rounded-full bg-ws-accent" />
+                        )}
 
                         <button
                             type="button"

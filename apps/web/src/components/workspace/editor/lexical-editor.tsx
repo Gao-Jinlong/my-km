@@ -21,15 +21,12 @@ import { HeadingNode, QuoteNode } from '@lexical/rich-text';
 import type { EditorThemeClasses } from 'lexical';
 import { useEffect, useRef } from 'react';
 import type { EditorContainer } from '@/features/editor/container/EditorContainer';
-import type { EditorService } from '@/features/editor/service/EditorService';
 import type { Document } from '@/features/editor/types';
 import { cn } from '@/lib/utils';
 import { getContainer } from '@/platform/bootstrap';
 import type { ContextMenuService } from '@/platform/context-menu/service';
 import type { ContextMenuContext } from '@/platform/context-menu/types';
-import type { EditorTabService } from '@/platform/editor-tab/service';
 import { MonitorService } from '@/platform/monitor/service';
-import { registerEditorService, unregisterEditorService } from './document-status-indicator';
 
 /**
  * 惰性获取 logger，避免模块级循环依赖
@@ -101,13 +98,11 @@ const theme: EditorThemeClasses = {
  */
 function EditorBridgePlugin({ documentId, filePath }: { documentId: string; filePath: string }) {
     const [editor] = useLexicalComposerContext();
-    const disposableRef = useRef<ReturnType<EditorService['onChange']> | null>(null);
 
     useEffect(() => {
         // 获取服务实例
         const container = getContainer();
         const editorContainer = container.get('EditorContainer') as EditorContainer;
-        const editorTabService = container.get('EditorTabService') as EditorTabService;
 
         // 复用或创建 EditorService 实例
         let editorService = editorContainer.getService(documentId);
@@ -117,25 +112,10 @@ function EditorBridgePlugin({ documentId, filePath }: { documentId: string; file
 
         // 将 Lexical 实例注入 EditorService
         editorService.setEditor(editor);
-        registerEditorService(documentId, editorService);
 
-        // 订阅 EditorService 状态变化，同步 isDirty 到 EditorTabService
-        disposableRef.current = editorService.onChange(state => {
-            editorTabService.updateDocument(documentId, { isDirty: state.isDirty });
-        });
-
-        // 初始同步一次
-        const initialState = editorService.getState();
-        editorTabService.updateDocument(documentId, { isDirty: initialState.isDirty });
-
-        // 清理时取消订阅，但不销毁 EditorService 实例
-        // EditorService 只在关闭文档时由 FileOpenService 销毁
-        return () => {
-            if (disposableRef.current) {
-                disposableRef.current.dispose();
-            }
-            unregisterEditorService(documentId);
-        };
+        // 不需要在这里订阅 onChange 或同步 isDirty
+        // EditorContainer 已在 createInstance 中订阅 EditorService.onChange
+        // UI 组件通过 useEditorServiceState hook 直接从 EditorContainer 获取状态
     }, [documentId, filePath, editor]);
 
     return null;

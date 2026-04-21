@@ -7,7 +7,8 @@
  * - 编辑器与文件系统的集成
  */
 
-import type { EditorService } from '@/features/editor/service/EditorService';
+import { Emitter } from '@/base/common/event';
+import type { EditorService, EditorState } from '@/features/editor/service/EditorService';
 import { createEditorService } from '@/features/editor/service/EditorService';
 import { ServiceBase } from '@/platform/base/service-base';
 import { Service } from '@/platform/di';
@@ -67,6 +68,12 @@ export class EditorContainer extends ServiceBase {
     /** 编辑器实例映射表 */
     private editors: Map<string, IEditorService> = new Map();
 
+    private readonly _onDidChangeEditorState = new Emitter<{
+        documentId: string;
+        state: EditorState;
+    }>();
+    readonly onDidChangeEditorState = this._onDidChangeEditorState.event;
+
     /**
      * 创建编辑器实例
      *
@@ -89,6 +96,10 @@ export class EditorContainer extends ServiceBase {
         // 创建实际的编辑器实例
         const editorService = createEditorService(documentId, filePath);
         this.editors.set(documentId, editorService);
+
+        editorService.onChange(state => {
+            this._onDidChangeEditorState.fire({ documentId, state });
+        });
 
         return editorService;
     }
@@ -138,6 +149,7 @@ export class EditorContainer extends ServiceBase {
 
     override dispose(): void {
         this.disposeAll();
+        this._onDidChangeEditorState.dispose();
         super.dispose();
     }
 }

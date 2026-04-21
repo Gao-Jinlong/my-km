@@ -197,7 +197,6 @@ export class FileOpenService extends ServiceBase {
             path,
             title: document.title,
             type: 'km',
-            isDirty: false,
             openedAt: new Date().toISOString(),
             content: JSON.stringify(blocks),
             document,
