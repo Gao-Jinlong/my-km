@@ -2,7 +2,7 @@
  * EditorService - 单个编辑器的业务逻辑服务
  */
 
-import type { LexicalEditor } from 'lexical';
+import type { LexicalEditor, Selection as LexicalSelection } from 'lexical';
 import { $getRoot, $getSelection, $isRangeSelection } from 'lexical';
 import { Emitter } from '@/base/common/event';
 import type { IDisposable } from '@/base/common/lifecycle';
@@ -102,6 +102,7 @@ class EditorServiceImpl implements EditorService {
     private isReadonly = false;
     private suppressDirty = false;
     private currentDocument: Document | null = null;
+    private hasChangesDuringSave = false;
 
     get isDisposed(): boolean {
         return this.disposed;
@@ -175,6 +176,10 @@ class EditorServiceImpl implements EditorService {
             ({ dirtyElements, dirtyLeaves }) => {
                 if (this.suppressDirty) return;
                 if ((dirtyElements?.size ?? 0) > 0 || (dirtyLeaves?.size ?? 0) > 0) {
+                    // 如果在保存过程中有变更，记录标志
+                    if (this.isSaving) {
+                        this.hasChangesDuringSave = true;
+                    }
                     this.setState({ isDirty: true });
                 }
             },
@@ -242,6 +247,9 @@ class EditorServiceImpl implements EditorService {
 
             this.setState({ isSaving: true });
 
+            // 重置保存过程中的变更标志
+            this.hasChangesDuringSave = false;
+
             // 从 Lexical 获取当前内容
             const blocks = lexicalToBlocks(this.editor);
 
@@ -270,13 +278,22 @@ class EditorServiceImpl implements EditorService {
             const fileSystem = container.get('FileSystemService') as FileSystemService;
             await fileSystem.writeFile(this.filePath, fileContent);
 
-            this.setState({ isDirty: false, isSaved: true });
+            // 保存完成后，检查是否有新的变更
+            // 如果有，保持 isDirty = true，只清除 isSaving 状态
+            // 如果没有，重置 isDirty = false，设置 isSaved = true
+            if (this.hasChangesDuringSave) {
+                // 保存过程中有新变更，保持 dirty 状态
+                this.setState({ isSaving: false, isSaved: false });
+            } else {
+                // 保存过程中无新变更，成功保存
+                this.setState({ isDirty: false, isSaving: false, isSaved: true });
 
-            // 2 秒后清除"已保存"状态
-            if (this.savedTimer) clearTimeout(this.savedTimer);
-            this.savedTimer = setTimeout(() => {
-                this.setState({ isSaved: false });
-            }, 2000);
+                // 2 秒后清除"已保存"状态
+                if (this.savedTimer) clearTimeout(this.savedTimer);
+                this.savedTimer = setTimeout(() => {
+                    this.setState({ isSaved: false });
+                }, 2000);
+            }
 
             return {
                 success: true,
@@ -284,13 +301,11 @@ class EditorServiceImpl implements EditorService {
             };
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Failed to save document';
-            this.setState({ error: errorMessage });
+            this.setState({ error: errorMessage, isSaving: false });
             return {
                 success: false,
                 error: errorMessage,
             };
-        } finally {
-            this.setState({ isSaving: false });
         }
     }
 
@@ -301,10 +316,10 @@ class EditorServiceImpl implements EditorService {
             return null;
         }
 
-        let lexicalSelection: any = null;
+        let lexicalSelection: LexicalSelection | null = null;
         this.editor.getEditorState().read(() => {
             // TODO: 使用 @lexical/selection 获取选区
-            lexicalSelection = null;
+            lexicalSelection = $getSelection();
         });
 
         if (!lexicalSelection) {

@@ -5,6 +5,7 @@
  */
 
 import { $createCodeNode, $isCodeNode, type CodeNode } from '@lexical/code';
+import { $createLinkNode, $isLinkNode, type LinkNode } from '@lexical/link';
 import {
     $createListItemNode,
     $createListNode,
@@ -21,6 +22,14 @@ import {
     type HeadingNode,
     type QuoteNode,
 } from '@lexical/rich-text';
+import {
+    $createTableCellNode,
+    $createTableNode,
+    $isTableCellNode,
+    $isTableNode,
+    type TableCellNode,
+    type TableNode,
+} from '@lexical/table';
 import type { LexicalEditor } from 'lexical';
 import {
     $createParagraphNode,
@@ -34,17 +43,20 @@ import { nanoid } from 'nanoid';
 import type {
     Block,
     CodeBlock,
+    FormulaBlock,
     HeadingBlock,
+    ImageBlock,
     Inline,
     ListBlock,
     ParagraphBlock,
     QuoteBlock,
+    TableBlock,
 } from '../types/block';
 
 /**
- * 将 Inline[] 转换为带格式的 TextNode
+ * 将 Inline[] 转换为带格式的 TextNode，如果有 link 则包裹 LinkNode
  */
-function inlineToTextNode(inline: Inline): TextNode {
+function inlineToTextNode(inline: Inline): TextNode | LinkNode {
     const textNode = $createTextNode(inline.text);
 
     if (inline.bold) textNode.toggleFormat('bold');
@@ -56,11 +68,21 @@ function inlineToTextNode(inline: Inline): TextNode {
     if (inline.subscript) textNode.toggleFormat('subscript');
     if (inline.superscript) textNode.toggleFormat('superscript');
 
+    // 如果有链接，包裹 LinkNode
+    if (inline.link) {
+        const linkNode = $createLinkNode(inline.link.url);
+        if (inline.link.title) {
+            linkNode.setTitle(inline.link.title);
+        }
+        linkNode.append(textNode);
+        return linkNode;
+    }
+
     return textNode;
 }
 
 /**
- * 将 TextNode 转换为 Inline
+ * 将 TextNode 转换为 Inline，如果父节点是 LinkNode 则提取链接信息
  */
 function textNodeToInline(textNode: TextNode): Inline {
     const inline: Inline = { text: textNode.getTextContent() };
@@ -75,10 +97,13 @@ function textNodeToInline(textNode: TextNode): Inline {
     if (format & 64) inline.superscript = true; // IS_SUPERSCRIPT
     if (format & 128) inline.highlight = true; // IS_HIGHLIGHT
 
-    // TODO: 处理链接
+    // 提取链接信息
     const linkNode = textNode.getParent();
-    if (linkNode && linkNode.getType() === 'link') {
-        // TODO: 提取链接信息
+    if (linkNode && $isLinkNode(linkNode)) {
+        inline.link = {
+            url: linkNode.getURL(),
+            title: linkNode.getTitle() || undefined,
+        };
     }
 
     return inline;
@@ -153,6 +178,60 @@ function blockToLexical(block: Block, _editor: LexicalEditor): any[] {
                 codeNode.append($createTextNode(line));
             });
             nodes.push(codeNode);
+            break;
+        }
+
+        case 'table': {
+            const { rows, cols, cells } = block.content;
+            const tableNode = $createTableNode();
+
+            for (let rowIndex = 0; rowIndex < rows; rowIndex++) {
+                const rowNode = $createTableRowNode();
+                for (let colIndex = 0; colIndex < cols; colIndex++) {
+                    const cell = cells.find(c => c.row === rowIndex && c.col === colIndex);
+                    const cellNode = $createTableCellNode(0); // 0 = data cell, 1 = header cell
+                    if (cell?.content) {
+                        const paragraph = $createParagraphNode();
+                        paragraph.append($createTextNode(cell.content));
+                        cellNode.append(paragraph);
+                    }
+                    rowNode.append(cellNode);
+                }
+                tableNode.append(rowNode);
+            }
+
+            nodes.push(tableNode);
+            break;
+        }
+
+        case 'image': {
+            const { src, alt, caption } = block.content;
+            // 使用段落节点包裹图片信息，caption 作为后续文本
+            const containerNode = $createParagraphNode();
+            // 创建一个特殊标记的文本节点来存储图片信息
+            const imageMarker = $createTextNode(`![${alt}](${src})`);
+            imageMarker.toggleFormat('code');
+            containerNode.append(imageMarker);
+
+            // 如果有 caption，添加到单独的段落
+            if (caption) {
+                const captionNode = $createParagraphNode();
+                captionNode.append($createTextNode(caption));
+                nodes.push(captionNode);
+            }
+
+            nodes.push(containerNode);
+            break;
+        }
+
+        case 'formula': {
+            const { latex } = block.content;
+            // 使用 code 格式标记公式 LaTeX 内容
+            const formulaNode = $createParagraphNode();
+            const formulaMarker = $createTextNode(`$$${latex}$$`);
+            formulaMarker.toggleFormat('code');
+            formulaNode.append(formulaMarker);
+            nodes.push(formulaNode);
             break;
         }
 
@@ -264,6 +343,90 @@ function lexicalNodeToBlock(node: any): Block | null {
             type: 'code',
             content: { code, language },
         } as CodeBlock;
+    }
+
+    if ($isTableNode(node)) {
+        const tableNode = node as TableNode;
+        const rows = tableNode.getChildren().filter($isTableRowNode);
+        const rowCount = rows.length;
+        const colCount = rowCount > 0 ? rows[0].getChildren().filter($isTableCellNode).length : 0;
+        const cells: { row: number; col: number; content: string }[] = [];
+
+        rows.forEach((rowNode, rowIndex) => {
+            rowNode
+                .getChildren()
+                .filter($isTableCellNode)
+                .forEach((cellNode, colIndex) => {
+                    const cellNodeTyped = cellNode as TableCellNode;
+                    const content = cellNodeTyped.getTextContent();
+                    cells.push({
+                        row: rowIndex,
+                        col: colIndex,
+                        content: content,
+                    });
+                });
+        });
+
+        return {
+            id: nanoid(),
+            type: 'table',
+            content: {
+                rows: rowCount,
+                cols: colCount,
+                cells: cells,
+            },
+        } as TableBlock;
+    }
+
+    // 检测图片节点（使用 Markdown 格式的 code 标记文本）
+    const imageMatch = node.getTextContent?.().match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (imageMatch && node.getChildren().length === 1) {
+        const firstChild = node.getFirstChild();
+        if ($isTextNode(firstChild)) {
+            const format = firstChild.getFormat();
+            // 检查是否有 code 格式标记（我们在 blocksToLexical 中设置的）
+            if (format & 16) {
+                // IS_CODE
+                const alt = imageMatch[1];
+                const src = imageMatch[2];
+                // 检查下一个兄弟节点是否为 caption
+                let caption: string | undefined;
+                const nextSibling = node.getNextSibling();
+                if (nextSibling && $isParagraphNode(nextSibling)) {
+                    const nextContent = nextSibling.getTextContent();
+                    // 如果下一个段落只包含简单文本，可能是 caption
+                    if (nextContent && !nextContent.startsWith('![')) {
+                        caption = nextContent;
+                    }
+                }
+                return {
+                    id: nanoid(),
+                    type: 'image',
+                    content: { src, alt, caption },
+                } as ImageBlock;
+            }
+        }
+    }
+
+    // 检测公式节点（$$...$$ 格式）
+    const formulaMatch = node.getTextContent?.().match(/^\$\$(.+)\$\$$/);
+    if (formulaMatch && node.getChildren().length === 1) {
+        const firstChild = node.getFirstChild();
+        if ($isTextNode(firstChild)) {
+            const format = firstChild.getFormat();
+            if (format & 16) {
+                // IS_CODE
+                const latex = formulaMatch[1];
+                return {
+                    id: nanoid(),
+                    type: 'formula',
+                    content: {
+                        latex,
+                        displayMode: true, // 默认都是 display mode
+                    },
+                } as FormulaBlock;
+            }
+        }
     }
 
     // 未知节点类型

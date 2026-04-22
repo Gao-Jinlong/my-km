@@ -9,7 +9,6 @@
 import { CodeNode } from '@lexical/code';
 import { LinkNode } from '@lexical/link';
 import { ListItemNode, ListNode } from '@lexical/list';
-import { AutoFocusPlugin } from '@lexical/react/LexicalAutoFocusPlugin';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
@@ -19,13 +18,15 @@ import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { TabIndentationPlugin } from '@lexical/react/LexicalTabIndentationPlugin';
 import { HeadingNode, QuoteNode } from '@lexical/rich-text';
 import type { EditorThemeClasses } from 'lexical';
+import { $getRoot } from 'lexical';
 import { useEffect, useRef } from 'react';
-import type { EditorContainer } from '@/features/editor/container/EditorContainer';
+import { EditorContainer } from '@/features/editor/container/EditorContainer';
 import type { Document } from '@/features/editor/types';
 import { cn } from '@/lib/utils';
 import { getContainer } from '@/platform/bootstrap';
-import type { ContextMenuService } from '@/platform/context-menu/service';
+import { ContextMenuService } from '@/platform/context-menu/service';
 import type { ContextMenuContext } from '@/platform/context-menu/types';
+import { EditorTabService } from '@/platform/editor-tab/service';
 import { MonitorService } from '@/platform/monitor/service';
 
 /**
@@ -102,7 +103,7 @@ function EditorBridgePlugin({ documentId, filePath }: { documentId: string; file
     useEffect(() => {
         // 获取服务实例
         const container = getContainer();
-        const editorContainer = container.get('EditorContainer') as EditorContainer;
+        const editorContainer = container.get(EditorContainer);
 
         // 复用或创建 EditorService 实例
         let editorService = editorContainer.getService(documentId);
@@ -135,18 +136,71 @@ function EditorContentPlugin({
     documentId: string;
 }) {
     const loadedRef = useRef(false);
+    const [editor] = useLexicalComposerContext();
 
     useEffect(() => {
         if (!doc || loadedRef.current) return;
 
         const container = getContainer();
-        const editorContainer = container.get('EditorContainer') as EditorContainer;
+        const editorContainer = container.get(EditorContainer);
         const editorService = editorContainer.getService(documentId);
         if (editorService) {
             loadedRef.current = true;
             editorService.loadDocument(doc);
         }
     }, [doc, documentId]);
+
+    // 内容加载后自动聚焦到编辑器末尾
+    useEffect(() => {
+        if (!loadedRef.current || !editor) return;
+
+        // 等待内容加载完成后聚焦
+        setTimeout(() => {
+            editor.focus(() => {
+                // 聚焦完成后将光标移动到末尾
+                editor.update(() => {
+                    const root = $getRoot();
+                    const lastNode = root.getLastDescendant();
+                    if (lastNode) {
+                        lastNode.selectEnd();
+                    } else {
+                        // 空文档时聚焦到根节点
+                        root.selectEnd();
+                    }
+                });
+            });
+        }, 0);
+    }, [editor]);
+
+    // 监听文档激活事件，切换 tab 时让编辑器获得焦点
+    useEffect(() => {
+        const container = getContainer();
+        const editorTabService = container.get(EditorTabService);
+
+        if (!editorTabService) return;
+
+        const unsubscribe = editorTabService.onDidChangeActive((activeId: string | null) => {
+            // 只有当前文档被激活时才聚焦
+            if (activeId === documentId && editor) {
+                editor.focus(() => {
+                    // 聚焦完成后将光标移动到末尾
+                    editor.update(() => {
+                        const root = $getRoot();
+                        const lastNode = root.getLastDescendant();
+                        if (lastNode) {
+                            lastNode.selectEnd();
+                        } else {
+                            root.selectEnd();
+                        }
+                    });
+                });
+            }
+        });
+
+        return () => {
+            unsubscribe.dispose();
+        };
+    }, [documentId, editor]);
 
     return null;
 }
@@ -187,7 +241,7 @@ function LexicalEditorImpl({
 
     // 注册编辑器右键菜单提供者
     useEffect(() => {
-        const contextMenuService = getContainer().get('ContextMenuService') as ContextMenuService;
+        const contextMenuService = getContainer().get(ContextMenuService);
         contextMenuServiceRef.current = contextMenuService;
 
         const dispose = contextMenuService.registerProvider(
@@ -247,9 +301,8 @@ function LexicalEditorImpl({
                                     className="prose prose-ws min-h-125 max-w-none outline-none"
                                     onContextMenu={e => {
                                         // 触发编辑器右键菜单
-                                        const contextMenuService = getContainer().get(
-                                            'ContextMenuService',
-                                        ) as ContextMenuService;
+                                        const contextMenuService =
+                                            getContainer().get(ContextMenuService);
                                         contextMenuService.show(e, {
                                             target: e.currentTarget,
                                             data: {
@@ -272,7 +325,6 @@ function LexicalEditorImpl({
                         <HistoryPlugin />
                         <ListPlugin />
                         <TabIndentationPlugin />
-                        <AutoFocusPlugin />
                     </div>
                 </div>
             </div>
