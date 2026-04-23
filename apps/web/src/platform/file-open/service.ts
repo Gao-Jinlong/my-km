@@ -18,9 +18,11 @@ import type { Document } from '@/features/editor/types';
 import { ServiceBase } from '@/platform/base/service-base';
 import { container } from '@/platform/bootstrap';
 import { Service } from '@/platform/di';
+import { DocumentStore } from '@/platform/document-store/service';
+import type { DocumentMetadata } from '@/platform/document-store/types';
 import { EditorContainer } from '@/platform/editor/container';
 import { EditorTabService } from '@/platform/editor-tab/service';
-import type { OpenDocument } from '@/platform/editor-tab/types';
+import type { TabInfo } from '@/platform/editor-tab/types';
 import { FileSystemService } from '@/platform/file-system/service';
 import type { Logger } from '@/platform/monitor';
 import { MonitorService } from '@/platform/monitor/service';
@@ -33,7 +35,9 @@ export class FileOpenService extends ServiceBase {
     private _fileService?: FileSystemService;
     private _editorContainer?: EditorContainer;
     private _editorTabService?: EditorTabService;
+    private _documentStore?: DocumentStore;
     private _logger?: Logger;
+    private _closeListenerDisposable?: { dispose(): void };
 
     private get fileService(): FileSystemService {
         if (!this._fileService) {
@@ -56,11 +60,27 @@ export class FileOpenService extends ServiceBase {
         return this._editorTabService;
     }
 
+    private get documentStore(): DocumentStore {
+        if (!this._documentStore) {
+            this._documentStore = container.get(DocumentStore);
+        }
+        return this._documentStore;
+    }
+
     protected get logger(): Logger {
         if (!this._logger) {
             this._logger = container.get(MonitorService).getLogger('file-open');
         }
         return this._logger;
+    }
+
+    constructor() {
+        super();
+        // 监听 tab 关闭事件，清理 DocumentStore 和 EditorContainer
+        this._closeListenerDisposable = this.editorTabService.onDidCloseDocument(id => {
+            this.documentStore.remove(id);
+            this.editorContainer.disposeInstance(id);
+        });
     }
 
     /**
@@ -87,15 +107,56 @@ export class FileOpenService extends ServiceBase {
                 return;
             }
 
+            const id = `file:${path}`;
+
+            // 如果已打开，仅激活
+            if (this.editorTabService.getActiveDocumentId() === id) {
+                return;
+            }
+            if (this.editorTabService.getOpenDocuments().some(d => d.id === id)) {
+                this.editorTabService.activateDocument(id);
+                return;
+            }
+
             // 读取文件内容
             const content = await this.fileService.readFile(path);
             const contentString = this.decodeContent(content);
 
-            // 创建文档对象
-            const document = this.createDocument(path, contentString);
+            // 解析文档
+            const { blocks, metadata } = deserializeFromKmFile(contentString);
+            const fileName = path.split('/').pop() || '未命名文档';
+            const title = metadata.title || fileName;
 
-            // 打开文档标签
-            this.editorTabService.openDocument(document);
+            // 1. 写 tab 信息（纯 tab 身份）
+            const tabInfo: TabInfo = {
+                id,
+                title,
+                openedAt: new Date().toISOString(),
+            };
+            this.editorTabService.openDocument(tabInfo);
+
+            // 2. 写文档元数据（path, type, title）
+            const docMeta: DocumentMetadata = {
+                id,
+                path,
+                type: 'km',
+                title,
+            };
+            this.documentStore.put(id, docMeta);
+
+            // 3. 创建 EditorService 并加载内容
+            const editorService = this.editorContainer.createInstance(id, path);
+            const document: Document = {
+                id,
+                path,
+                title,
+                type: 'km',
+                content: blocks,
+                version: 1,
+                createdAt: metadata.createdAt,
+                updatedAt: metadata.updatedAt,
+            };
+            editorService.loadDocument(document);
 
             this.logger.info(`Opened file: ${path}`);
         } catch (error) {
@@ -121,12 +182,10 @@ export class FileOpenService extends ServiceBase {
      * 关闭文件
      */
     closeFile(path: string): void {
-        const openDocuments = this.editorTabService.getOpenDocuments();
-        const openDoc = openDocuments.find(doc => doc.path === path);
-
-        if (openDoc) {
-            this.editorContainer.disposeInstance(openDoc.id);
-            this.editorTabService.closeDocument(openDoc.id);
+        const docMeta = this.documentStore.getByPath(path);
+        if (docMeta) {
+            // 关闭 tab，事件监听器会自动清理 DocumentStore 和 EditorContainer
+            this.editorTabService.closeDocument(docMeta.id);
             this.logger.info(`Closed file: ${path}`);
         }
     }
@@ -135,8 +194,12 @@ export class FileOpenService extends ServiceBase {
      * 关闭所有文件
      */
     closeAll(): void {
-        this.editorContainer.disposeAll();
         this.editorTabService.closeAllDocuments();
+        // 事件监听器会逐个触发清理，但批量操作更高效
+        this.editorContainer.disposeAll();
+        for (const d of this.documentStore.getAll()) {
+            this.documentStore.remove(d.id);
+        }
         this.logger.info('Closed all files');
     }
 
@@ -173,37 +236,6 @@ export class FileOpenService extends ServiceBase {
     }
 
     /**
-     * 创建文档对象（仅处理 .km 格式）
-     */
-    private createDocument(path: string, content: string): OpenDocument {
-        const id = `file:${path}`;
-        const fileName = path.split('/').pop() || '未命名文档';
-
-        const { blocks, metadata } = deserializeFromKmFile(content);
-
-        const document: Document = {
-            id,
-            path,
-            title: metadata.title || fileName,
-            type: 'km',
-            content: blocks,
-            version: 1,
-            createdAt: metadata.createdAt,
-            updatedAt: metadata.updatedAt,
-        };
-
-        return {
-            id,
-            path,
-            title: document.title,
-            type: 'km',
-            openedAt: new Date().toISOString(),
-            content: JSON.stringify(blocks),
-            document,
-        };
-    }
-
-    /**
      * 解码文件内容为字符串
      */
     private decodeContent(content: unknown): string {
@@ -217,6 +249,7 @@ export class FileOpenService extends ServiceBase {
     }
 
     override dispose(): void {
+        this._closeListenerDisposable?.dispose();
         this.closeAll();
         super.dispose();
     }

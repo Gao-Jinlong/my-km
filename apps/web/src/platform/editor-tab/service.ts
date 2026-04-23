@@ -7,7 +7,7 @@
 import { Emitter } from '@/base/common/event';
 import { ServiceBase } from '@/platform/base/service-base';
 import { Service } from '@/platform/di';
-import type { OpenDocument } from './types';
+import type { TabInfo } from './types';
 
 /**
  * 编辑器标签页服务
@@ -34,11 +34,11 @@ import type { OpenDocument } from './types';
  */
 @Service({ singleton: true })
 export class EditorTabService extends ServiceBase {
-    private _openDocuments: OpenDocument[] = [];
+    private _openTabs: TabInfo[] = [];
     private _activeDocumentId: string | null = null;
 
     // 事件发射器
-    private readonly _onDidOpenDocument = new Emitter<OpenDocument>();
+    private readonly _onDidOpenDocument = new Emitter<TabInfo>();
     private readonly _onDidCloseDocument = new Emitter<string>();
     private readonly _onDidChangeActive = new Emitter<string | null>();
     private readonly _onDidChangeDocuments = new Emitter<void>();
@@ -61,21 +61,21 @@ export class EditorTabService extends ServiceBase {
      * 如果文档已存在于列表中，则直接激活它；
      * 否则将其添加到列表并激活。
      */
-    openDocument(doc: OpenDocument): void {
-        const existing = this._openDocuments.find(d => d.id === doc.id);
+    openDocument(tab: TabInfo): void {
+        const existing = this._openTabs.find(d => d.id === tab.id);
 
         if (existing) {
             // 文档已打开，仅激活
-            this._activeDocumentId = doc.id;
+            this._activeDocumentId = tab.id;
             this._onDidChangeActive.fire(this._activeDocumentId);
             this._onDidChangeDocuments.fire();
             return;
         }
 
         // 添加新文档并激活
-        this._openDocuments.push(doc);
-        this._activeDocumentId = doc.id;
-        this._onDidOpenDocument.fire(doc);
+        this._openTabs.push(tab);
+        this._activeDocumentId = tab.id;
+        this._onDidOpenDocument.fire(tab);
         this._onDidChangeActive.fire(this._activeDocumentId);
         this._onDidChangeDocuments.fire();
     }
@@ -89,23 +89,23 @@ export class EditorTabService extends ServiceBase {
      * 注意：允许关闭最后一个文档（activeDocumentId 变为 null）。
      */
     closeDocument(id: string): void {
-        const index = this._openDocuments.findIndex(d => d.id === id);
+        const index = this._openTabs.findIndex(d => d.id === id);
         if (index === -1) {
             return;
         }
 
         const wasActive = this._activeDocumentId === id;
-        this._openDocuments.splice(index, 1);
+        this._openTabs.splice(index, 1);
 
         this._onDidCloseDocument.fire(id);
 
         if (wasActive) {
             // 自动激活相邻文档
-            if (this._openDocuments.length === 0) {
+            if (this._openTabs.length === 0) {
                 this._activeDocumentId = null;
             } else {
-                const nextIndex = Math.min(index, this._openDocuments.length - 1);
-                this._activeDocumentId = this._openDocuments[nextIndex].id;
+                const nextIndex = Math.min(index, this._openTabs.length - 1);
+                this._activeDocumentId = this._openTabs[nextIndex].id;
             }
             this._onDidChangeActive.fire(this._activeDocumentId);
         }
@@ -129,8 +129,8 @@ export class EditorTabService extends ServiceBase {
     /**
      * 更新文档属性
      */
-    updateDocument(id: string, updates: Partial<OpenDocument>): void {
-        const doc = this._openDocuments.find(d => d.id === id);
+    updateDocument(id: string, updates: Partial<TabInfo>): void {
+        const doc = this._openTabs.find(d => d.id === id);
         if (!doc) {
             return;
         }
@@ -143,13 +143,13 @@ export class EditorTabService extends ServiceBase {
      * 关闭除指定文档外的所有文档
      */
     closeOtherDocuments(keepId: string): void {
-        const toClose = this._openDocuments.filter(d => d.id !== keepId);
+        const toClose = this._openTabs.filter(d => d.id !== keepId);
 
         if (toClose.length === 0) {
             return;
         }
 
-        this._openDocuments = this._openDocuments.filter(d => d.id === keepId);
+        this._openTabs = this._openTabs.filter(d => d.id === keepId);
 
         // 为每个关闭的文档触发事件
         for (const doc of toClose) {
@@ -166,12 +166,12 @@ export class EditorTabService extends ServiceBase {
      * 关闭所有文档
      */
     closeAllDocuments(): void {
-        if (this._openDocuments.length === 0) {
+        if (this._openTabs.length === 0) {
             return;
         }
 
-        const closedIds = this._openDocuments.map(d => d.id);
-        this._openDocuments = [];
+        const closedIds = this._openTabs.map(d => d.id);
+        this._openTabs = [];
         this._activeDocumentId = null;
 
         for (const id of closedIds) {
@@ -185,8 +185,8 @@ export class EditorTabService extends ServiceBase {
     /**
      * 获取所有打开的文档（返回副本）
      */
-    getOpenDocuments(): OpenDocument[] {
-        return [...this._openDocuments];
+    getOpenDocuments(): TabInfo[] {
+        return [...this._openTabs];
     }
 
     /**
@@ -199,15 +199,15 @@ export class EditorTabService extends ServiceBase {
     /**
      * 获取当前激活的文档
      */
-    getActiveDocument(): OpenDocument | undefined {
+    getActiveDocument(): TabInfo | undefined {
         if (this._activeDocumentId === null) {
             return undefined;
         }
-        return this._openDocuments.find(d => d.id === this._activeDocumentId);
+        return this._openTabs.find(d => d.id === this._activeDocumentId);
     }
 
     override dispose(): void {
-        this._openDocuments = [];
+        this._openTabs = [];
         this._activeDocumentId = null;
         this._onDidOpenDocument.dispose();
         this._onDidCloseDocument.dispose();

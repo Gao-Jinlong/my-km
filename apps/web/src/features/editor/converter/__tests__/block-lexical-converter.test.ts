@@ -1,303 +1,323 @@
 /**
  * Block ↔ Lexical Round-Trip 测试
  *
- * 验证 blocksToLexical + lexicalToBlocks 双向转换的数据一致性
- *
- * 注意：由于 Lexical 节点创建需要在真实编辑器上下文中运行，
- * 本测试主要验证数据结构的正确性和转换逻辑的完整性。
+ * 验证 blocksToLexical + lexicalToBlocks 双向转换的数据一致性。
+ * 使用 createHeadlessEditor 在无 DOM 环境下运行。
  */
 
+import { CodeNode } from '@lexical/code';
+import { createHeadlessEditor } from '@lexical/headless';
+import { LinkNode } from '@lexical/link';
+import { ListItemNode, ListNode } from '@lexical/list';
+import { HeadingNode, QuoteNode } from '@lexical/rich-text';
+import { TableCellNode, TableNode, TableRowNode } from '@lexical/table';
+import type { LexicalEditor } from 'lexical';
 import { describe, expect, it } from 'vitest';
 import type {
+    Block,
     CodeBlock,
-    FormulaBlock,
     HeadingBlock,
-    ImageBlock,
     ListBlock,
     ParagraphBlock,
     QuoteBlock,
     TableBlock,
-} from '../types/block';
+} from '../../types';
+import { blocksToLexical, lexicalToBlocks } from '../block-lexical-converter';
 
 /**
- * 数据结构完整性测试
- * 验证 Block 数据模型的定义是否正确
+ * 创建用于测试的 headless 编辑器
  */
-describe('block-lexical-converter data structures', () => {
-    describe('Inline 格式标志', () => {
-        it('应该支持所有行内格式标志', () => {
-            const fullInline: Inline = {
-                text: 'Test',
-                bold: true,
-                italic: true,
-                underline: true,
-                strikethrough: true,
-                code: true,
-                highlight: true,
-                subscript: true,
-                superscript: true,
-                link: { url: 'https://example.com', title: 'Example' },
-            };
-
-            expect(fullInline.bold).toBe(true);
-            expect(fullInline.italic).toBe(true);
-            expect(fullInline.underline).toBe(true);
-            expect(fullInline.strikethrough).toBe(true);
-            expect(fullInline.code).toBe(true);
-            expect(fullInline.highlight).toBe(true);
-            expect(fullInline.subscript).toBe(true);
-            expect(fullInline.superscript).toBe(true);
-            expect(fullInline.link?.url).toBe('https://example.com');
-        });
+function createTestEditor(): LexicalEditor {
+    return createHeadlessEditor({
+        nodes: [
+            ListNode,
+            ListItemNode,
+            HeadingNode,
+            QuoteNode,
+            CodeNode,
+            LinkNode,
+            TableNode,
+            TableRowNode,
+            TableCellNode,
+        ],
+        onError: error => {
+            throw error;
+        },
     });
+}
 
-    describe('paragraph 块', () => {
-        it('应该正确定义 paragraph 块结构', () => {
-            const block: ParagraphBlock = {
-                id: 'block-1',
-                type: 'paragraph',
-                content: {
-                    inline: [
-                        { text: 'Hello' },
-                        { text: ' ', bold: true },
-                        { text: 'World', italic: true },
-                    ],
-                },
-            };
+/**
+ * Round-trip 测试：blocksToLexical → lexicalToBlocks
+ *
+ * blocksToLexical 内部通过 editor.update() 写入节点，
+ * update 完成后需要等一个微任务让 Lexical 提交状态，
+ * 然后 lexicalToBlocks 才能读到正确的节点树。
+ */
+async function roundTrip(blocks: Block[]): Promise<Block[]> {
+    const editor = createTestEditor();
+    blocksToLexical(blocks, editor);
+    // 等待 Lexical 的 update listener 执行完毕并提交新状态
+    await new Promise(resolve => setTimeout(resolve, 0));
+    return lexicalToBlocks(editor);
+}
 
-            expect(block.type).toBe('paragraph');
-            expect(block.content.inline).toHaveLength(3);
+describe('block-lexical-converter round-trip', () => {
+    describe('paragraph', () => {
+        it('应该 round-trip 简单段落', async () => {
+            const blocks: Block[] = [
+                {
+                    id: 'p1',
+                    type: 'paragraph',
+                    content: { inline: [{ text: 'Hello World' }] },
+                } as ParagraphBlock,
+            ];
+
+            const result = await roundTrip(blocks);
+            expect(result).toHaveLength(1);
+            expect(result[0].type).toBe('paragraph');
+            expect(result[0].content.inline[0].text).toBe('Hello World');
         });
-    });
 
-    describe('heading 块', () => {
-        it('应该支持 H1-H6 所有级别', () => {
-            const headings = [1, 2, 3, 4, 5, 6] as const;
-
-            headings.forEach(level => {
-                const block: HeadingBlock = {
-                    id: `heading-${level}`,
-                    type: 'heading',
+        it('应该 round-trip 带格式的段落', async () => {
+            const blocks: Block[] = [
+                {
+                    id: 'p1',
+                    type: 'paragraph',
                     content: {
-                        level,
-                        inline: [{ text: `Heading ${level}` }],
-                    },
-                };
-
-                expect(block.type).toBe('heading');
-                expect(block.content.level).toBe(level);
-            });
-        });
-    });
-
-    describe('list 块', () => {
-        it('应该支持 bullet, number, check 三种列表类型', () => {
-            const listTypes = ['bullet', 'number', 'check'] as const;
-
-            listTypes.forEach(listType => {
-                const block: ListBlock = {
-                    id: `list-${listType}`,
-                    type: 'list',
-                    content: {
-                        listType,
-                        items: [
-                            {
-                                id: 'item-1',
-                                inline: [{ text: 'Item 1' }],
-                                checked: listType === 'check',
-                            },
+                        inline: [
+                            { text: 'Normal ' },
+                            { text: 'Bold', bold: true },
+                            { text: ' Italic', italic: true },
+                            { text: ' Code', code: true },
                         ],
                     },
-                };
+                } as ParagraphBlock,
+            ];
 
-                expect(block.type).toBe('list');
-                expect(block.content.listType).toBe(listType);
-            });
+            const result = await roundTrip(blocks);
+            expect(result).toHaveLength(1);
+            expect(result[0].content.inline).toHaveLength(4);
+            expect(result[0].content.inline[0].text).toBe('Normal ');
+            expect(result[0].content.inline[1].bold).toBe(true);
+            expect(result[0].content.inline[2].italic).toBe(true);
+            expect(result[0].content.inline[3].code).toBe(true);
         });
 
-        it('应该支持列表项的 checked 状态', () => {
-            const block: ListBlock = {
-                id: 'checklist-1',
-                type: 'list',
-                content: {
-                    listType: 'check',
-                    items: [
-                        { id: 'item-1', inline: [{ text: 'Done' }], checked: true },
-                        { id: 'item-2', inline: [{ text: 'Todo' }], checked: false },
-                    ],
-                },
-            };
+        it('应该 round-trip 空段落', async () => {
+            const blocks: Block[] = [
+                {
+                    id: 'p1',
+                    type: 'paragraph',
+                    content: { inline: [] },
+                } as ParagraphBlock,
+            ];
 
-            expect(block.content.items[0].checked).toBe(true);
-            expect(block.content.items[1].checked).toBe(false);
-        });
-    });
-
-    describe('quote 块', () => {
-        it('应该正确定义 quote 块结构', () => {
-            const block: QuoteBlock = {
-                id: 'quote-1',
-                type: 'quote',
-                content: {
-                    inline: [{ text: 'This is a quote' }],
-                    cite: 'Author Name',
-                },
-            };
-
-            expect(block.type).toBe('quote');
-            expect(block.content.inline).toBeDefined();
+            const result = await roundTrip(blocks);
+            expect(result).toHaveLength(1);
+            expect(result[0].type).toBe('paragraph');
         });
     });
 
-    describe('code 块', () => {
-        it('应该支持多行代码和语言标识', () => {
-            const block: CodeBlock = {
-                id: 'code-1',
-                type: 'code',
-                content: {
-                    language: 'typescript',
-                    code: 'const x = 10;\nconsole.log(x);\nreturn x;',
-                },
-            };
+    describe('heading', () => {
+        it('应该 round-trip H1-H6', async () => {
+            const levels = [1, 2, 3, 4, 5, 6] as const;
 
-            expect(block.type).toBe('code');
-            expect(block.content.language).toBe('typescript');
-            expect(block.content.code).toContain('\n');
+            for (const level of levels) {
+                const blocks: Block[] = [
+                    {
+                        id: `h-${level}`,
+                        type: 'heading',
+                        content: { level, inline: [{ text: `Heading ${level}` }] },
+                    } as HeadingBlock,
+                ];
+
+                const result = await roundTrip(blocks);
+                expect(result).toHaveLength(1);
+                expect(result[0].type).toBe('heading');
+                expect((result[0].content as HeadingBlock['content']).level).toBe(level);
+            }
         });
     });
 
-    describe('table 块', () => {
-        it('应该正确定义表格结构', () => {
-            const block: TableBlock = {
-                id: 'table-1',
-                type: 'table',
-                content: {
-                    rows: 3,
-                    cols: 3,
-                    cells: [
-                        { row: 0, col: 0, content: 'A1' },
-                        { row: 0, col: 1, content: 'A2' },
-                        { row: 1, col: 0, content: 'B1' },
-                        { row: 2, col: 2, content: 'C3' },
-                    ],
-                },
-            };
+    describe('list', () => {
+        it('应该 round-trip 有序列表', async () => {
+            const blocks: Block[] = [
+                {
+                    id: 'list-1',
+                    type: 'list',
+                    content: {
+                        listType: 'number',
+                        items: [
+                            { id: 'i1', inline: [{ text: 'First' }] },
+                            { id: 'i2', inline: [{ text: 'Second' }] },
+                        ],
+                    },
+                } as ListBlock,
+            ];
 
-            expect(block.type).toBe('table');
-            expect(block.content.rows).toBe(3);
-            expect(block.content.cols).toBe(3);
-            expect(block.content.cells).toHaveLength(4);
-            expect(block.content.cells[0]).toEqual({ row: 0, col: 0, content: 'A1' });
+            const result = await roundTrip(blocks);
+            expect(result).toHaveLength(1);
+            expect(result[0].type).toBe('list');
+            expect((result[0].content as ListBlock['content']).listType).toBe('number');
+            expect((result[0].content as ListBlock['content']).items).toHaveLength(2);
+        });
+
+        it('应该 round-trip 无序列表', async () => {
+            const blocks: Block[] = [
+                {
+                    id: 'list-1',
+                    type: 'list',
+                    content: {
+                        listType: 'bullet',
+                        items: [
+                            { id: 'i1', inline: [{ text: 'Item A' }] },
+                            { id: 'i2', inline: [{ text: 'Item B' }] },
+                        ],
+                    },
+                } as ListBlock,
+            ];
+
+            const result = await roundTrip(blocks);
+            expect(result).toHaveLength(1);
+            expect((result[0].content as ListBlock['content']).listType).toBe('bullet');
         });
     });
 
-    describe('image 块', () => {
-        it('应该正确定义图片结构', () => {
-            const block: ImageBlock = {
-                id: 'image-1',
-                type: 'image',
-                content: {
-                    src: 'https://example.com/image.png',
-                    alt: 'Description',
-                    caption: 'This is a caption',
-                },
-            };
+    describe('quote', () => {
+        it('应该 round-trip 引用块', async () => {
+            const blocks: Block[] = [
+                {
+                    id: 'q1',
+                    type: 'quote',
+                    content: { inline: [{ text: 'This is a quote' }] },
+                } as QuoteBlock,
+            ];
 
-            expect(block.type).toBe('image');
-            expect(block.content.src).toBe('https://example.com/image.png');
-            expect(block.content.alt).toBe('Description');
-            expect(block.content.caption).toBe('This is a caption');
-        });
-
-        it('应该支持无 caption 的图片', () => {
-            const block: ImageBlock = {
-                id: 'image-2',
-                type: 'image',
-                content: {
-                    src: '/image.png',
-                    alt: 'Simple',
-                },
-            };
-
-            expect(block.content.caption).toBeUndefined();
+            const result = await roundTrip(blocks);
+            expect(result).toHaveLength(1);
+            expect(result[0].type).toBe('quote');
+            expect(result[0].content.inline[0].text).toBe('This is a quote');
         });
     });
 
-    describe('formula 块', () => {
-        it('应该正确定义公式结构', () => {
-            const block: FormulaBlock = {
-                id: 'formula-1',
-                type: 'formula',
-                content: {
-                    latex: 'E = mc^2',
-                    displayMode: true,
-                },
-            };
+    describe('code', () => {
+        it('应该 round-trip 代码块', async () => {
+            const blocks: Block[] = [
+                {
+                    id: 'code-1',
+                    type: 'code',
+                    content: {
+                        language: 'typescript',
+                        code: 'const x = 10;\nconsole.log(x);',
+                    },
+                } as CodeBlock,
+            ];
 
-            expect(block.type).toBe('formula');
-            expect(block.content.latex).toBe('E = mc^2');
-            expect(block.content.displayMode).toBe(true);
-        });
-
-        it('应该支持行内公式', () => {
-            const block: FormulaBlock = {
-                id: 'formula-2',
-                type: 'formula',
-                content: {
-                    latex: 'a^2 + b^2 = c^2',
-                    displayMode: false,
-                },
-            };
-
-            expect(block.content.displayMode).toBe(false);
+            const result = await roundTrip(blocks);
+            expect(result).toHaveLength(1);
+            expect(result[0].type).toBe('code');
+            expect((result[0].content as CodeBlock['content']).language).toBe('typescript');
+            expect((result[0].content as CodeBlock['content']).code).toBe(
+                'const x = 10;\nconsole.log(x);',
+            );
         });
     });
 
-    describe('复杂行内格式', () => {
-        it('应该支持多种格式组合', () => {
-            const block: ParagraphBlock = {
-                id: 'complex-1',
-                type: 'paragraph',
-                content: {
-                    inline: [
-                        { text: 'Normal ' },
-                        { text: 'Bold', bold: true },
-                        { text: ' ' },
-                        { text: 'Bold+Italic', bold: true, italic: true },
-                        { text: ' ' },
-                        { text: 'Code', code: true },
-                        { text: ' ' },
-                        { text: 'Link', link: { url: 'https://example.com' } },
-                    ],
-                },
-            };
+    describe('table', () => {
+        it('应该 round-trip 表格', async () => {
+            const blocks: Block[] = [
+                {
+                    id: 'table-1',
+                    type: 'table',
+                    content: {
+                        rows: 2,
+                        cols: 2,
+                        cells: [
+                            { row: 0, col: 0, content: 'A' },
+                            { row: 0, col: 1, content: 'B' },
+                            { row: 1, col: 0, content: 'C' },
+                            { row: 1, col: 1, content: 'D' },
+                        ],
+                    },
+                } as TableBlock,
+            ];
 
-            expect(block.content.inline).toHaveLength(8);
-            expect(block.content.inline[1].bold).toBe(true);
-            expect(block.content.inline[3].bold).toBe(true);
-            expect(block.content.inline[3].italic).toBe(true);
-            expect(block.content.inline[5].code).toBe(true);
-            expect(block.content.inline[7].link?.url).toBe('https://example.com');
+            const result = await roundTrip(blocks);
+            expect(result).toHaveLength(1);
+            expect(result[0].type).toBe('table');
+            const tableContent = result[0].content as TableBlock['content'];
+            expect(tableContent.rows).toBe(2);
+            expect(tableContent.cols).toBe(2);
+            expect(tableContent.cells).toHaveLength(4);
         });
+    });
 
-        it('应该支持嵌套链接中的格式', () => {
-            const block: ParagraphBlock = {
-                id: 'link-format-1',
-                type: 'paragraph',
-                content: {
-                    inline: [
-                        {
-                            text: 'Styled Link',
-                            bold: true,
-                            link: { url: 'https://example.com', title: 'Example' },
-                        },
-                    ],
-                },
-            };
+    describe('mixed content', () => {
+        it('应该 round-trip 混合内容文档', async () => {
+            const blocks: Block[] = [
+                {
+                    id: 'h1',
+                    type: 'heading',
+                    content: { level: 1, inline: [{ text: 'Title' }] },
+                } as HeadingBlock,
+                {
+                    id: 'p1',
+                    type: 'paragraph',
+                    content: { inline: [{ text: 'Intro paragraph' }] },
+                } as ParagraphBlock,
+                {
+                    id: 'list1',
+                    type: 'list',
+                    content: {
+                        listType: 'bullet',
+                        items: [
+                            { id: 'i1', inline: [{ text: 'Item 1' }] },
+                            { id: 'i2', inline: [{ text: 'Item 2' }] },
+                        ],
+                    },
+                } as ListBlock,
+                {
+                    id: 'q1',
+                    type: 'quote',
+                    content: { inline: [{ text: 'A quote' }] },
+                } as QuoteBlock,
+                {
+                    id: 'p2',
+                    type: 'paragraph',
+                    content: { inline: [{ text: 'End' }] },
+                } as ParagraphBlock,
+            ];
 
-            expect(block.content.inline[0].bold).toBe(true);
-            expect(block.content.inline[0].link?.url).toBe('https://example.com');
-            expect(block.content.inline[0].link?.title).toBe('Example');
+            const result = await roundTrip(blocks);
+            expect(result).toHaveLength(5);
+            expect(result[0].type).toBe('heading');
+            expect(result[1].type).toBe('paragraph');
+            expect(result[2].type).toBe('list');
+            expect(result[3].type).toBe('quote');
+            expect(result[4].type).toBe('paragraph');
+        });
+    });
+
+    describe('link round-trip', () => {
+        it('应该 round-trip 包含链接的段落', async () => {
+            const blocks: Block[] = [
+                {
+                    id: 'p1',
+                    type: 'paragraph',
+                    content: {
+                        inline: [
+                            { text: 'Visit ' },
+                            { text: 'example.com', link: { url: 'https://example.com' } },
+                        ],
+                    },
+                } as ParagraphBlock,
+            ];
+
+            const result = await roundTrip(blocks);
+            expect(result).toHaveLength(1);
+            expect(result[0].content.inline[0].text).toBe('Visit ');
+            expect(result[0].content.inline[1].text).toBe('example.com');
+            expect(result[0].content.inline[1].link?.url).toBe('https://example.com');
         });
     });
 });

@@ -15,6 +15,7 @@ import { getContainer } from '@/platform/bootstrap';
 import type { ContextMenuService } from '@/platform/context-menu/service';
 import type { ContextMenuContext } from '@/platform/context-menu/types';
 import type { DialogService } from '@/platform/dialog/service';
+import { DocumentStore } from '@/platform/document-store/service';
 import { useEditorTabs } from '@/platform/editor-tab/use-editor-tabs';
 import type { FileOpenService } from '@/platform/file-open/service';
 import { projectManager } from '@/platform/file-system/project-manager';
@@ -109,7 +110,12 @@ function FileTreeNode({
                 onContextMenu={handleContextMenuClick}
                 className={cn(
                     'flex cursor-pointer items-center gap-1.5 rounded-sm px-2 py-1 text-sm transition-colors',
-                    !isDirectory && activeDocumentId === `file:${file.path}`
+                    !isDirectory &&
+                        (() => {
+                            const docStore = getContainer().get(DocumentStore);
+                            const docMeta = docStore.getByPath(file.path);
+                            return activeDocumentId === docMeta?.id;
+                        })()
                         ? 'bg-ws-accent/20 font-medium text-ws-fg-primary'
                         : isSelected
                           ? 'bg-ws-accent/10 text-ws-fg-primary'
@@ -181,7 +187,7 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
     // 已加载的子目录映射：path -> children
     const [loadedChildren, setLoadedChildren] = useState<Map<string, FileStat[]>>(() => new Map());
 
-    const { activeDocumentId, closeDocument, openDocuments } = useEditorTabs();
+    const { activeDocumentId, closeDocument } = useEditorTabs();
 
     // 获取服务实例
     const fileSystemService = getContainer().get<FileSystemService>('FileSystemService');
@@ -406,16 +412,22 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
                                         }
                                         clearStaleCache(fileData.path, isDirectory);
                                         // 关闭被删除文件对应的编辑器 tab
+                                        const docStore = getContainer().get(DocumentStore);
                                         if (isDirectory) {
-                                            // 目录：关闭所有以该目录路径开头的 tab
-                                            const prefix = `file:${fileData.path}/`;
-                                            for (const doc of openDocuments) {
-                                                if (doc.id.startsWith(prefix)) {
+                                            // 目录：关闭该目录下所有文件的 tab
+                                            const dirPrefix = fileData.path.endsWith('/')
+                                                ? fileData.path
+                                                : `${fileData.path}/`;
+                                            for (const doc of docStore.getAll()) {
+                                                if (doc.path.startsWith(dirPrefix)) {
                                                     closeDocument(doc.id);
                                                 }
                                             }
                                         } else {
-                                            closeDocument(`file:${fileData.path}`);
+                                            const docMeta = docStore.getByPath(fileData.path);
+                                            if (docMeta) {
+                                                closeDocument(docMeta.id);
+                                            }
                                         }
                                         await refreshTree();
                                         getLogger().info('删除成功:', fileData.path);
@@ -444,7 +456,6 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
         clearStaleCache,
         refreshTree,
         closeDocument,
-        openDocuments,
     ]);
 
     const handleToggleFolder = useCallback(

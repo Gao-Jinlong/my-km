@@ -2,11 +2,11 @@
  * EditorTab 类型定义
  */
 
-export interface OpenDocument {
+export interface TabInfo {
     id: string;
-    path: string;
     title: string;
-    type: 'km';
     openedAt: string;
-    content?: string;
 }
+
+/** @deprecated 使用 TabInfo 代替 */
+export type OpenDocument = TabInfo;

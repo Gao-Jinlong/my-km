@@ -25,8 +25,10 @@ import {
 import {
     $createTableCellNode,
     $createTableNode,
+    $createTableRowNode,
     $isTableCellNode,
     $isTableNode,
+    $isTableRowNode,
     type TableCellNode,
     type TableNode,
 } from '@lexical/table';

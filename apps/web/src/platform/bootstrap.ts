@@ -13,6 +13,7 @@ import { ConditionalService } from './conditional/service';
 import { ContextMenuService } from './context-menu/service';
 import { ServiceContainer } from './di';
 import { DialogService } from './dialog/service';
+import { DocumentStore } from './document-store/service';
 import { EditorContainer } from './editor/container';
 import { EditorTabService } from './editor-tab/service';
 import { EventBusService } from './event-bus/service';
@@ -34,6 +35,7 @@ export interface AppServices {
     dialogService: DialogService;
     editorContainer: EditorContainer;
     editorTabService: EditorTabService;
+    documentStore: DocumentStore;
     fileOpenService: FileOpenService;
     eventBusService: EventBusService;
     commandService: CommandService;
@@ -55,6 +57,7 @@ function createServiceContainer(): ServiceContainer {
     container.register(ContextMenuService);
     container.register(DialogService);
     container.register(EditorContainer);
+    container.register(DocumentStore);
     container.register(EditorTabService);
     container.register(FileOpenService);
     container.register(EventBusService);

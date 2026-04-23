@@ -6,6 +6,7 @@ import { getFileIconComponent } from '@/lib/file-icon';
 import { cn } from '@/lib/utils';
 import { container } from '@/platform/bootstrap';
 import type { ContextMenuService } from '@/platform/context-menu/service';
+import { DocumentStore } from '@/platform/document-store/service';
 import { useAllEditorServiceStates } from '@/platform/editor/use-editor-service-state';
 import { useEditorTabs } from '@/platform/editor-tab/use-editor-tabs';
 
@@ -16,7 +17,14 @@ import { useEditorTabs } from '@/platform/editor-tab/use-editor-tabs';
  * 支持切换和关闭文档
  */
 export function EditorTabs() {
-    const { openDocuments, activeDocumentId, activateDocument, closeDocument } = useEditorTabs();
+    const {
+        openDocuments,
+        activeDocumentId,
+        activateDocument,
+        closeDocument,
+        closeOtherDocuments,
+        closeAllDocuments,
+    } = useEditorTabs();
     const editorStates = useAllEditorServiceStates();
 
     const handleTabClick = useCallback(
@@ -41,6 +49,12 @@ export function EditorTabs() {
         contextMenuService.show(e, { data: { tabId } });
     }, []);
 
+    // 从 DocumentStore 获取 tab 的路径（用于图标和复制路径）
+    const getPath = useCallback((id: string): string => {
+        const docStore = container.get(DocumentStore);
+        return docStore.get(id)?.path ?? '';
+    }, []);
+
     // 注册编辑器标签页右键菜单
     useEffect(() => {
         const contextMenuService = container.get('ContextMenuService') as ContextMenuService;
@@ -57,35 +71,25 @@ export function EditorTabs() {
                         {
                             id: 'close-others',
                             label: '关闭其他',
-                            action: () => {
-                                for (const doc of openDocuments) {
-                                    if (doc.id !== tabId) {
-                                        closeDocument(doc.id);
-                                    }
-                                }
-                            },
+                            action: () => closeOtherDocuments(tabId),
                         },
                         {
                             id: 'close-all',
                             label: '关闭所有',
-                            action: () => {
-                                for (const doc of openDocuments) {
-                                    closeDocument(doc.id);
-                                }
-                            },
+                            action: () => closeAllDocuments(),
                         },
                         { id: 'sep-1', type: 'separator' as const },
                         {
                             id: 'copy-path',
                             label: '复制路径',
-                            action: () => navigator.clipboard.writeText(tab.path),
+                            action: () => navigator.clipboard.writeText(getPath(tabId)),
                         },
                     ],
                 },
             ];
         });
         return () => dispose.dispose();
-    }, [openDocuments, closeDocument]);
+    }, [openDocuments, closeDocument, closeOtherDocuments, closeAllDocuments, getPath]);
 
     // 键盘快捷键处理
     useEffect(() => {
@@ -115,7 +119,8 @@ export function EditorTabs() {
     return (
         <div className="flex h-[36px] items-center bg-ws-bg-tertiary">
             {openDocuments.map(tab => {
-                const { Icon, props } = getFileIconComponent({ path: tab.path });
+                const filePath = getPath(tab.id);
+                const { Icon, props } = getFileIconComponent({ path: filePath });
 
                 return (
                     <div

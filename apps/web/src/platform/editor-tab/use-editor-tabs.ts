@@ -3,12 +3,12 @@
 import { useSyncExternalStore } from 'react';
 import { container } from '@/platform/bootstrap';
 import { EditorTabService } from './service';
-import type { OpenDocument } from './types';
+import type { TabInfo } from './types';
 
 const editorTabService = container.get<EditorTabService>(EditorTabService);
 
 interface EditorTabsState {
-    openDocuments: OpenDocument[];
+    openDocuments: TabInfo[];
     activeDocumentId: string | null;
 }
 

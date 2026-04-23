@@ -1,27 +1,27 @@
 /**
  * LexicalEditor - Lexical 编辑器组件
  *
- * 基于 @lexical/react 的富文本编辑器组件
+ * 基于 @lexical/extension 的 Extensions API 构建。
+ * 使用 LexicalExtensionComposer 替代旧的 LexicalComposer + initialConfig 模式。
  */
 
 'use client';
 
-import { CodeNode } from '@lexical/code';
-import { LinkNode } from '@lexical/link';
-import { ListItemNode, ListNode } from '@lexical/list';
-import { LexicalComposer } from '@lexical/react/LexicalComposer';
+import { CodeExtension } from '@lexical/code';
+import { TabIndentationExtension } from '@lexical/extension';
+import { HistoryExtension } from '@lexical/history';
+import { LinkExtension } from '@lexical/link';
+import { ListExtension } from '@lexical/list';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
-import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin';
-import { ListPlugin } from '@lexical/react/LexicalListPlugin';
-import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
-import { TabIndentationPlugin } from '@lexical/react/LexicalTabIndentationPlugin';
-import { HeadingNode, QuoteNode } from '@lexical/rich-text';
+import { LexicalExtensionComposer } from '@lexical/react/LexicalExtensionComposer';
+import { useLexicalIsTextContentEmpty } from '@lexical/react/useLexicalIsTextContentEmpty';
+import { RichTextExtension } from '@lexical/rich-text';
+import { TableExtension } from '@lexical/table';
 import type { EditorThemeClasses } from 'lexical';
-import { $getRoot } from 'lexical';
+import { $getRoot, defineExtension } from 'lexical';
 import { useEffect, useRef } from 'react';
 import { EditorContainer } from '@/features/editor/container/EditorContainer';
-import type { Document } from '@/features/editor/types';
 import { cn } from '@/lib/utils';
 import { getContainer } from '@/platform/bootstrap';
 import { ContextMenuService } from '@/platform/context-menu/service';
@@ -91,9 +91,56 @@ const theme: EditorThemeClasses = {
 };
 
 /**
+ * 根 Extension — 组合所有编辑器功能
+ *
+ * 使用 defineExtension 定义根扩展，通过 dependencies 声明所有功能依赖。
+ * 各内置 Extension 负责注册各自的节点：
+ * - RichTextExtension → HeadingNode, QuoteNode
+ * - ListExtension → ListNode, ListItemNode
+ * - TableExtension → TableNode, TableRowNode, TableCellNode
+ * - CodeExtension → CodeNode, CodeHighlightNode
+ * - LinkExtension → LinkNode
+ */
+const rootExtension = defineExtension({
+    name: '[my-km-editor]',
+    dependencies: [
+        RichTextExtension,
+        HistoryExtension,
+        ListExtension,
+        TabIndentationExtension,
+        TableExtension,
+        CodeExtension,
+        LinkExtension,
+    ],
+    theme,
+    onError: (error: Error) => {
+        getLogger().error('LexicalEditor error:', error);
+    },
+});
+
+/**
+ * EditorPlaceholder - 占位符组件
+ *
+ * 使用 useLexicalIsTextContentEmpty 控制显示，
+ * 替代旧的 RichTextPlugin 内置占位符逻辑。
+ */
+function EditorPlaceholder({ content }: { content?: string }) {
+    const [editor] = useLexicalComposerContext();
+    const isEmpty = useLexicalIsTextContentEmpty(editor);
+
+    if (!isEmpty || !content) return null;
+
+    return (
+        <div className="pointer-events-none absolute top-6 left-4 text-ws-fg-placeholder">
+            {content}
+        </div>
+    );
+}
+
+/**
  * EditorBridgePlugin - 将 Lexical 实例注入 EditorService
  *
- * 每个文档有独立的 LexicalComposer（通过 key={doc.id} 隔离），
+ * 每个文档有独立的 LexicalExtensionComposer（通过 key={doc.id} 隔离），
  * 此插件在挂载时创建/复用 EditorService 并注入 Lexical 实例。
  * 清理时只取消订阅，不销毁 EditorService（由 FileOpenService 在关闭文档时销毁）。
  */
@@ -101,70 +148,41 @@ function EditorBridgePlugin({ documentId, filePath }: { documentId: string; file
     const [editor] = useLexicalComposerContext();
 
     useEffect(() => {
-        // 获取服务实例
         const container = getContainer();
         const editorContainer = container.get(EditorContainer);
 
-        // 复用或创建 EditorService 实例
         let editorService = editorContainer.getService(documentId);
         if (!editorService) {
             editorService = editorContainer.createInstance(documentId, filePath);
         }
 
-        // 将 Lexical 实例注入 EditorService
         editorService.setEditor(editor);
-
-        // 不需要在这里订阅 onChange 或同步 isDirty
-        // EditorContainer 已在 createInstance 中订阅 EditorService.onChange
-        // UI 组件通过 useEditorServiceState hook 直接从 EditorContainer 获取状态
     }, [documentId, filePath, editor]);
 
     return null;
 }
 
 /**
- * EditorContentPlugin - 挂载时通过 EditorService.loadDocument 加载文档内容
+ * EditorContentPlugin - 编辑器内容管理插件
  *
- * 必须通过 EditorService.loadDocument 加载（而非直接调用 blocksToLexical），
- * 这样 EditorService 才能记录 currentDocument，saveDocument 才能正常工作。
+ * 内容由 FileOpenService.openFile() 通过 EditorService.loadDocument() 加载，
+ * 此插件负责：挂载时聚焦到编辑器末尾、切换 tab 时重新聚焦。
  */
-function EditorContentPlugin({
-    document: doc,
-    documentId,
-}: {
-    document: Document | null;
-    documentId: string;
-}) {
-    const loadedRef = useRef(false);
+function EditorContentPlugin({ documentId }: { documentId: string }) {
     const [editor] = useLexicalComposerContext();
 
+    // 挂载时自动聚焦到编辑器末尾
     useEffect(() => {
-        if (!doc || loadedRef.current) return;
+        if (!editor) return;
 
-        const container = getContainer();
-        const editorContainer = container.get(EditorContainer);
-        const editorService = editorContainer.getService(documentId);
-        if (editorService) {
-            loadedRef.current = true;
-            editorService.loadDocument(doc);
-        }
-    }, [doc, documentId]);
-
-    // 内容加载后自动聚焦到编辑器末尾
-    useEffect(() => {
-        if (!loadedRef.current || !editor) return;
-
-        // 等待内容加载完成后聚焦
         setTimeout(() => {
             editor.focus(() => {
-                // 聚焦完成后将光标移动到末尾
                 editor.update(() => {
                     const root = $getRoot();
                     const lastNode = root.getLastDescendant();
                     if (lastNode) {
                         lastNode.selectEnd();
                     } else {
-                        // 空文档时聚焦到根节点
                         root.selectEnd();
                     }
                 });
@@ -180,10 +198,8 @@ function EditorContentPlugin({
         if (!editorTabService) return;
 
         const unsubscribe = editorTabService.onDidChangeActive((activeId: string | null) => {
-            // 只有当前文档被激活时才聚焦
             if (activeId === documentId && editor) {
                 editor.focus(() => {
-                    // 聚焦完成后将光标移动到末尾
                     editor.update(() => {
                         const root = $getRoot();
                         const lastNode = root.getLastDescendant();
@@ -205,23 +221,8 @@ function EditorContentPlugin({
     return null;
 }
 
-/**
- * 编辑器初始化配置
- */
-function getInitialConfig(documentId: string) {
-    return {
-        namespace: `editor-${documentId}`,
-        theme,
-        nodes: [ListNode, ListItemNode, HeadingNode, QuoteNode, CodeNode, LinkNode],
-        onError: (error: Error) => {
-            getLogger().error('LexicalEditor error:', error);
-        },
-    };
-}
-
 interface LexicalEditorProps {
     documentId: string;
-    document: Document | null;
     filePath: string;
     className?: string;
     placeholder?: string;
@@ -230,13 +231,7 @@ interface LexicalEditorProps {
 /**
  * LexicalEditor 组件内部实现
  */
-function LexicalEditorImpl({
-    documentId,
-    document,
-    filePath,
-    className,
-    placeholder,
-}: LexicalEditorProps) {
+function LexicalEditorImpl({ documentId, filePath, className, placeholder }: LexicalEditorProps) {
     const contextMenuServiceRef = useRef<ContextMenuService | null>(null);
 
     // 注册编辑器右键菜单提供者
@@ -287,54 +282,40 @@ function LexicalEditorImpl({
         };
     }, []);
 
-    const initialConfig = getInitialConfig(documentId);
-
     return (
-        <LexicalComposer initialConfig={initialConfig}>
+        <LexicalExtensionComposer extension={rootExtension} contentEditable={null}>
             <div className={cn('relative flex h-full flex-col', className)}>
                 {/* 编辑区域 */}
                 <div className="flex-1 overflow-y-auto">
                     <div className="mx-auto max-w-200 px-4 py-6">
-                        <RichTextPlugin
-                            contentEditable={
-                                <ContentEditable
-                                    className="prose prose-ws min-h-125 max-w-none outline-none"
-                                    onContextMenu={e => {
-                                        // 触发编辑器右键菜单
-                                        const contextMenuService =
-                                            getContainer().get(ContextMenuService);
-                                        contextMenuService.show(e, {
-                                            target: e.currentTarget,
-                                            data: {
-                                                documentId,
-                                                type: 'editor',
-                                            },
-                                            x: e.clientX,
-                                            y: e.clientY,
-                                        });
-                                    }}
-                                />
-                            }
-                            placeholder={
-                                <div className="pointer-events-none absolute top-6 left-4 text-ws-fg-placeholder">
-                                    {placeholder}
-                                </div>
-                            }
-                            ErrorBoundary={() => <div>编辑器加载失败</div>}
+                        <ContentEditable
+                            className="prose prose-ws min-h-125 max-w-none outline-none"
+                            onContextMenu={e => {
+                                const contextMenuService = getContainer().get(ContextMenuService);
+                                contextMenuService.show(e, {
+                                    target: e.currentTarget,
+                                    data: {
+                                        documentId,
+                                        type: 'editor',
+                                    },
+                                    x: e.clientX,
+                                    y: e.clientY,
+                                });
+                            }}
                         />
-                        <HistoryPlugin />
-                        <ListPlugin />
-                        <TabIndentationPlugin />
                     </div>
                 </div>
+
+                {/* 占位符 */}
+                <EditorPlaceholder content={placeholder} />
             </div>
 
             {/* EditorBridgePlugin - 注入 Lexical 实例到 EditorService */}
             <EditorBridgePlugin documentId={documentId} filePath={filePath} />
 
-            {/* EditorContentPlugin - 监听 document 变化并加载内容 */}
-            <EditorContentPlugin document={document} documentId={documentId} />
-        </LexicalComposer>
+            {/* EditorContentPlugin - 编辑器内容管理 */}
+            <EditorContentPlugin documentId={documentId} />
+        </LexicalExtensionComposer>
     );
 }
 
@@ -342,11 +323,10 @@ function LexicalEditorImpl({
  * LexicalEditor - 主组件
  *
  * 使用 EditorContainer 管理编辑器实例
- * 从 store 获取文档内容
+ * 文档内容由 FileOpenService.openFile() 直接加载到 EditorService
  */
 export function LexicalEditor({
     documentId,
-    document,
     filePath,
     className,
     placeholder,
@@ -354,7 +334,6 @@ export function LexicalEditor({
     return (
         <LexicalEditorImpl
             documentId={documentId}
-            document={document}
             filePath={filePath}
             className={className}
             placeholder={placeholder}
