@@ -22,12 +22,36 @@ import type { EditorThemeClasses } from 'lexical';
 import { $getRoot, defineExtension } from 'lexical';
 import { useEffect, useRef } from 'react';
 import { EditorContainer } from '@/features/editor/container/EditorContainer';
+import {
+    type AutoSaveService,
+    createAutoSaveService,
+} from '@/features/editor/service/AutoSaveService';
 import { cn } from '@/lib/utils';
 import { getContainer } from '@/platform/bootstrap';
 import { ContextMenuService } from '@/platform/context-menu/service';
 import type { ContextMenuContext } from '@/platform/context-menu/types';
 import { EditorTabService } from '@/platform/editor-tab/service';
+import type { FileSystemService } from '@/platform/file-system/service';
 import { MonitorService } from '@/platform/monitor/service';
+import { StatusBarPlugin } from './plugins/StatusBarPlugin';
+import { ToolbarPlugin } from './plugins/ToolbarPlugin';
+
+/**
+ * 模块级 AutoSaveService 单例
+ */
+let globalAutoSaveService: AutoSaveService | null = null;
+
+/**
+ * 获取或创建 AutoSaveService 单例
+ */
+function getAutoSaveService(): AutoSaveService {
+    if (!globalAutoSaveService) {
+        const container = getContainer();
+        const fileSystemService = container.get<FileSystemService>('FileSystemService');
+        globalAutoSaveService = createAutoSaveService(fileSystemService);
+    }
+    return globalAutoSaveService;
+}
 
 /**
  * 惰性获取 logger，避免模块级循环依赖
@@ -40,14 +64,16 @@ function getLogger() {
  * 编辑器主题配置
  */
 const theme: EditorThemeClasses = {
-    // 文本格式
-    bold: 'font-bold',
-    code: 'font-mono bg-ws-bg-secondary px-1 rounded',
-    highlight: 'bg-yellow-200',
-    italic: 'italic',
-    strikethrough: 'line-through',
-    underline: 'underline',
-    underlineStrikethrough: 'underline line-through',
+    // 文本格式 — 必须嵌套在 text 属性下，Lexical 的 createTextInnerDOM 读取 theme.text
+    text: {
+        bold: 'font-bold',
+        code: 'font-mono bg-ws-bg-secondary px-1 rounded',
+        highlight: 'bg-yellow-200',
+        italic: 'italic',
+        strikethrough: 'line-through',
+        underline: 'underline',
+        underlineStrikethrough: 'underline line-through',
+    },
 
     // 段落
     paragraph: 'my-2',
@@ -142,7 +168,8 @@ function EditorPlaceholder({ content }: { content?: string }) {
  *
  * 每个文档有独立的 LexicalExtensionComposer（通过 key={doc.id} 隔离），
  * 此插件在挂载时创建/复用 EditorService 并注入 Lexical 实例。
- * 清理时只取消订阅，不销毁 EditorService（由 FileOpenService 在关闭文档时销毁）。
+ * 同时注册 AutoSaveService，当 Lexical 实例就绪后启用自动保存。
+ * 清理时注销 AutoSaveService，不销毁 EditorService（由 FileOpenService 在关闭文档时销毁）。
  */
 function EditorBridgePlugin({ documentId, filePath }: { documentId: string; filePath: string }) {
     const [editor] = useLexicalComposerContext();
@@ -157,6 +184,14 @@ function EditorBridgePlugin({ documentId, filePath }: { documentId: string; file
         }
 
         editorService.setEditor(editor);
+
+        // 注册自动保存
+        const autoSaveService = getAutoSaveService();
+        autoSaveService.register(documentId, editorService);
+
+        return () => {
+            autoSaveService.unregister(documentId);
+        };
     }, [documentId, filePath, editor]);
 
     return null;
@@ -285,6 +320,9 @@ function LexicalEditorImpl({ documentId, filePath, className, placeholder }: Lex
     return (
         <LexicalExtensionComposer extension={rootExtension} contentEditable={null}>
             <div className={cn('relative flex h-full flex-col', className)}>
+                {/* 工具栏 - 在 composer 内部 */}
+                <ToolbarPlugin documentId={documentId} />
+
                 {/* 编辑区域 */}
                 <div className="flex-1 overflow-y-auto">
                     <div className="mx-auto max-w-200 px-4 py-6">
@@ -309,6 +347,9 @@ function LexicalEditorImpl({ documentId, filePath, className, placeholder }: Lex
                 {/* 占位符 */}
                 <EditorPlaceholder content={placeholder} />
             </div>
+
+            {/* StatusBarPlugin - 状态栏数据同步 */}
+            <StatusBarPlugin documentId={documentId} />
 
             {/* EditorBridgePlugin - 注入 Lexical 实例到 EditorService */}
             <EditorBridgePlugin documentId={documentId} filePath={filePath} />

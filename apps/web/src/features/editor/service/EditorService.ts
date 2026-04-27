@@ -169,6 +169,11 @@ class EditorServiceImpl implements EditorService {
     // ========== 编辑器实例 ==========
 
     setEditor(editor: LexicalEditor): void {
+        // 清理旧的 update listener，防止泄漏
+        if (this.updateListenerCleanup) {
+            this.updateListenerCleanup();
+        }
+
         this.editor = editor;
 
         // 注册 Lexical 更新监听器，内容变化时标记为 dirty
@@ -184,6 +189,11 @@ class EditorServiceImpl implements EditorService {
                 }
             },
         );
+
+        // 如果文档在 Lexical 挂载前已加载，重放到编辑器
+        if (this.currentDocument) {
+            this.loadDocument(this.currentDocument);
+        }
     }
 
     getEditor(): LexicalEditor | null {

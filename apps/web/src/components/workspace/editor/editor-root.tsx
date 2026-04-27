@@ -10,27 +10,19 @@ interface EditorRootProps {
 /**
  * EditorRoot - 编辑器根组件
  *
- * 负责整合 EditorShell、Toolbar 和 ContentArea
- * 管理编辑器状态和格式控制
+ * 提供 EditorShell 容器和右上角文档状态指示器。
+ * 工具栏已内聚到 LexicalEditor 内部（ToolbarPlugin），
+ * 编辑内容由 ContentArea → LexicalEditor 渲染。
  */
 export function EditorRoot({ documentId, className }: EditorRootProps) {
-    // TODO: 集成 EditorService 获取 formatState
-    // const { formatState, onFormatToggle } = useEditorService(documentId);
-
-    // 临时占位实现
-
     return (
         <EditorShell className={className}>
-            {/* 工具栏区域 */}
-            <div className="border-ws-border border-b bg-ws-bg-secondary px-3 py-2">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <span className="text-ws-fg-placeholder text-xs">工具栏</span>
-                    </div>
-                    <DocumentStatusIndicator documentId={documentId} />
-                </div>
-            </div>
+            {/* 内容区域 - LexicalEditor 包含 toolbar + content */}
             <ContentArea documentId={documentId} />
+            {/* 文档状态指示器 - 右上角浮动 */}
+            <div className="absolute top-2 right-2 z-10">
+                <DocumentStatusIndicator documentId={documentId} />
+            </div>
         </EditorShell>
     );
 }
