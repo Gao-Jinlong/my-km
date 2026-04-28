@@ -7,6 +7,10 @@
 // reflect-metadata 必须在所有装饰器被求值前加载
 import 'reflect-metadata';
 
+import {
+    type AIHarnessService,
+    createAIHarnessService,
+} from '../features/ai/harness/ai-harness.service';
 import { CommandService } from './command/service';
 import { registerConditionEvaluators } from './conditional/evaluators';
 import { ConditionalService } from './conditional/service';
@@ -43,6 +47,7 @@ export interface AppServices {
     keyboardShortcutService: KeyboardShortcutService;
     panelService: PanelService;
     conditionalService: ConditionalService;
+    aiHarness: AIHarnessService;
 }
 
 /**
@@ -66,6 +71,10 @@ function createServiceContainer(): ServiceContainer {
     container.register(KeyboardShortcutService);
     container.register(PanelService);
     container.register(ConditionalService);
+
+    // AI Harness（通过工厂函数创建，使用 registerInstance 注册）
+    const aiHarness = createAIHarnessService();
+    container.registerInstance('aiHarness', aiHarness);
 
     return container;
 }

@@ -66,6 +66,7 @@
     "reflect-metadata": "^0.2.2",
     "shared": "workspace:*",
     "shiki": "^3.21.0",
+    "socket.io-client": "^4.8.3",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
     "zod": "^4.3.5",

@@ -89,3 +89,17 @@ model PasswordReset {
 
   @@index([token])
 }
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String // 'user' | 'assistant' | 'tool' | 'system'
+  content        String?  @db.Text
+  toolCalls      Json?    // [{ id, name }] - assistant 消息的工具调用摘要
+  toolResultId   String?  // role === 'tool' 时关联的 tool call id
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([conversationId])
+  @@index([createdAt])
+}

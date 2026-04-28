@@ -272,6 +272,25 @@ export class ServiceContainer extends Disposable {
         return this.registrations.has(serviceId);
     }
 
+    /**
+     * 注册已有实例（用于非 DI 创建的服务）
+     *
+     * @param id 服务标识
+     * @param instance 服务实例
+     *
+     * @example
+     * ```typescript
+     * const harness = createAIHarnessService();
+     * container.registerInstance('aiHarness', harness);
+     * ```
+     */
+    registerInstance<T>(id: string, instance: T): void {
+        if (this.instances.has(id)) {
+            console.warn(`Service instance "${id}" already registered, overriding`);
+        }
+        this.instances.set(id, instance as unknown);
+    }
+
     override dispose(): void {
         this._store.dispose();
         this.registrations.clear();

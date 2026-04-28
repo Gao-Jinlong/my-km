@@ -22,7 +22,8 @@
             "@/*": ["./src/*"],
             "@/components/*": ["./src/components/*"],
             "@/lib/*": ["./src/lib/*"],
-            "@workspace/shared": ["../../packages/shared/src"]
+            "@workspace/shared": ["../../packages/shared/src"],
+            "@workspace/shared/*": ["../../packages/shared/src/*"]
         },
         "allowArbitraryExtensions": true,
         "experimentalDecorators": true,
