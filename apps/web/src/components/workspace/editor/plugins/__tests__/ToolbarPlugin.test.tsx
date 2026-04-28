@@ -83,7 +83,7 @@ describe('Toolbar', () => {
 
         const boldButton = screen.getByTitle('Bold (Ctrl+B)');
         // Active buttons should have the active styling class
-        expect(boldButton.className).toContain('bg-ws-accent-secondary');
+        expect(boldButton.className).toContain('bg-ws-accent');
     });
 
     it('should dispatch FORMAT_TEXT_COMMAND on button click', () => {
@@ -125,6 +125,6 @@ describe('Toolbar', () => {
 
         const boldButton = screen.getByTitle('Bold (Ctrl+B)');
         // When formatState is null, no button should be active
-        expect(boldButton.className).not.toContain('bg-ws-accent-secondary');
+        expect(boldButton.className).not.toContain('bg-ws-accent');
     });
 });

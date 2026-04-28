@@ -54,9 +54,9 @@ export function Toolbar({ editor, formatState, className }: ToolbarProps) {
                         title={format.title}
                         onClick={() => handleFormatToggle(format.name)}
                         className={cn(
-                            'flex h-7 min-w-[28px] items-center justify-center rounded px-1.5 text-sm transition-colors',
+                            'flex h-7 min-w-[28px] items-center justify-center rounded px-1.5 text-sm',
                             isActive
-                                ? 'bg-ws-accent-secondary text-ws-fg-primary'
+                                ? 'bg-ws-accent text-ws-accent-foreground'
                                 : 'text-ws-fg-secondary hover:bg-ws-bg-secondary hover:text-ws-fg-primary',
                         )}
                     >

@@ -1,5 +1,5 @@
 {
-  "version": "2.9",
+  "version": "2.11",
   "children": [
     {
       "type": "frame",
@@ -1709,6 +1709,135 @@
         },
         {
           "type": "frame",
+          "id": "gpzaH",
+          "name": "Status Bar",
+          "width": "fill_container",
+          "height": 22,
+          "fill": "#ffffff",
+          "stroke": {
+            "thickness": {
+              "top": 1
+            },
+            "fill": "#d0d7de"
+          },
+          "padding": [
+            0,
+            12
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "ylhr7",
+              "name": "statusLeft",
+              "gap": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "niSIA",
+                  "name": "slBranch",
+                  "gap": 4,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "geZ6e",
+                      "name": "slBI",
+                      "width": 12,
+                      "height": 12,
+                      "iconFontName": "git-branch",
+                      "iconFontFamily": "lucide",
+                      "fill": "#636c76"
+                    },
+                    {
+                      "type": "text",
+                      "id": "b5Ofg",
+                      "name": "slBT",
+                      "fill": "#636c76",
+                      "content": "main",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "icon_font",
+                  "id": "7fVdK",
+                  "name": "slSync",
+                  "width": 11,
+                  "height": 11,
+                  "iconFontName": "refresh-cw",
+                  "iconFontFamily": "lucide",
+                  "fill": "#636c76"
+                },
+                {
+                  "type": "text",
+                  "id": "66EyC",
+                  "name": "slPos",
+                  "fill": "#636c76",
+                  "content": "Ln 1, Col 1",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "qiwnw",
+                  "name": "slCount",
+                  "fill": "#636c76",
+                  "content": "128 chars",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "4fxfN",
+              "name": "statusRight",
+              "gap": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "AwFBr",
+                  "name": "srEnc",
+                  "fill": "#636c76",
+                  "content": "UTF-8",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "D2nbS",
+                  "name": "srLang",
+                  "fill": "#636c76",
+                  "content": "Markdown",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "icon_font",
+                  "id": "JnQBW",
+                  "name": "srBell",
+                  "width": 12,
+                  "height": 12,
+                  "iconFontName": "bell",
+                  "iconFontFamily": "lucide",
+                  "fill": "#636c76"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
           "id": "TJ1yP",
           "name": "Main Body",
           "width": "fill_container",
@@ -2978,135 +3107,6 @@
                       ]
                     }
                   ]
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "type": "frame",
-          "id": "gpzaH",
-          "name": "Status Bar",
-          "width": "fill_container",
-          "height": 22,
-          "fill": "#ffffff",
-          "stroke": {
-            "thickness": {
-              "top": 1
-            },
-            "fill": "#d0d7de"
-          },
-          "padding": [
-            0,
-            12
-          ],
-          "justifyContent": "space_between",
-          "alignItems": "center",
-          "children": [
-            {
-              "type": "frame",
-              "id": "ylhr7",
-              "name": "statusLeft",
-              "gap": 12,
-              "alignItems": "center",
-              "children": [
-                {
-                  "type": "frame",
-                  "id": "niSIA",
-                  "name": "slBranch",
-                  "gap": 4,
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "icon_font",
-                      "id": "geZ6e",
-                      "name": "slBI",
-                      "width": 12,
-                      "height": 12,
-                      "iconFontName": "git-branch",
-                      "iconFontFamily": "lucide",
-                      "fill": "#636c76"
-                    },
-                    {
-                      "type": "text",
-                      "id": "b5Ofg",
-                      "name": "slBT",
-                      "fill": "#636c76",
-                      "content": "main",
-                      "fontFamily": "Inter",
-                      "fontSize": 11,
-                      "fontWeight": "normal"
-                    }
-                  ]
-                },
-                {
-                  "type": "icon_font",
-                  "id": "7fVdK",
-                  "name": "slSync",
-                  "width": 11,
-                  "height": 11,
-                  "iconFontName": "refresh-cw",
-                  "iconFontFamily": "lucide",
-                  "fill": "#636c76"
-                },
-                {
-                  "type": "text",
-                  "id": "66EyC",
-                  "name": "slPos",
-                  "fill": "#636c76",
-                  "content": "Ln 1, Col 1",
-                  "fontFamily": "Inter",
-                  "fontSize": 11,
-                  "fontWeight": "normal"
-                },
-                {
-                  "type": "text",
-                  "id": "qiwnw",
-                  "name": "slCount",
-                  "fill": "#636c76",
-                  "content": "128 chars",
-                  "fontFamily": "Inter",
-                  "fontSize": 11,
-                  "fontWeight": "normal"
-                }
-              ]
-            },
-            {
-              "type": "frame",
-              "id": "4fxfN",
-              "name": "statusRight",
-              "gap": 12,
-              "alignItems": "center",
-              "children": [
-                {
-                  "type": "text",
-                  "id": "AwFBr",
-                  "name": "srEnc",
-                  "fill": "#636c76",
-                  "content": "UTF-8",
-                  "fontFamily": "Inter",
-                  "fontSize": 11,
-                  "fontWeight": "normal"
-                },
-                {
-                  "type": "text",
-                  "id": "D2nbS",
-                  "name": "srLang",
-                  "fill": "#636c76",
-                  "content": "Markdown",
-                  "fontFamily": "Inter",
-                  "fontSize": 11,
-                  "fontWeight": "normal"
-                },
-                {
-                  "type": "icon_font",
-                  "id": "JnQBW",
-                  "name": "srBell",
-                  "width": 12,
-                  "height": 12,
-                  "iconFontName": "bell",
-                  "iconFontFamily": "lucide",
-                  "fill": "#636c76"
                 }
               ]
             }
