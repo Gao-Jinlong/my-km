@@ -94,7 +94,12 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
     private _setupEventProxy(): void {
         this._store.add(this._wsClient.onStreamChunk(e => this._onStreamChunk.fire(e)));
         this._store.add(this._wsClient.onToolCall(e => this._onToolCall.fire(e)));
-        this._store.add(this._wsClient.onStreamDone(() => this._onStreamDone.fire()));
+        this._store.add(
+            this._wsClient.onStreamDone(() => {
+                this._conversationState.stopGenerating();
+                this._onStreamDone.fire();
+            }),
+        );
         this._store.add(this._wsClient.onError(e => this._onError.fire(e)));
         this._store.add(
             this._wsClient.onHistory(e => {
@@ -176,14 +181,6 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
     }
 
     sendMessage(content: string): void {
-        // 获取当前对话的上下文
-        const conversationId = this._conversationState.conversationId;
-        const context = conversationId
-            ? this._contextCollector
-                  .getContext(conversationId.replace('doc-', ''))
-                  .catch(() => null)
-            : Promise.resolve(null);
-
         // 先添加用户消息到本地状态
         this._conversationState.addMessage({
             id: `user-${Date.now()}`,
@@ -192,11 +189,26 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
             createdAt: new Date().toISOString(),
         });
 
+        // 立即开始生成状态
+        this._conversationState.startGenerating();
+
+        // 获取当前对话的上下文
+        const conversationId = this._conversationState.conversationId;
+        const context = conversationId
+            ? this._contextCollector
+                  .getContext(conversationId.replace('doc-', ''))
+                  .catch(() => null)
+            : Promise.resolve(null);
+
         // 异步获取上下文并发送
-        context.then(ctx => {
-            this._wsClient.sendMessage(content, ctx);
-            this._conversationState.startGenerating();
-        });
+        context
+            .then(ctx => {
+                this._wsClient.sendMessage(content, ctx);
+            })
+            .catch(() => {
+                // context 获取失败不影响已添加的用户消息
+                this._conversationState.stopGenerating();
+            });
     }
 
     stopGenerating(): void {

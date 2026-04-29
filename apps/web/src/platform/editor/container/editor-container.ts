@@ -11,7 +11,9 @@ import { Emitter } from '@/base/common/event';
 import type { EditorService, EditorState } from '@/features/editor/service/EditorService';
 import { createEditorService } from '@/features/editor/service/EditorService';
 import { ServiceBase } from '@/platform/base/service-base';
+import { getContainer } from '@/platform/bootstrap';
 import { Service } from '@/platform/di';
+import type { EditorTabService } from '@/platform/editor-tab/service';
 
 /**
  * 编辑器服务接口
@@ -25,29 +27,34 @@ export interface IEditorService {
     readonly isDisposed: boolean;
 
     /** 订阅状态变化事件 */
-    readonly onChange: (listener: (state: any) => void) => any;
+    readonly onChange: (listener: (state: unknown) => void) => void;
 
     /** 设置 Lexical 编辑器实例 */
-    setEditor(editor: any): void;
+    setEditor(editor: unknown): void;
     /** 获取 Lexical 编辑器实例 */
-    getEditor(): any | null;
+    getEditor(): unknown | null;
     /** 加载文档 */
-    loadDocument(document: any): void;
+    loadDocument(document: unknown): void;
     /** 保存文档 */
-    saveDocument(): Promise<any>;
+    saveDocument(): Promise<unknown>;
     /** 销毁编辑器 */
     destroy(): void;
 
     /** 获取状态 */
-    getState(): any;
+    getState(): unknown;
     /** 获取选区 */
-    getSelection(): any | null;
+    getSelection(): unknown | null;
     /** 获取选中文本 */
     getSelectedText(): string | null;
     /** 获取完整内容 */
     getFullContent(): string;
     /** 获取格式状态 */
-    getFormatState(): any;
+    getFormatState(): unknown;
+
+    /** 在光标位置插入文本 */
+    insertTextAtCursor(text: string): void;
+    /** 替换选中的文本 */
+    replaceSelection(text: string): void;
 }
 
 /**
@@ -122,6 +129,20 @@ export class EditorContainer extends ServiceBase {
      */
     getService(documentId: string): EditorService | null {
         return (this.editors.get(documentId) as EditorService) || null;
+    }
+
+    /**
+     * 获取当前活跃编辑器实例
+     *
+     * @returns EditorService 实例或 null
+     */
+    getActiveInstance(): EditorService | null {
+        const editorTabService = getContainer().get('EditorTabService') as EditorTabService;
+        const activeDocumentId = editorTabService.getActiveDocumentId();
+        if (!activeDocumentId) {
+            return null;
+        }
+        return (this.editors.get(activeDocumentId) as EditorService) || null;
     }
 
     /**

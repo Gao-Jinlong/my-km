@@ -5,8 +5,6 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AIContext, AIContextService } from '../../ai/service/AIContextService';
-import { createAIContextService } from '../../ai/service/AIContextService';
 import { registerBuiltinBlocks } from '../registry/builtin-types';
 import { createAutoSaveService, SaveStatus } from '../service/AutoSaveService';
 import { createEditorService } from '../service/EditorService';
@@ -30,16 +28,12 @@ function createTestDocument(overrides?: Partial<Document>): Document {
 }
 
 describe('Editor Integration', () => {
-    let aiContextService: AIContextService;
-
     beforeEach(() => {
         registerBuiltinBlocks();
-        aiContextService = createAIContextService();
         vi.clearAllMocks();
     });
 
     afterEach(() => {
-        aiContextService.dispose();
         vi.clearAllMocks();
     });
 
@@ -146,7 +140,7 @@ describe('Editor Integration', () => {
 
             // 收集 AI 上下文 - 注意：getFullContent() 需要 Lexical 编辑器
             // 在没有注入编辑器的情况下返回空字符串，这是预期行为
-            const context: AIContext = {
+            const context = {
                 document: {
                     id: 'doc-123',
                     path: '/test/document.md',

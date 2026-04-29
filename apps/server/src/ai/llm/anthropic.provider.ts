@@ -26,7 +26,7 @@ export class AnthropicProvider implements LLMProvider {
         // 转换消息格式为 Anthropic API 格式
         const anthropicMessages = messages.map(msg => {
             if (typeof msg.content === 'string') {
-                return { role: msg.role, content: msg.content };
+                return { role: msg.role, content: msg.content } as const;
             }
             return { role: msg.role, content: msg.content };
         });
@@ -35,8 +35,15 @@ export class AnthropicProvider implements LLMProvider {
             {
                 model: this.model,
                 max_tokens: 4096,
-                messages: anthropicMessages as Array<{ role: string; content: unknown }>,
-                tools: tools as Array<{ name: string; description: string; input_schema: object }>,
+                messages: anthropicMessages as Anthropic.MessageParam[],
+                tools: tools?.map(
+                    t =>
+                        ({
+                            name: t.name,
+                            description: t.description,
+                            input_schema: { type: 'object', ...(t.input_schema as object) },
+                        }) as Anthropic.Tool,
+                ),
                 stream: true,
             },
             {

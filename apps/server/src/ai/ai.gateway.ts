@@ -7,7 +7,6 @@
  * - 对话历史加载
  */
 
-import { EventEmitter } from 'node:events';
 import { Logger } from '@nestjs/common';
 import {
     ConnectedSocket,
@@ -18,9 +17,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { AiService } from './ai.service';
-
-// 全局事件发射器，用于 gateway → service 通信
-export const aiToolEvent = new EventEmitter();
+import { aiToolEvent } from './ai-events';
 
 /**
  * 客户端 → 服务端消息
@@ -37,7 +34,7 @@ interface ClientMsg {
 
 @WebSocketGateway({
     cors: {
-        origin: process.env.FRONTEND_URL ?? 'http://localhost:3000',
+        origin: process.env.FRONTEND_URL ?? 'http://localhost:4000',
         credentials: true,
     },
     namespace: 'ai',
@@ -55,13 +52,11 @@ export class AiGateway {
      * 连接认证
      */
     async handleConnection(client: Socket) {
-        const token = client.handshake.auth?.token ?? client.handshake.query?.token;
-        if (!token) {
-            this.logger.warn(`Connection rejected: no token from ${client.id}`);
-            client.disconnect();
-            return;
-        }
-        this.logger.log(`Client connected: ${client.id}`);
+        this.logger.log(
+            `Client connected: ${client.id}, transport: ${client.conn.transport?.name ?? 'unknown'}`,
+        );
+        this.logger.log(`Handshake query: ${JSON.stringify(client.handshake.query)}`);
+        this.logger.log(`Handshake auth: ${JSON.stringify(client.handshake.auth)}`);
     }
 
     handleDisconnect(client: Socket) {
@@ -80,7 +75,10 @@ export class AiGateway {
      */
     @SubscribeMessage('join')
     async handleJoin(@MessageBody() data: ClientMsg, @ConnectedSocket() client: Socket) {
+        this.logger.log(`[${client.id}] join event received: ${JSON.stringify(data)}`);
+
         if (!data.conversationId) {
+            this.logger.warn(`[${client.id}] join rejected: no conversationId`);
             client.emit('error', {
                 message: 'conversationId is required',
                 code: 'MISSING_CONVERSATION_ID',
@@ -89,6 +87,7 @@ export class AiGateway {
         }
 
         client.join(data.conversationId);
+        this.logger.log(`[${client.id}] joined room: ${data.conversationId}`);
         this.aiService.registerClient(data.conversationId, {
             send: msg => client.emit('message', msg),
         });
@@ -97,6 +96,7 @@ export class AiGateway {
 
         // 加载历史
         const history = await this.aiService.getConversationHistory(data.conversationId);
+        this.logger.log(`[${client.id}] sending ${history.length} history messages`);
         client.emit('history', { messages: history });
     }
 
@@ -105,7 +105,12 @@ export class AiGateway {
      */
     @SubscribeMessage('message')
     async handleMessage(@MessageBody() data: ClientMsg, @ConnectedSocket() client: Socket) {
+        this.logger.log(
+            `[${client.id}] message received: conversationId=${data.conversationId}, contentLength=${data.content?.length ?? 0}`,
+        );
+
         if (!data.conversationId || !data.content) {
+            this.logger.warn(`[${client.id}] message rejected: missing conversationId or content`);
             client.emit('error', {
                 message: 'conversationId and content are required',
                 code: 'MISSING_PARAMS',

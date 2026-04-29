@@ -69,6 +69,9 @@ class ConversationStateImpl extends Disposable implements ConversationState {
      * 开始生成助手消息
      */
     startGenerating(): void {
+        if (this._isGenerating) {
+            return;
+        }
         this._isGenerating = true;
         this._currentAssistantMessage = {
             id: `stream-${Date.now()}`,
@@ -88,11 +91,8 @@ class ConversationStateImpl extends Disposable implements ConversationState {
             this._currentAssistantMessage.content =
                 (this._currentAssistantMessage.content ?? '') + content;
         }
+        // 流式片段只触发 onStreamChunk，不触发全量 onStateChange
         this._onStreamChunk.fire({ content });
-        this._onStateChange.fire({
-            messages: [...this._messages],
-            isGenerating: this._isGenerating,
-        });
     }
 
     /**

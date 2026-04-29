@@ -9,8 +9,8 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { aiToolEvent } from './ai.gateway';
 import type { InFlightToolCall, LLMMessage, ToolDefinition } from './ai.types';
+import { aiToolEvent } from './ai-events';
 import type { LLMProvider } from './llm/llm-provider.interface';
 
 /**
@@ -98,12 +98,14 @@ export class AiService {
                     assistantText += output.content ?? '';
                     this.sendStreamChunk(conversationId, output.content ?? '');
                 } else if (output.type === 'tool_call') {
-                    toolCalls.push({
-                        id: output.toolCall?.id,
-                        name: output.toolCall?.name,
-                        arguments: output.toolCall?.arguments,
-                        timestamp: new Date(),
-                    });
+                    if (output.toolCall?.id && output.toolCall?.name) {
+                        toolCalls.push({
+                            id: output.toolCall.id,
+                            name: output.toolCall.name,
+                            arguments: output.toolCall.arguments ?? {},
+                            timestamp: new Date(),
+                        });
+                    }
                 } else if (output.type === 'done') {
                     break;
                 }
@@ -277,7 +279,7 @@ export class AiService {
 
     private async buildMessages(conversationId: string): Promise<LLMMessage[]> {
         const history = await this.getConversationHistory(conversationId);
-        return history.map((msg: any) => ({
+        return history.map((msg: { role: string; content: string }) => ({
             role: msg.role as 'user' | 'assistant' | 'tool',
             content: msg.content ?? '',
         })) as LLMMessage[];

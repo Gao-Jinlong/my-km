@@ -1,5 +1,6 @@
 import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { NestFactory, Reflector } from '@nestjs/core';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module';
@@ -69,6 +70,11 @@ async function bootstrap() {
             showRequestDuration: true,
         },
     });
+
+    // 配置 Socket.io WebSocket 适配器
+    const ioAdapter = new IoAdapter(app);
+    app.useWebSocketAdapter(ioAdapter);
+    logger.log('Socket.io WebSocket adapter configured', 'Bootstrap');
 
     // 启用 CORS
     const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:4000'];

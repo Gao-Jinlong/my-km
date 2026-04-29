@@ -32,9 +32,6 @@ export interface WSClient {
 
 class WSClientImpl extends Disposable implements WSClient {
     private _socket: Socket | null = null;
-    private _url = '';
-    private _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    private _reconnectDelay = 3000;
 
     // 事件发射器
     private _onStreamChunk = new Emitter<{ content: string }>();
@@ -49,9 +46,9 @@ class WSClientImpl extends Disposable implements WSClient {
     }
 
     async connect(url: string): Promise<void> {
-        this._url = url;
         return new Promise((resolve, reject) => {
             try {
+                console.log(`[AI WS] Connecting to ${url}...`);
                 this._socket = io(url, {
                     autoConnect: true,
                     reconnection: true,
@@ -60,33 +57,43 @@ class WSClientImpl extends Disposable implements WSClient {
                 });
 
                 this._socket.on('connect', () => {
-                    this._reconnectDelay = 3000;
+                    console.log(`[AI WS] Connected, socket id: ${this._socket?.id}`);
                     resolve();
+                });
+
+                this._socket.on('connect_error', err => {
+                    console.error(`[AI WS] Connect error: ${err.message}`);
+                    this._onError.fire({ message: 'WebSocket connection error', code: 'WS_ERROR' });
+                    reject(new Error('WebSocket connection error'));
+                });
+
+                this._socket.on('disconnect', reason => {
+                    console.log(`[AI WS] Disconnected, reason: ${reason}`);
+                });
+
+                this._socket.on('reconnect', attempt => {
+                    console.log(`[AI WS] Reconnected after ${attempt} attempts`);
+                });
+
+                this._socket.on('reconnect_error', err => {
+                    console.error(`[AI WS] Reconnect error: ${err.message}`);
+                });
+
+                this._socket.on('error', err => {
+                    console.error(`[AI WS] Error: ${err}`);
                 });
 
                 this._socket.on('message', (data: unknown) => {
                     this._handleMessage(data);
                 });
-
-                this._socket.on('disconnect', () => {
-                    this._scheduleReconnect();
-                });
-
-                this._socket.on('connect_error', () => {
-                    this._onError.fire({ message: 'WebSocket connection error', code: 'WS_ERROR' });
-                    reject(new Error('WebSocket connection error'));
-                });
             } catch (error) {
+                console.error(`[AI WS] Connect exception:`, error);
                 reject(error);
             }
         });
     }
 
     disconnect(): void {
-        if (this._reconnectTimer) {
-            clearTimeout(this._reconnectTimer);
-            this._reconnectTimer = null;
-        }
         this._socket?.disconnect();
         this._socket = null;
     }
@@ -99,18 +106,22 @@ class WSClientImpl extends Disposable implements WSClient {
     }
 
     joinConversation(conversationId: string): void {
+        console.log(`[AI WS] Joining conversation: ${conversationId}`);
         this._socket?.emit('join', { type: 'join', conversationId });
     }
 
     sendMessage(content: string, context: unknown): void {
+        console.log(`[AI WS] Sending message, length: ${content.length}`);
         this._socket?.emit('message', { type: 'message', content, context });
     }
 
     sendToolResult(toolCallId: string, result: unknown, error?: string): void {
+        console.log(`[AI WS] Sending tool result: ${toolCallId}`);
         this._socket?.emit('tool_result', { type: 'tool_result', toolCallId, result, error });
     }
 
     stopGenerating(): void {
+        console.log(`[AI WS] Stop generating`);
         this._socket?.emit('stop', { type: 'stop' });
     }
 
@@ -136,7 +147,7 @@ class WSClientImpl extends Disposable implements WSClient {
 
     private _handleMessage(data: unknown): void {
         try {
-            const msg = data as any;
+            const msg = data as Record<string, unknown>;
             switch (msg.type) {
                 case 'stream_chunk':
                     this._onStreamChunk.fire({ content: msg.content });
@@ -163,18 +174,6 @@ class WSClientImpl extends Disposable implements WSClient {
         } catch (error) {
             console.error('Failed to parse WebSocket message:', error);
         }
-    }
-
-    private _scheduleReconnect(): void {
-        if (this._reconnectTimer) return;
-        this._reconnectTimer = setTimeout(() => {
-            this._reconnectTimer = null;
-            if (this._url) {
-                this.connect(this._url).catch(() => {
-                    // 连接失败会自动重试
-                });
-            }
-        }, this._reconnectDelay);
     }
 
     override dispose(): void {

@@ -23,8 +23,10 @@ export function AIPanel() {
     const [isConnected, setIsConnected] = useState(false);
     const [selectedText, setSelectedText] = useState<string | null>(null);
     const [docTitle, setDocTitle] = useState('');
+    const [error, setError] = useState<string | null>(null);
     const harnessRef = useRef<AIHarnessService | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const isInitializedRef = useRef(false);
 
     // 初始化 harness 服务和 WebSocket 连接
     useEffect(() => {
@@ -36,21 +38,31 @@ export function AIPanel() {
             registerDefaultTools(harness);
         });
 
-        // 连接 WebSocket（MVP: 用 session ID 作为 conversationId）
-        const connect = async () => {
-            try {
-                await harness.connect('http://localhost:3000/ai');
-                setIsConnected(true);
+        // 连接 WebSocket（只在首次挂载时执行）
+        if (!isInitializedRef.current) {
+            isInitializedRef.current = true;
+            const connect = async () => {
+                try {
+                    const wsUrl =
+                        (typeof import.meta !== 'undefined' &&
+                            (import.meta as Record<string, { env?: Record<string, string> }>).env
+                                ?.VITE_AI_WS_URL) ??
+                        'http://localhost:3001/ai';
+                    await harness.connect(wsUrl);
+                    setIsConnected(true);
 
-                // 使用当前打开的文档 ID 作为 conversationId
-                const conversationId = 'doc-default';
-                harness.joinConversation(conversationId);
-            } catch (error) {
-                console.error('Failed to connect to AI service:', error);
-                setIsConnected(false);
-            }
-        };
-        connect();
+                    // 使用当前打开的文档 ID 作为 conversationId
+                    // TODO: 从 EditorTabService 获取当前活跃文档 ID
+                    const conversationId = 'doc-default';
+                    harness.joinConversation(conversationId);
+                } catch (error) {
+                    console.error('Failed to connect to AI service:', error);
+                    setIsConnected(false);
+                    setError('Failed to connect to AI service');
+                }
+            };
+            connect();
+        }
 
         // 监听状态变化
         const stateListener = harness.onStateChange(
@@ -68,13 +80,21 @@ export function AIPanel() {
             },
         );
 
+        // 监听错误
+        const errorListener = harness.onError(({ message }) => {
+            setError(message);
+            // 3 秒后自动清除错误
+            setTimeout(() => setError(null), 3000);
+        });
+
         // 初始化选中状态
         setSelectedText(harness.selectedText);
 
         return () => {
             stateListener.dispose();
             selectionListener.dispose();
-            harness.disconnect();
+            errorListener.dispose();
+            // 不在 cleanup 中断开连接，连接由 Harness 生命周期管理
         };
     }, []);
 
@@ -128,6 +148,13 @@ export function AIPanel() {
                     </span>
                 </div>
             </div>
+
+            {/* 错误提示 */}
+            {error && (
+                <div className="border-red-500/30 border-b bg-red-500/10 px-4 py-2">
+                    <p className="text-red-400 text-xs">{error}</p>
+                </div>
+            )}
 
             {/* 消息列表 */}
             <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">

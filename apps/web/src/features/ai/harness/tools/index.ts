@@ -10,6 +10,7 @@ import {
 } from '@workspace/shared/ai';
 import { getContainer } from '@/platform/bootstrap';
 import { EditorContainer } from '@/platform/editor/container';
+import { FileSystemService } from '@/platform/file-system/service';
 import type { ToolHandler } from '../../types/ai.types';
 
 /**
@@ -21,7 +22,7 @@ export const getDocumentContentHandler: ToolHandler<
 > = {
     ...getDocumentContentTool,
     execute: async ({ documentId, selectionOnly }) => {
-        const harness = getContainer().get('aiHarness') as any;
+        const harness = getContainer().get('aiHarness') as import('../index').AIHarnessService;
         const context = await harness.getContext(documentId);
         if (!context) {
             return { success: false, error: 'Document not found' };
@@ -43,10 +44,49 @@ export const getFileTreeHandler: ToolHandler<
 > = {
     ...getFileTreeTool,
     execute: async ({ maxDepth = 3 }) => {
-        // TODO: 接入 FileSystemService 获取目录树
-        return { success: true, tree: [], note: 'File tree not yet implemented' };
+        try {
+            const fileSystem = getContainer().get(FileSystemService);
+            const files = await fileSystem.listFiles('/');
+            const tree = buildFileTree(files, maxDepth, 0);
+            return { success: true, tree };
+        } catch (error) {
+            return {
+                success: false,
+                tree: [],
+                note: (error as Error).message,
+            };
+        }
     },
 };
+
+/**
+ * 递归构建文件树
+ */
+function buildFileTree(
+    files: Array<{ name: string; type: string; path?: string }>,
+    maxDepth: number,
+    currentDepth: number,
+): unknown[] {
+    if (currentDepth >= maxDepth) {
+        return [];
+    }
+    return files.map(file => {
+        const node: { name: string; type: string; children?: unknown[] } = {
+            name: file.name,
+            type: file.type,
+        };
+        if (file.type === 'directory' && file.path) {
+            try {
+                const fileSystem = getContainer().get(FileSystemService);
+                fileSystem.listFiles(file.path);
+                node.children = [];
+            } catch {
+                node.children = [];
+            }
+        }
+        return node;
+    });
+}
 
 /**
  * 插入文本工具
@@ -58,14 +98,13 @@ export const insertTextHandler: ToolHandler<
     ...insertTextTool,
     execute: async ({ text }) => {
         const editorContainer = getContainer().get(EditorContainer);
-        const editorService = (editorContainer as any).getActiveInstance?.() ?? null;
+        const editorService = editorContainer.getActiveInstance();
         if (!editorService) {
             return { success: false, error: 'No active editor' };
         }
 
         try {
-            editorService.focus();
-            editorService.insertTextAtCursor?.(text);
+            editorService.insertTextAtCursor(text);
             return { success: true };
         } catch (error) {
             return { success: false, error: (error as Error).message };
@@ -83,7 +122,7 @@ export const replaceTextHandler: ToolHandler<
     ...replaceTextTool,
     execute: async ({ newText }) => {
         const editorContainer = getContainer().get(EditorContainer);
-        const editorService = (editorContainer as any).getActiveInstance?.() ?? null;
+        const editorService = editorContainer.getActiveInstance();
         if (!editorService) {
             return { success: false, error: 'No active editor' };
         }
@@ -94,7 +133,7 @@ export const replaceTextHandler: ToolHandler<
         }
 
         try {
-            editorService.replaceSelection?.(newText);
+            editorService.replaceSelection(newText);
             return { success: true };
         } catch (error) {
             return { success: false, error: (error as Error).message };

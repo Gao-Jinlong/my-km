@@ -2,8 +2,14 @@
  * EditorService - 单个编辑器的业务逻辑服务
  */
 
-import type { LexicalEditor, Selection as LexicalSelection } from 'lexical';
-import { $getRoot, $getSelection, $isRangeSelection } from 'lexical';
+import type { LexicalEditor } from 'lexical';
+import {
+    $createTextNode,
+    $getRoot,
+    $getSelection,
+    $isElementNode,
+    $isRangeSelection,
+} from 'lexical';
 import { Emitter } from '@/base/common/event';
 import type { IDisposable } from '@/base/common/lifecycle';
 import { container } from '@/platform/bootstrap';
@@ -59,6 +65,10 @@ export interface EditorService {
     getSelectedText(): string | null;
     getFullContent(): string;
     getFormatState(): FormatState;
+
+    // 编辑器操作
+    insertTextAtCursor(text: string): void;
+    replaceSelection(text: string): void;
 
     // 生命周期
     destroy(): void;
@@ -326,23 +336,62 @@ class EditorServiceImpl implements EditorService {
             return null;
         }
 
-        let lexicalSelection: LexicalSelection | null = null;
+        let result: Selection | null = null;
         this.editor.getEditorState().read(() => {
-            // TODO: 使用 @lexical/selection 获取选区
-            lexicalSelection = $getSelection();
+            const sel = $getSelection();
+            if (!$isRangeSelection(sel)) {
+                return;
+            }
+            const anchor = sel.anchor;
+            const head = sel.focus;
+            const text = sel.getTextContent();
+            result = {
+                anchor: { blockId: anchor.key, offset: anchor.offset },
+                head: { blockId: head.key, offset: head.offset },
+                text,
+            };
         });
 
-        if (!lexicalSelection) {
-            return null;
-        }
-
-        // TODO: 将 Lexical 选区转换为 Selection 格式
-        return null;
+        return result;
     }
 
     getSelectedText(): string | null {
         const selection = this.getSelection();
         return selection?.text ?? null;
+    }
+
+    insertTextAtCursor(text: string): void {
+        if (!this.editor) {
+            return;
+        }
+        this.editor.update(() => {
+            const selection = $getSelection();
+            if ($isRangeSelection(selection)) {
+                selection.insertText(text);
+            } else {
+                const node = $createTextNode(text);
+                const root = $getRoot();
+                const lastChild = root.getLastChild();
+                if (lastChild && $isElementNode(lastChild)) {
+                    lastChild.append(node);
+                } else {
+                    root.append(node);
+                }
+            }
+        });
+    }
+
+    replaceSelection(text: string): void {
+        if (!this.editor) {
+            return;
+        }
+        this.editor.update(() => {
+            const selection = $getSelection();
+            if ($isRangeSelection(selection) && !selection.isCollapsed()) {
+                selection.removeText();
+                selection.insertText(text);
+            }
+        });
     }
 
     getFullContent(): string {
