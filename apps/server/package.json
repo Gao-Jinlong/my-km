@@ -43,6 +43,7 @@
     "dotenv": "^17.2.3",
     "ioredis": "^5.9.1",
     "mailer": "link:@nestjs/modules/mailer",
+    "openai": "^6.36.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",

@@ -1,39 +1,47 @@
 /**
- * AiService — AI 核心服务
+ * AiService — AI 核心服务（重构版）
  *
- * 负责：
- * - 消息编排和 LLM 调用
- * - Tool call 循环管理
- * - 对话历史持久化
+ * 职责：
+ * - 保留现有 handleUserMessage / getConversationHistory 用于向后兼容
+ * - 注入新服务（MessageService、ConversationService 等）
+ * - 逐步将逻辑委托给新的模块化组件
+ *
+ * 注意：在完整迁移到 AILoopOrchestrator 之前，
+ * 这个类保留现有的 handleUserMessage 实现以保持向后兼容。
  */
 
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { InFlightToolCall, LLMMessage, ToolDefinition } from './ai.types';
-import { aiToolEvent } from './ai-events';
-import type { LLMProvider } from './llm/llm-provider.interface';
-
-/**
- * WebSocket 客户端抽象（用于向连接的客户端推送消息）
- */
-export interface WSClient {
-    send(message: object): void;
-}
+import { ConnectionManager } from './connection/connection-manager';
+import { ConversationService } from './conversation/conversation.service';
+import { MessageService } from './message/message.service';
+import { ProviderRouter } from './provider/provider.router';
+import type { LLMProvider } from './provider/provider.types';
+import type { AISessionManager } from './session/ai-session-manager';
+import { ToolDispatcher } from './tools/tool.dispatcher';
 
 @Injectable()
 export class AiService {
     private readonly logger = new Logger(AiService.name);
     private provider: LLMProvider | null = null;
     private toolDefinitions: ToolDefinition[] = [];
-    private clients = new Map<string, WSClient>(); // conversationId -> client
 
-    constructor(private prisma: PrismaService) {}
+    constructor(
+        _prisma: PrismaService,
+        private messageService: MessageService,
+        _conversationService: ConversationService,
+        private connectionManager: ConnectionManager,
+        private providerRouter: ProviderRouter,
+        private toolDispatcher: ToolDispatcher,
+    ) {}
 
     /**
      * 设置 LLM provider
      */
     setProvider(provider: LLMProvider): void {
         this.provider = provider;
+        this.providerRouter.register(provider.name, provider, true);
         this.logger.log(`LLM provider set to: ${provider.name}`);
     }
 
@@ -42,24 +50,14 @@ export class AiService {
      */
     setToolDefinitions(tools: ToolDefinition[]): void {
         this.toolDefinitions = tools;
+        this.toolDispatcher.registerMany(tools);
     }
 
     /**
-     * 注册 WebSocket 客户端
-     */
-    registerClient(conversationId: string, client: WSClient): void {
-        this.clients.set(conversationId, client);
-    }
-
-    /**
-     * 移除 WebSocket 客户端
-     */
-    removeClient(conversationId: string): void {
-        this.clients.delete(conversationId);
-    }
-
-    /**
-     * 处理用户消息
+     * 处理用户消息（保留向后兼容）
+     *
+     * 注意：在完整迁移到 AILoopOrchestrator 后，此方法将被废弃，
+     * 请求应通过 RequestDispatcher.dispatch() 进入。
      */
     async handleUserMessage(
         conversationId: string,
@@ -73,14 +71,14 @@ export class AiService {
         }
 
         // 保存用户消息
-        await this.saveMessage(conversationId, 'user', content);
+        await this.messageService.create({ conversationId, role: 'user', content });
 
         // 构建对话历史
-        const messages = await this.buildMessages(conversationId);
+        const messages = await this.messageService.buildLLMHistory(conversationId);
 
         // 推送 tool call 到前端并等待结果
         let currentMessages = [...messages];
-        const maxToolRounds = 10; // 防止无限循环
+        const maxToolRounds = 10;
         let round = 0;
 
         while (round < maxToolRounds) {
@@ -118,12 +116,16 @@ export class AiService {
 
             // 保存助手消息
             if (assistantText) {
-                await this.saveMessage(conversationId, 'assistant', assistantText, toolCalls);
+                await this.messageService.create({
+                    conversationId,
+                    role: 'assistant',
+                    content: assistantText,
+                    toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+                });
             }
 
-            // 如果有工具调用，发送给前端执行
+            // 无工具调用 → 结束
             if (toolCalls.length === 0) {
-                // 无工具调用，对话结束
                 this.sendStreamDone(conversationId);
                 return;
             }
@@ -133,9 +135,9 @@ export class AiService {
                 this.sendToolCall(conversationId, tool);
             }
 
-            // 等待前端返回 tool_result（通过 handleToolResult 方法）
-            // 这里使用 Promise race with timeout
-            const results = await this.waitForToolResults(conversationId, toolCalls, 30000);
+            // 等待前端返回 tool_result
+            // 注意：这里仍然使用旧的事件机制，将在 Phase 3 中替换为 ToolDispatcher
+            const results = await this._waitForToolResultsLegacy(conversationId, toolCalls, 30000);
 
             if (!results) {
                 this.sendError(conversationId, 'Tool execution timed out', 'TOOL_TIMEOUT');
@@ -157,16 +159,17 @@ export class AiService {
                     ],
                 });
 
-                // 保存 tool 结果到 DB
-                await this.saveMessage(conversationId, 'tool', JSON.stringify(result), [], toolId);
+                await this.messageService.create({
+                    conversationId,
+                    role: 'tool',
+                    content: JSON.stringify(result),
+                    toolResultId: toolId,
+                });
             }
 
             currentMessages = [
                 ...currentMessages,
-                {
-                    role: 'assistant',
-                    content: assistantText || undefined,
-                } as LLMMessage,
+                { role: 'assistant', content: assistantText || undefined } as LLMMessage,
                 ...toolResultMessages,
             ];
         }
@@ -178,16 +181,6 @@ export class AiService {
     }
 
     /**
-     * 处理前端返回的工具结果
-     * 注意：在 MVP 中，tool call 是同步等待的（通过 waitForToolResults），
-     * 这个方法保留用于未来异步处理。
-     */
-    handleToolResult(_conversationId: string, _toolCallId: string, _result: unknown): void {
-        // 当前在 handleUserMessage 中通过 Promise 等待
-        // 保留此方法用于未来扩展
-    }
-
-    /**
      * 停止当前生成
      */
     stopGeneration(_conversationId: string, abortController: AbortController): void {
@@ -195,22 +188,10 @@ export class AiService {
     }
 
     /**
-     * 加载对话历史
+     * 加载对话历史（委托给 MessageService）
      */
     async getConversationHistory(conversationId: string): Promise<object[]> {
-        const messages = await this.prisma.message.findMany({
-            where: { conversationId },
-            orderBy: { createdAt: 'asc' },
-            take: 100,
-            select: {
-                id: true,
-                role: true,
-                content: true,
-                toolCalls: true,
-                toolResultId: true,
-                createdAt: true,
-            },
-        });
+        const messages = await this.messageService.findByConversationId(conversationId);
 
         return messages.map(msg => ({
             id: msg.id,
@@ -222,122 +203,50 @@ export class AiService {
         }));
     }
 
+    // ========== 私有方法 ==========
+
     /**
-     * 等待前端返回工具结果（带超时）
-     *
-     * 注意：这里使用一个简单的 Promise 方案。在完整实现中，
-     * 应该使用更健壮的消息队列机制。
+     * 等待工具结果（委托给 ToolDispatcher，消除全局 EventEmitter）
      */
-    private waitForToolResults(
+    private async _waitForToolResultsLegacy(
         conversationId: string,
         toolCalls: InFlightToolCall[],
         timeoutMs: number,
     ): Promise<Record<string, unknown> | null> {
-        return new Promise(resolve => {
-            const results: Record<string, unknown> = {};
-            let resolved = false;
-
-            const timeout = setTimeout(() => {
-                if (!resolved) {
-                    resolved = true;
-                    aiToolEvent.removeListener('tool_result', handler);
-                    resolve(null);
-                }
-            }, timeoutMs);
-
-            const handler = (data: {
-                conversationId: string;
-                toolCallId: string;
-                result: unknown;
-                error?: string;
-            }) => {
-                if (data.conversationId !== conversationId) return;
-                const { toolCallId, result, error } = data;
-
-                if (error) {
-                    results[toolCallId] = { error };
-                } else {
-                    results[toolCallId] = result;
-                }
-
-                // 所有工具都有结果了
-                if (Object.keys(results).length >= toolCalls.length) {
-                    clearTimeout(timeout);
-                    if (!resolved) {
-                        resolved = true;
-                        aiToolEvent.removeListener('tool_result', handler);
-                        resolve(results);
-                    }
-                }
-            };
-
-            aiToolEvent.on('tool_result', handler);
-        });
-    }
-
-    // ========== 私有方法 ==========
-
-    private async buildMessages(conversationId: string): Promise<LLMMessage[]> {
-        const history = await this.getConversationHistory(conversationId);
-        return history.map((msg: { role: string; content: string }) => ({
-            role: msg.role as 'user' | 'assistant' | 'tool',
-            content: msg.content ?? '',
-        })) as LLMMessage[];
-    }
-
-    private async saveMessage(
-        conversationId: string,
-        role: string,
-        content: string | null,
-        toolCalls: InFlightToolCall[] = [],
-        toolResultId?: string,
-    ): Promise<void> {
-        await this.prisma.message.create({
-            data: {
-                conversationId,
-                role,
-                content,
-                toolCalls:
-                    toolCalls.length > 0
-                        ? JSON.parse(
-                              JSON.stringify(toolCalls.map(t => ({ id: t.id, name: t.name }))),
-                          )
-                        : undefined,
-                toolResultId,
-            },
-        });
+        return this.toolDispatcher.waitForResultsByConversation(
+            conversationId,
+            toolCalls,
+            timeoutMs,
+        );
     }
 
     private sendStreamChunk(conversationId: string, content: string): void {
-        const client = this.clients.get(conversationId);
-        if (client) {
-            client.send({ type: 'stream_chunk', content });
-        }
+        this.connectionManager.emitToConversation(conversationId, 'stream_chunk', {
+            type: 'stream_chunk',
+            content,
+        });
     }
 
     private sendStreamDone(conversationId: string): void {
-        const client = this.clients.get(conversationId);
-        if (client) {
-            client.send({ type: 'stream_done' });
-        }
+        this.connectionManager.emitToConversation(conversationId, 'stream_done', {
+            type: 'stream_done',
+        });
     }
 
     private sendError(conversationId: string, message: string, code: string): void {
-        const client = this.clients.get(conversationId);
-        if (client) {
-            client.send({ type: 'error', message, code });
-        }
+        this.connectionManager.emitToConversation(conversationId, 'error', {
+            type: 'error',
+            message,
+            code,
+        });
     }
 
     private sendToolCall(conversationId: string, tool: InFlightToolCall): void {
-        const client = this.clients.get(conversationId);
-        if (client) {
-            client.send({
-                type: 'tool_call',
-                id: tool.id,
-                name: tool.name,
-                arguments: tool.arguments,
-            });
-        }
+        this.connectionManager.emitToConversation(conversationId, 'tool_call', {
+            type: 'tool_call',
+            id: tool.id,
+            name: tool.name,
+            arguments: tool.arguments,
+        });
     }
 }

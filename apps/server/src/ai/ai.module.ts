@@ -4,18 +4,41 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { AiController } from './ai.controller';
 import { AiGateway } from './ai.gateway';
 import { AiService } from './ai.service';
-import { AnthropicProvider } from './llm/anthropic.provider';
+import { ConnectionManager } from './connection/connection-manager';
+import { ConversationService } from './conversation/conversation.service';
+import { AiRateLimiter } from './dispatch/rate-limiter.guard';
+import { RequestDispatcher } from './dispatch/request-dispatcher';
+import { MessageService } from './message/message.service';
+import { AILoopOrchestrator } from './orchestrator/ai-loop.orchestrator';
+import { AnthropicProvider } from './provider/anthropic.provider';
+import { OpenAIProvider } from './provider/openai.provider';
+import { ProviderRouter } from './provider/provider.router';
+import { AISessionManager } from './session/ai-session-manager';
+import { ToolDispatcher } from './tools/tool.dispatcher';
 
 /**
  * AI 模块
  *
  * 初始化 LLM provider 和工具定义。
+ * 支持多 provider: Anthropic, OpenAI
  */
 @Module({
     imports: [PrismaModule, ConfigModule],
     controllers: [AiController],
-    providers: [AiService, AiGateway],
-    exports: [AiService],
+    providers: [
+        AiGateway,
+        AiService,
+        ConversationService,
+        MessageService,
+        AISessionManager,
+        ConnectionManager,
+        AILoopOrchestrator,
+        ProviderRouter,
+        ToolDispatcher,
+        RequestDispatcher,
+        AiRateLimiter,
+    ],
+    exports: [AiService, ConversationService, MessageService],
 })
 export class AiModule implements OnModuleInit {
     constructor(
@@ -40,6 +63,12 @@ export class AiModule implements OnModuleInit {
                 this.configService.get<string>('ANTHROPIC_MODEL'),
             );
             this.aiService.setProvider(anthropicProvider);
+        } else if (provider === 'openai') {
+            const openaiProvider = new OpenAIProvider(
+                apiKey,
+                this.configService.get<string>('OPENAI_MODEL'),
+            );
+            this.aiService.setProvider(openaiProvider);
         } else {
             console.warn(`⚠️  Unknown AI provider: ${provider}`);
         }

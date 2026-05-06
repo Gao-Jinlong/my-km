@@ -2,11 +2,12 @@
  * Anthropic Claude LLM Provider
  *
  * 使用 @anthropic-ai/sdk 实现流式输出和 tool call。
+ * 从 llm/ 迁移到 provider/ 目录。
  */
 
 import Anthropic from '@anthropic-ai/sdk';
 import type { LLMMessage, LLMOutput, ToolDefinition } from '../ai.types';
-import type { LLMProvider } from './llm-provider.interface';
+import type { LLMProvider } from './provider.types';
 
 export class AnthropicProvider implements LLMProvider {
     readonly name = 'anthropic';

@@ -95,11 +95,46 @@ model Message {
   conversationId String
   role           String // 'user' | 'assistant' | 'tool' | 'system'
   content        String?  @db.Text
+
+  // Tool call 相关
   toolCalls      Json?    // [{ id, name }] - assistant 消息的工具调用摘要
   toolResultId   String?  // role === 'tool' 时关联的 tool call id
+
+  // Token 统计（用于用量追踪和上下文窗口管理）
+  tokenCount     Int?
+  finishReason   String?  // 'stop' | 'tool_calls' | 'length' | 'error'
+
+  // 元数据
+  metadata       Json?    // 扩展字段：model used, latency, etc.
+
   createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([conversationId])
+  @@index([createdAt])
+  @@index([role])
+}
+
+model Conversation {
+  id        String   @id @default(cuid())
+  userId    String?  // 关联用户（可选，匿名用户也可为 null）
+  title     String?  // 对话标题（首次交互后由 AI 生成）
+  status    String   @default("active")  // active | archived | deleted
+
+  // 模型配置（覆盖默认）
+  model     String?  // 指定模型
+  provider  String?  // 指定 provider
+
+  // 统计
+  messageCount Int   @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages Message[]
+
+  @@index([userId])
+  @@index([status])
   @@index([createdAt])
 }
