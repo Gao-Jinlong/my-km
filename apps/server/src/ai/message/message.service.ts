@@ -8,6 +8,7 @@
  * - Token 统计
  */
 
+import { Prisma } from '@my-km/prisma';
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { InFlightToolCall, LLMMessage } from '../ai.types';
@@ -46,12 +47,15 @@ export class MessageService {
                 content: opts.content,
                 toolCalls:
                     opts.toolCalls && opts.toolCalls.length > 0
-                        ? opts.toolCalls.map(t => ({ id: t.id, name: t.name }))
+                        ? (opts.toolCalls.map(t => ({
+                              id: t.id,
+                              name: t.name,
+                          })) as Prisma.InputJsonValue)
                         : undefined,
                 toolResultId: opts.toolResultId,
                 tokenCount: opts.tokenCount,
                 finishReason: opts.finishReason,
-                metadata: opts.metadata ? (opts.metadata as Record<string, unknown>) : undefined,
+                metadata: opts.metadata ? (opts.metadata as Prisma.InputJsonValue) : undefined,
             },
         });
 
