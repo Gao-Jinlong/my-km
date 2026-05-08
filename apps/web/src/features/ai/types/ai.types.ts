@@ -34,9 +34,16 @@ export interface MessageWire {
  */
 export type ClientMessage =
     | { type: 'join'; conversationId: string }
-    | { type: 'message'; content: string; context: AIContextWire }
-    | { type: 'tool_result'; toolCallId: string; result: unknown; error?: string }
-    | { type: 'stop' };
+    | { type: 'create_conversation'; conversationId: string; title?: string }
+    | { type: 'message'; conversationId: string; content: string; context: AIContextWire | null }
+    | {
+          type: 'tool_result';
+          conversationId: string;
+          toolCallId: string;
+          result: unknown;
+          error?: string;
+      }
+    | { type: 'stop'; conversationId: string };
 
 /**
  * 服务端 → 客户端消息

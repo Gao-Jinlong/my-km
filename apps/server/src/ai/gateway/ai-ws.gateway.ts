@@ -18,6 +18,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { AiService } from '../ai.service';
 import { ConnectionManager } from '../connection/connection-manager';
+import { ConversationService } from '../conversation/conversation.service';
 import { RequestDispatcher } from '../dispatch/request-dispatcher';
 import { AISessionManager } from '../session/ai-session-manager';
 import { ToolDispatcher } from '../tools/tool.dispatcher';
@@ -45,6 +46,7 @@ export class AiGateway {
     constructor(
         private aiService: AiService,
         private connectionManager: ConnectionManager,
+        private conversationService: ConversationService,
         private requestDispatcher: RequestDispatcher,
         private sessionManager: AISessionManager,
         private toolDispatcher: ToolDispatcher,
@@ -84,6 +86,9 @@ export class AiGateway {
 
     /**
      * 加入对话
+     *
+     * 如果对话不存在，自动创建（决策 D3/D11）。
+     * TODO(P1): 从 JWT 提取 userId，传入 createConversation
      */
     @SubscribeMessage('join')
     async handleJoin(@MessageBody() data: ClientMsg, @ConnectedSocket() client: Socket) {
@@ -96,6 +101,19 @@ export class AiGateway {
                 code: 'MISSING_CONVERSATION_ID',
             });
             return;
+        }
+
+        // 确保对话存在：不存在则自动创建
+        let conversation = await this.conversationService.findById(data.conversationId);
+        if (!conversation) {
+            this.logger.log(
+                `[${client.id}] conversation not found, creating: ${data.conversationId}`,
+            );
+            // TODO(P1): 从 JWT 提取 userId 传入
+            conversation = await this.conversationService.create({
+                id: data.conversationId,
+                userId: undefined,
+            });
         }
 
         client.join(data.conversationId);

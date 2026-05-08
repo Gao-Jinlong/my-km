@@ -50,7 +50,19 @@ export class RequestDispatcher {
 
         // 1. 速率限制检查
         const conversation = await this.conversationService.findById(conversationId);
-        const userId = conversation?.userId ?? null;
+        if (!conversation) {
+            this.logger.warn(
+                `[${clientId}] dispatch rejected: conversation ${conversationId} not found`,
+            );
+            this.connectionManager.emitToClient(clientId, 'error', {
+                type: 'error',
+                message: 'Conversation not found. Please join a conversation first.',
+                code: 'CONVERSATION_NOT_FOUND',
+            });
+            return;
+        }
+
+        const userId = conversation.userId ?? null;
         if (!this.rateLimiter.check(userId, clientId)) {
             this.connectionManager.emitToConversation(conversationId, 'error', {
                 type: 'error',
@@ -60,25 +72,14 @@ export class RequestDispatcher {
             return;
         }
 
-        // 2. 确保对话存在（如果不存在则创建）
-        let conv = conversation;
-        if (!conv) {
-            conv = await this.conversationService.create({
-                userId: undefined, // 匿名用户
-            });
-        }
-
-        // 3. 创建 AI 会话（并发控制）
+        // 2. 创建 AI 会话（并发控制）
         const session = this.sessionManager.create({
             conversationId,
             clientId,
         });
 
         try {
-            // 4. 将客户端加入对话
-            this.connectionManager.joinConversation(clientId, conversationId);
-
-            // 5. 执行 AI 循环
+            // 3. 执行 AI 循环
             await this.loopOrchestrator.execute(session, content);
         } catch (error) {
             this.logger.error(`Dispatch failed for session ${session.id}:`, error);
@@ -88,7 +89,7 @@ export class RequestDispatcher {
                 code: 'DISPATCH_ERROR',
             });
         } finally {
-            // 6. 清理会话
+            // 4. 清理会话
             this.sessionManager.cleanup(conversationId);
         }
     }

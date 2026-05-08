@@ -8,6 +8,7 @@
 import { io, type Socket } from 'socket.io-client';
 import { Emitter, type Event } from '@/base/common/event';
 import { Disposable } from '@/base/common/lifecycle';
+import type { ServerMessage } from '../types/ai.types';
 
 /**
  * WSClient 接口
@@ -17,10 +18,16 @@ export interface WSClient {
     disconnect(): void;
     send(message: object): void;
     joinConversation(conversationId: string): void;
-    sendMessage(content: string, context: unknown): void;
-    sendToolResult(toolCallId: string, result: unknown, error?: string): void;
-    stopGenerating(): void;
+    sendMessage(content: string, context: unknown, conversationId: string): void;
+    sendToolResult(
+        conversationId: string,
+        toolCallId: string,
+        result: unknown,
+        error?: string,
+    ): void;
+    stopGenerating(conversationId: string): void;
     get isConnected(): boolean;
+    get onConnectionChange(): Event<{ connected: boolean }>;
     get onStreamChunk(): Event<{ content: string }>;
     get onToolCall(): Event<{ id: string; name: string; args: object }>;
     get onStreamDone(): Event<void>;
@@ -40,6 +47,7 @@ class WSClientImpl extends Disposable implements WSClient {
     private _onError = new Emitter<{ message: string; code: string }>();
     private _onHistory = new Emitter<{ messages: unknown[] }>();
     private _onToolTimeout = new Emitter<{ toolCallId: string; message: string }>();
+    private _onConnectionChange = new Emitter<{ connected: boolean }>();
 
     get isConnected(): boolean {
         return this._socket?.connected ?? false;
@@ -58,6 +66,7 @@ class WSClientImpl extends Disposable implements WSClient {
 
                 this._socket.on('connect', () => {
                     console.log(`[AI WS] Connected, socket id: ${this._socket?.id}`);
+                    this._onConnectionChange.fire({ connected: true });
                     resolve();
                 });
 
@@ -69,6 +78,7 @@ class WSClientImpl extends Disposable implements WSClient {
 
                 this._socket.on('disconnect', reason => {
                     console.log(`[AI WS] Disconnected, reason: ${reason}`);
+                    this._onConnectionChange.fire({ connected: false });
                 });
 
                 this._socket.on('reconnect', attempt => {
@@ -110,22 +120,36 @@ class WSClientImpl extends Disposable implements WSClient {
         this._socket?.emit('join', { type: 'join', conversationId });
     }
 
-    sendMessage(content: string, context: unknown): void {
+    sendMessage(content: string, context: unknown, conversationId: string): void {
         console.log(`[AI WS] Sending message, length: ${content.length}`);
-        this._socket?.emit('message', { type: 'message', content, context });
+        this._socket?.emit('message', { type: 'message', conversationId, content, context });
     }
 
-    sendToolResult(toolCallId: string, result: unknown, error?: string): void {
+    sendToolResult(
+        conversationId: string,
+        toolCallId: string,
+        result: unknown,
+        error?: string,
+    ): void {
         console.log(`[AI WS] Sending tool result: ${toolCallId}`);
-        this._socket?.emit('tool_result', { type: 'tool_result', toolCallId, result, error });
+        this._socket?.emit('tool_result', {
+            type: 'tool_result',
+            conversationId,
+            toolCallId,
+            result,
+            error,
+        });
     }
 
-    stopGenerating(): void {
+    stopGenerating(conversationId: string): void {
         console.log(`[AI WS] Stop generating`);
-        this._socket?.emit('stop', { type: 'stop' });
+        this._socket?.emit('stop', { type: 'stop', conversationId });
     }
 
     // 事件访问器
+    get onConnectionChange(): Event<{ connected: boolean }> {
+        return this._onConnectionChange.event;
+    }
     get onStreamChunk(): Event<{ content: string }> {
         return this._onStreamChunk.event;
     }
@@ -147,7 +171,7 @@ class WSClientImpl extends Disposable implements WSClient {
 
     private _handleMessage(data: unknown): void {
         try {
-            const msg = data as Record<string, unknown>;
+            const msg = data as ServerMessage;
             switch (msg.type) {
                 case 'stream_chunk':
                     this._onStreamChunk.fire({ content: msg.content });
@@ -184,6 +208,7 @@ class WSClientImpl extends Disposable implements WSClient {
         this._onError.dispose();
         this._onHistory.dispose();
         this._onToolTimeout.dispose();
+        this._onConnectionChange.dispose();
         super.dispose();
     }
 }

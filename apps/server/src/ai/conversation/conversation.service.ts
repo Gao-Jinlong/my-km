@@ -29,6 +29,7 @@ export class ConversationService {
     async create(opts: CreateConversationOpts = {}) {
         const conversation = await this.prisma.conversation.create({
             data: {
+                id: opts.id || undefined,
                 userId: opts.userId || null,
                 title: opts.title || null,
                 model: opts.model || null,

@@ -5,6 +5,7 @@
 export type ConversationStatus = 'active' | 'archived' | 'deleted';
 
 export interface CreateConversationOpts {
+    id?: string; // 前端生成的 ID（如 nanoid），可选
     userId?: string;
     title?: string;
     model?: string;

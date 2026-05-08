@@ -1,15 +1,15 @@
 /**
  * AIPanel — AI 聊天 UI 主组件
  *
- * 连接 AIHarnessService，渲染消息列表和输入区域。
+ * 通过 useAIHarness hook 订阅 AIHarnessService 状态，
+ * 渲染消息列表和输入区域。
  */
 
 import { Loader2, Send } from 'lucide-react';
+import { nanoid } from 'nanoid';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import type { AIHarnessService } from '@/features/ai/harness';
-import type { MessageWire } from '@/features/ai/types/ai.types';
-import { getContainer } from '@/platform/bootstrap';
+import { useAIHarness } from '@/hooks/use-ai-harness';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import { AIHeader } from './ai-header';
 import { ContextBadge } from './context-badge';
@@ -18,98 +18,66 @@ import { MessageBubble } from './message-bubble';
 export function AIPanel() {
     const { aiPanelCollapsed, toggleAIPanel } = useWorkspaceStore();
     const [inputValue, setInputValue] = useState('');
-    const [messages, setMessages] = useState<ReadonlyArray<MessageWire>>([]);
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [isConnected, setIsConnected] = useState(false);
-    const [selectedText, setSelectedText] = useState<string | null>(null);
-    const [docTitle, setDocTitle] = useState('');
-    const [error, setError] = useState<string | null>(null);
-    const harnessRef = useRef<AIHarnessService | null>(null);
+    const [showContextBadge, setShowContextBadge] = useState(true);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const isInitializedRef = useRef(false);
 
-    // 初始化 harness 服务和 WebSocket 连接
+    const {
+        messages,
+        isGenerating,
+        isConnected,
+        selectedText,
+        documentTitle,
+        error,
+        connect,
+        joinConversation,
+        sendMessage,
+        stopGenerating,
+        registerTools,
+    } = useAIHarness();
+
+    // 初始化：注册工具、连接 WebSocket、加入对话
     useEffect(() => {
-        const harness = getContainer().get('aiHarness') as AIHarnessService;
-        harnessRef.current = harness;
+        if (isInitializedRef.current) return;
+        isInitializedRef.current = true;
 
         // 注册工具
         import('./tool-setup').then(({ registerDefaultTools }) => {
-            registerDefaultTools(harness);
+            registerTools(registerDefaultTools);
         });
 
-        // 连接 WebSocket（只在首次挂载时执行）
-        if (!isInitializedRef.current) {
-            isInitializedRef.current = true;
-            const connect = async () => {
-                try {
-                    const wsUrl =
-                        (typeof import.meta !== 'undefined' &&
-                            (import.meta as Record<string, { env?: Record<string, string> }>).env
-                                ?.VITE_AI_WS_URL) ??
-                        'http://localhost:3001/ai';
-                    await harness.connect(wsUrl);
-                    setIsConnected(true);
+        const doConnect = async () => {
+            try {
+                const meta = import.meta as { env?: { VITE_AI_WS_URL?: string } };
+                const wsUrl = meta.env?.VITE_AI_WS_URL ?? 'http://localhost:3001/ai';
+                await connect(wsUrl);
 
-                    // 使用当前打开的文档 ID 作为 conversationId
-                    // TODO: 从 EditorTabService 获取当前活跃文档 ID
-                    const conversationId = 'doc-default';
-                    harness.joinConversation(conversationId);
-                } catch (error) {
-                    console.error('Failed to connect to AI service:', error);
-                    setIsConnected(false);
-                    setError('Failed to connect to AI service');
-                }
-            };
-            connect();
-        }
-
-        // 监听状态变化
-        const stateListener = harness.onStateChange(
-            ({ messages: newMessages, isGenerating: generating }) => {
-                setMessages(newMessages);
-                setIsGenerating(generating);
-            },
-        );
-
-        // 监听选中文本变化
-        const selectionListener = harness.onSelectionChange(
-            ({ selectedText: text, documentTitle: title }) => {
-                setSelectedText(text);
-                setDocTitle(title);
-            },
-        );
-
-        // 监听错误
-        const errorListener = harness.onError(({ message }) => {
-            setError(message);
-            // 3 秒后自动清除错误
-            setTimeout(() => setError(null), 3000);
-        });
-
-        // 初始化选中状态
-        setSelectedText(harness.selectedText);
-
-        return () => {
-            stateListener.dispose();
-            selectionListener.dispose();
-            errorListener.dispose();
-            // 不在 cleanup 中断开连接，连接由 Harness 生命周期管理
+                const conversationId = `conv-${nanoid(8)}`;
+                joinConversation(conversationId);
+            } catch (error) {
+                console.error('Failed to connect to AI service:', error);
+            }
         };
-    }, []);
+        doConnect();
+    }, [connect, joinConversation, registerTools]);
+
+    // 当 harness 选中文字变化时，重新显示 badge
+    useEffect(() => {
+        if (selectedText) setShowContextBadge(true);
+    }, [selectedText]);
 
     // 自动滚动到底部
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, []);
+    });
 
     const handleSend = useCallback(() => {
         const trimmed = inputValue.trim();
-        if (!trimmed || !harnessRef.current || isGenerating) return;
+        if (!trimmed || isGenerating) return;
 
-        harnessRef.current.sendMessage(trimmed);
+        sendMessage(trimmed);
         setInputValue('');
-    }, [inputValue, isGenerating]);
+    }, [inputValue, isGenerating, sendMessage]);
 
     const handleKeyDown = useCallback(
         (e: React.KeyboardEvent) => {
@@ -122,8 +90,8 @@ export function AIPanel() {
     );
 
     const handleStop = useCallback(() => {
-        harnessRef.current?.stopGenerating();
-    }, []);
+        stopGenerating();
+    }, [stopGenerating]);
 
     if (aiPanelCollapsed) {
         return (
@@ -171,7 +139,7 @@ export function AIPanel() {
                     </div>
                 )}
 
-                {messages.map((msg: MessageWire) => (
+                {messages.map(msg => (
                     <MessageBubble key={msg.id} message={msg} />
                 ))}
                 <div ref={messagesEndRef} />
@@ -180,11 +148,13 @@ export function AIPanel() {
             {/* 输入区域 */}
             <div className="flex flex-col gap-2 border-ws-border border-t p-3">
                 {/* 选中文本上下文指示 */}
-                <ContextBadge
-                    selectedText={selectedText}
-                    documentTitle={docTitle}
-                    onClear={() => setSelectedText(null)}
-                />
+                {showContextBadge && selectedText && (
+                    <ContextBadge
+                        selectedText={selectedText}
+                        documentTitle={documentTitle}
+                        onClear={() => setShowContextBadge(false)}
+                    />
+                )}
 
                 {isGenerating && (
                     <div className="flex items-center justify-between px-1">
