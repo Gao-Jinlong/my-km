@@ -3113,6 +3113,816 @@
           ]
         }
       ]
+    },
+    {
+      "type": "frame",
+      "id": "e7RFD",
+      "x": 4926,
+      "y": 48,
+      "name": "AIPanel - Multi-Conversation",
+      "width": 420,
+      "height": 900,
+      "fill": "#181818",
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "fV8nJ",
+          "name": "Panel Header",
+          "width": "fill_container",
+          "height": 48,
+          "stroke": {
+            "thickness": {
+              "bottom": 1
+            },
+            "fill": "#333333"
+          },
+          "padding": [
+            0,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "Y0Eof",
+              "name": "AI Title",
+              "gap": 8,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "F5uozy",
+                  "name": "sparkle",
+                  "width": 18,
+                  "height": 18,
+                  "iconFontName": "sparkles",
+                  "iconFontFamily": "lucide",
+                  "fill": "#58a6ff"
+                },
+                {
+                  "type": "text",
+                  "id": "AGHRX",
+                  "name": "titleText",
+                  "fill": "#cccccc",
+                  "content": "AI Assistant",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "C6HQmD",
+              "name": "Close Button",
+              "width": 28,
+              "height": 28,
+              "cornerRadius": 4,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "Xkhft",
+                  "name": "closeIcon",
+                  "width": 16,
+                  "height": 16,
+                  "iconFontName": "x",
+                  "iconFontFamily": "lucide",
+                  "fill": "#999999"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "yu4MV",
+          "name": "Conversation List Section",
+          "width": "fill_container",
+          "height": 180,
+          "layout": "vertical",
+          "children": [
+            {
+              "type": "frame",
+              "id": "exUMY",
+              "name": "New Conv Bar",
+              "width": "fill_container",
+              "height": 40,
+              "stroke": {
+                "thickness": {
+                  "bottom": 1
+                },
+                "fill": "#333333"
+              },
+              "gap": 8,
+              "padding": [
+                0,
+                12
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "QyNsQ",
+                  "name": "New Conversation Button",
+                  "height": 32,
+                  "fill": "#1e1e1e",
+                  "cornerRadius": 6,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#333333"
+                  },
+                  "gap": 6,
+                  "padding": [
+                    0,
+                    12
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "NvbTI",
+                      "name": "plusIcon",
+                      "width": 14,
+                      "height": 14,
+                      "iconFontName": "plus",
+                      "iconFontFamily": "lucide",
+                      "fill": "#58a6ff"
+                    },
+                    {
+                      "type": "text",
+                      "id": "M1o7EH",
+                      "name": "newConvText",
+                      "fill": "#58a6ff",
+                      "content": "New Conversation",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "t1Hv3",
+                  "name": "Search Button",
+                  "width": 28,
+                  "height": 28,
+                  "cornerRadius": 4,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "UbyT4",
+                      "name": "searchIcon",
+                      "width": 16,
+                      "height": 16,
+                      "iconFontName": "search",
+                      "iconFontFamily": "lucide",
+                      "fill": "#999999"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "u5Yu2",
+              "name": "Conversation List",
+              "width": "fill_container",
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "dRIeC",
+                  "name": "Conversation Item - Active",
+                  "width": "fill_container",
+                  "height": 48,
+                  "fill": "#58a6ff",
+                  "gap": 10,
+                  "padding": [
+                    0,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "y82vJ",
+                      "name": "Status Dot - Active",
+                      "fill": "#ffffff",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "text",
+                      "id": "l0sNVM",
+                      "name": "convTitle1",
+                      "fill": "#ffffff",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Fix auth bug with token refresh",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    },
+                    {
+                      "type": "text",
+                      "id": "Ry6FA",
+                      "name": "convTime1",
+                      "fill": "#ffffff",
+                      "content": "10:30",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "w4PRm4",
+                  "name": "Conversation Item - Inactive",
+                  "width": "fill_container",
+                  "height": 48,
+                  "gap": 10,
+                  "padding": [
+                    0,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "I0esY",
+                      "name": "convTitle2",
+                      "fill": "#cccccc",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Refactor frontend architecture",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "e3DZVi",
+                      "name": "convTime2",
+                      "fill": "#999999",
+                      "content": "Yesterday",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "noigP",
+                  "name": "Conv Separator",
+                  "width": "fill_container",
+                  "height": 1,
+                  "fill": "#333333"
+                },
+                {
+                  "type": "frame",
+                  "id": "XSmr2",
+                  "name": "Conversation Item - Unread",
+                  "width": "fill_container",
+                  "height": 48,
+                  "gap": 10,
+                  "padding": [
+                    0,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "fMb0s",
+                      "name": "Unread Dot",
+                      "fill": "#58a6ff",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "text",
+                      "id": "wlGce",
+                      "name": "convTitle3",
+                      "fill": "#cccccc",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "AI chat feature implementation",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "Gg8IX",
+                      "name": "convTime3",
+                      "fill": "#999999",
+                      "content": "Monday",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "MKLSK",
+                  "name": "Conv Separator 2",
+                  "width": "fill_container",
+                  "height": 1,
+                  "fill": "#333333"
+                },
+                {
+                  "type": "frame",
+                  "id": "cjacn",
+                  "name": "Conversation Item - Generating",
+                  "width": "fill_container",
+                  "height": 48,
+                  "gap": 10,
+                  "padding": [
+                    0,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "hyKlL",
+                      "name": "Spinner Icon",
+                      "width": 14,
+                      "height": 14,
+                      "iconFontName": "loader",
+                      "iconFontFamily": "lucide",
+                      "fill": "#58a6ff"
+                    },
+                    {
+                      "type": "text",
+                      "id": "u6vApS",
+                      "name": "convTitle4",
+                      "fill": "#cccccc",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Database migration planning",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "fHWtE",
+                      "name": "convTime4",
+                      "fill": "#999999",
+                      "content": "10:32",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "e0Hcv",
+          "name": "Section Divider",
+          "width": "fill_container",
+          "height": 1,
+          "fill": "#333333"
+        },
+        {
+          "type": "frame",
+          "id": "f4SFv4",
+          "name": "Message List Section",
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "children": [
+            {
+              "type": "frame",
+              "id": "V4svQ1",
+              "name": "AI Welcome Message",
+              "width": "fill_container",
+              "gap": 10,
+              "padding": [
+                12,
+                16
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "MYAS7",
+                  "name": "AI Avatar",
+                  "width": 32,
+                  "height": 32,
+                  "fill": "#252525",
+                  "cornerRadius": 24,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#333333"
+                  },
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "dJGBZ",
+                      "name": "sparkleFixed",
+                      "width": 16,
+                      "height": 16,
+                      "iconFontName": "sparkles",
+                      "iconFontFamily": "lucide",
+                      "fill": "#58a6ff"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "fjkw0",
+                  "name": "AI Message Bubble",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "rKjk8",
+                      "name": "aiBubbleContent",
+                      "fill": "#cccccc",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Hi! I can help you debug the auth issue. Let me look at the token refresh logic.",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "aZfkQ",
+                      "name": "Tool Call Indicator",
+                      "width": "fill_container",
+                      "height": 32,
+                      "fill": "#181818",
+                      "cornerRadius": 6,
+                      "stroke": {
+                        "thickness": 1,
+                        "fill": "#333333"
+                      },
+                      "gap": 8,
+                      "padding": [
+                        0,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon_font",
+                          "id": "y7p8C",
+                          "name": "toolIcon",
+                          "width": 14,
+                          "height": 14,
+                          "iconFontName": "code",
+                          "iconFontFamily": "lucide",
+                          "fill": "#58a6ff"
+                        },
+                        {
+                          "type": "text",
+                          "id": "x6WDV",
+                          "name": "toolName",
+                          "fill": "#58a6ff",
+                          "content": "read_file",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "qoq9L",
+                          "name": "toolTarget",
+                          "fill": "#999999",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "auth.service.ts",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "icon_font",
+                          "id": "pcU1r",
+                          "name": "toolStatus",
+                          "width": 14,
+                          "height": 14,
+                          "iconFontName": "check",
+                          "iconFontFamily": "lucide",
+                          "fill": "#58a6ff"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "yjlyw",
+              "name": "User Message",
+              "width": "fill_container",
+              "padding": [
+                12,
+                16
+              ],
+              "justifyContent": "end",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "gL6Pi",
+                  "name": "User Message Bubble",
+                  "width": "fill_container",
+                  "fill": "#58a6ff",
+                  "cornerRadius": 10,
+                  "layout": "vertical",
+                  "padding": 12,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "NMejE",
+                      "name": "userBubbleContent",
+                      "fill": "#ffffff",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Yes, the refresh token isn't being saved properly after login.",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "IozPR",
+              "name": "AI Response Message",
+              "width": "fill_container",
+              "gap": 10,
+              "padding": [
+                12,
+                16
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "j8Ru5G",
+                  "name": "AI Avatar 2",
+                  "width": 32,
+                  "height": 32,
+                  "fill": "#252525",
+                  "cornerRadius": 24,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#333333"
+                  },
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "HylMd",
+                      "name": "sparkleFixed2",
+                      "width": 16,
+                      "height": 16,
+                      "iconFontName": "sparkles",
+                      "iconFontFamily": "lucide",
+                      "fill": "#58a6ff"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "I3dTGs",
+                  "name": "AI Response Bubble",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "k8qzi",
+                      "name": "aiBubbleContent2",
+                      "fill": "#cccccc",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "I found the issue. The `saveRefreshToken` method is using the wrong field name.",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "zg8iH",
+                      "name": "Tool Call - Writing",
+                      "width": "fill_container",
+                      "height": 32,
+                      "fill": "#181818",
+                      "cornerRadius": 6,
+                      "stroke": {
+                        "thickness": 1,
+                        "fill": "#333333"
+                      },
+                      "gap": 8,
+                      "padding": [
+                        0,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon_font",
+                          "id": "L5YRUW",
+                          "name": "toolIcon2",
+                          "width": 14,
+                          "height": 14,
+                          "iconFontName": "pencil",
+                          "iconFontFamily": "lucide",
+                          "fill": "#58a6ff"
+                        },
+                        {
+                          "type": "text",
+                          "id": "QK66t",
+                          "name": "toolName2",
+                          "fill": "#58a6ff",
+                          "content": "write_file",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "SpnhK",
+                          "name": "toolTarget2",
+                          "fill": "#999999",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "auth.service.ts",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "icon_font",
+                          "id": "Xy7t5",
+                          "name": "toolStatus2",
+                          "width": 14,
+                          "height": 14,
+                          "iconFontName": "loader",
+                          "iconFontFamily": "lucide",
+                          "fill": "#58a6ff"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "wiRMl",
+          "name": "Context Bar",
+          "width": "fill_container",
+          "height": 32,
+          "fill": "#1e1e1e",
+          "stroke": {
+            "thickness": {
+              "top": 1
+            },
+            "fill": "#333333"
+          },
+          "gap": 8,
+          "padding": [
+            0,
+            16
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon_font",
+              "id": "EhovU",
+              "name": "contextIcon",
+              "width": 14,
+              "height": 14,
+              "iconFontName": "file-text",
+              "iconFontFamily": "lucide",
+              "fill": "#999999"
+            },
+            {
+              "type": "text",
+              "id": "xHEaV",
+              "name": "contextLabel",
+              "fill": "#999999",
+              "content": "Current context:",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "E85q7",
+              "name": "contextFile",
+              "fill": "#58a6ff",
+              "content": "main.md",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "TIm1R",
+          "name": "Input Area",
+          "width": "fill_container",
+          "height": 52,
+          "stroke": {
+            "thickness": {
+              "top": 1
+            },
+            "fill": "#333333"
+          },
+          "gap": 8,
+          "padding": [
+            0,
+            16
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "f2BsAE",
+              "name": "Input Box",
+              "width": "fill_container",
+              "height": 36,
+              "fill": "#252525",
+              "cornerRadius": 6,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#333333"
+              },
+              "padding": [
+                0,
+                12
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "uTQRQ",
+                  "name": "placeholderText",
+                  "fill": "#999999",
+                  "content": "Reply in this conversation...",
+                  "fontFamily": "Inter",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "a55qs",
+              "name": "Send Button",
+              "width": 36,
+              "height": 36,
+              "fill": "#58a6ff",
+              "cornerRadius": 6,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "BIKME",
+                  "name": "sendIcon",
+                  "width": 16,
+                  "height": 16,
+                  "iconFontName": "send",
+                  "iconFontFamily": "lucide",
+                  "fill": "#ffffff"
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ],
   "variables": {

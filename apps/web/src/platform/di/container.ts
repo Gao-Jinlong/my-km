@@ -24,6 +24,7 @@ export type ServiceConstructor<T = unknown> = new (...args: unknown[]) => T;
  */
 export type AnyServiceConstructor<T = unknown> = abstract new (...args: unknown[]) => T;
 
+const CIRCULAR_DEPENDENCY_ERROR = `Circular dependency detected`;
 interface ServiceRegistration {
     id: string;
     constructor: any;
@@ -125,7 +126,7 @@ export class ServiceContainer extends Disposable {
         if (resolutionPath.includes(serviceId)) {
             const cycle = [...resolutionPath, serviceId].join(' -> ');
             throw new Error(
-                `Circular dependency detected: ${cycle}\n\n` +
+                `${CIRCULAR_DEPENDENCY_ERROR}: ${cycle}\n\n` +
                     `Services involved: ${[...new Set(resolutionPath)].join(', ')}`,
             );
         }
@@ -162,7 +163,8 @@ export class ServiceContainer extends Disposable {
             try {
                 return this._resolve(depId, newPath);
             } catch (error) {
-                if ((error as Error).message.startsWith('Circular dependency')) {
+                // TODO 后续需要替换为专用的错误类，而不是简单的字符串匹配
+                if ((error as Error).message.startsWith(CIRCULAR_DEPENDENCY_ERROR)) {
                     throw error;
                 }
                 throw new Error(
