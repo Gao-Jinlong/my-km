@@ -52,6 +52,31 @@ export class ConversationService {
     }
 
     /**
+     * 获取所有对话（不限用户）
+     * TODO: 接入 auth 后改为 findByUserId
+     */
+    async findAll(opts: ListOpts = {}) {
+        const { limit = 50, offset = 0, status = CONVERSATION_STATUS.ACTIVE } = opts;
+
+        return this.prisma.conversation.findMany({
+            where: { status },
+            orderBy: { updatedAt: 'desc' },
+            take: limit,
+            skip: offset,
+            select: {
+                id: true,
+                title: true,
+                status: true,
+                model: true,
+                provider: true,
+                messageCount: true,
+                createdAt: true,
+                updatedAt: true,
+            },
+        });
+    }
+
+    /**
      * 根据用户 ID 列出对话
      */
     async findByUserId(userId: string, opts: ListOpts = {}) {

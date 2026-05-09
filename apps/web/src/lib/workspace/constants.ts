@@ -19,7 +19,7 @@ export const PANEL_SIZES = {
         DEFAULT: '25', // 25% (~400px on 1920px screen)
         MIN: '20', // 20% (~300px)
         MAX: '45', // 45% (~800px)
-        COLLAPSED: '4', // 4% (~48px)
+        COLLAPSED: '0', // 0% — fully hidden when collapsed
     },
 } as const;
 

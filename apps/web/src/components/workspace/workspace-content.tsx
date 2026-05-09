@@ -27,7 +27,7 @@ const LAYOUT_VERSION = '1.0.0';
 const VERSION_KEY = 'workspace-layout-version';
 
 export function WorkspaceContent() {
-    const { sidebarCollapsed, setSidebarCollapsed } = useWorkspaceStore();
+    const { sidebarCollapsed, aiPanelCollapsed, setSidebarCollapsed } = useWorkspaceStore();
     const panelServiceRef = useRef<PanelService | null>(null);
 
     // 初始化面板服务
@@ -54,7 +54,7 @@ export function WorkspaceContent() {
             defaultSize: 25,
             minSize: 20,
             maxSize: 45,
-            collapsedSize: 4,
+            collapsedSize: 0,
         });
 
         // 设置自动隐藏阈值为 10%
@@ -135,7 +135,9 @@ export function WorkspaceContent() {
                                 <Sidebar collapsed={sidebarCollapsed} />
                             </Panel>
 
-                            <Separator className="w-px bg-ws-border transition-colors hover:bg-ws-accent/50" />
+                            {!sidebarCollapsed && (
+                                <Separator className="w-px bg-ws-border transition-colors hover:bg-ws-accent/50" />
+                            )}
 
                             {/* Editor Area */}
                             <Panel
@@ -146,9 +148,9 @@ export function WorkspaceContent() {
                                 <EditorArea />
                             </Panel>
 
-                            <Separator className="w-px bg-ws-border transition-colors hover:bg-ws-accent/50" />
-
-                            {/* Right AI Panel */}
+                            {!aiPanelCollapsed && (
+                                <Separator className="w-px bg-ws-border transition-colors hover:bg-ws-accent/50" />
+                            )}
                             <Panel
                                 id="ai-panel"
                                 defaultSize={PANEL_SIZES.AI_PANEL.DEFAULT}

@@ -13,10 +13,11 @@ import { useAIHarness } from '@/hooks/use-ai-harness';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import { AIHeader } from './ai-header';
 import { ContextBadge } from './context-badge';
+import { ConversationList } from './conversation-list';
 import { MessageBubble } from './message-bubble';
 
 export function AIPanel() {
-    const { aiPanelCollapsed, toggleAIPanel } = useWorkspaceStore();
+    const { aiPanelCollapsed, toggleAIPanel, aiViewMode, setAIPanelViewMode } = useWorkspaceStore();
     const [inputValue, setInputValue] = useState('');
     const [showContextBadge, setShowContextBadge] = useState(true);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -36,6 +37,10 @@ export function AIPanel() {
         registerTools,
     } = useAIHarness();
 
+    // Track which conversation is currently generating
+    const [generatingConversationId, setGeneratingConversationId] = useState<string | undefined>();
+    const [activeConversationId, setActiveConversationId] = useState<string | undefined>();
+
     // 初始化：注册工具、连接 WebSocket、加入对话
     useEffect(() => {
         if (isInitializedRef.current) return;
@@ -54,12 +59,22 @@ export function AIPanel() {
 
                 const conversationId = `conv-${nanoid(8)}`;
                 joinConversation(conversationId);
+                setActiveConversationId(conversationId);
             } catch (error) {
                 console.error('Failed to connect to AI service:', error);
             }
         };
         doConnect();
     }, [connect, joinConversation, registerTools]);
+
+    // Track generating state
+    useEffect(() => {
+        if (isGenerating && activeConversationId) {
+            setGeneratingConversationId(activeConversationId);
+        } else {
+            setGeneratingConversationId(undefined);
+        }
+    }, [isGenerating, activeConversationId]);
 
     // 当 harness 选中文字变化时，重新显示 badge
     useEffect(() => {
@@ -93,110 +108,140 @@ export function AIPanel() {
         stopGenerating();
     }, [stopGenerating]);
 
+    const handleJoinConversation = useCallback(
+        (id: string) => {
+            setActiveConversationId(id);
+            joinConversation(id);
+            setAIPanelViewMode('chat');
+        },
+        [joinConversation, setAIPanelViewMode],
+    );
+
+    const handleCreateNewConversation = useCallback(
+        (id: string) => {
+            setActiveConversationId(id);
+            joinConversation(id);
+            setAIPanelViewMode('chat');
+        },
+        [joinConversation, setAIPanelViewMode],
+    );
+
     if (aiPanelCollapsed) {
-        return (
-            <div className="flex h-full flex-col bg-ws-bg-primary">
-                <AIHeader collapsed onToggle={toggleAIPanel} />
-            </div>
-        );
+        return null;
     }
 
     return (
         <div className="flex h-full flex-col bg-ws-bg-primary">
-            <AIHeader collapsed={false} onToggle={toggleAIPanel} />
+            <AIHeader
+                collapsed={false}
+                onToggle={toggleAIPanel}
+                viewMode={aiViewMode}
+                onViewModeToggle={() => setAIPanelViewMode(aiViewMode === 'chat' ? 'list' : 'chat')}
+            />
 
-            {/* 连接状态指示 */}
-            <div className="flex h-6 items-center justify-center border-ws-border border-b px-4">
-                <div className="flex items-center gap-1.5">
-                    <div
-                        className={`h-1.5 w-1.5 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}
-                    />
-                    <span className="text-[10px] text-ws-fg-muted">
-                        {isConnected ? 'Connected' : 'Connecting...'}
-                    </span>
-                </div>
-            </div>
-
-            {/* 错误提示 */}
-            {error && (
-                <div className="border-red-500/30 border-b bg-red-500/10 px-4 py-2">
-                    <p className="text-red-400 text-xs">{error}</p>
-                </div>
-            )}
-
-            {/* 消息列表 */}
-            <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
-                {messages.length === 0 && (
-                    <div className="flex h-full items-center justify-center">
-                        <div className="text-center">
-                            <h3 className="font-semibold text-sm text-ws-fg-primary">
-                                AI Assistant
-                            </h3>
-                            <p className="mt-1 text-ws-fg-muted text-xs">
-                                Select text in the editor and send a message
-                            </p>
+            {aiViewMode === 'list' ? (
+                <ConversationList
+                    onJoinConversation={handleJoinConversation}
+                    onCreateNewConversation={handleCreateNewConversation}
+                    activeConversationId={activeConversationId}
+                    generatingConversationId={generatingConversationId}
+                />
+            ) : (
+                <>
+                    {/* 连接状态指示 */}
+                    <div className="flex h-6 items-center justify-center border-ws-border border-b px-4">
+                        <div className="flex items-center gap-1.5">
+                            <div
+                                className={`h-1.5 w-1.5 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}
+                            />
+                            <span className="text-[10px] text-ws-fg-muted">
+                                {isConnected ? 'Connected' : 'Connecting...'}
+                            </span>
                         </div>
                     </div>
-                )}
 
-                {messages.map(msg => (
-                    <MessageBubble key={msg.id} message={msg} />
-                ))}
-                <div ref={messagesEndRef} />
-            </div>
-
-            {/* 输入区域 */}
-            <div className="flex flex-col gap-2 border-ws-border border-t p-3">
-                {/* 选中文本上下文指示 */}
-                {showContextBadge && selectedText && (
-                    <ContextBadge
-                        selectedText={selectedText}
-                        documentTitle={documentTitle}
-                        onClear={() => setShowContextBadge(false)}
-                    />
-                )}
-
-                {isGenerating && (
-                    <div className="flex items-center justify-between px-1">
-                        <div className="flex items-center gap-2 text-ws-fg-muted text-xs">
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                            <span>AI is thinking...</span>
+                    {/* 错误提示 */}
+                    {error && (
+                        <div className="border-red-500/30 border-b bg-red-500/10 px-4 py-2">
+                            <p className="text-red-400 text-xs">{error}</p>
                         </div>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleStop}
-                            className="h-6 px-2 text-xs"
-                        >
-                            Stop
-                        </Button>
-                    </div>
-                )}
+                    )}
 
-                <div className="flex items-end gap-2">
-                    <textarea
-                        value={inputValue}
-                        onChange={e => setInputValue(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        placeholder="Ask AI anything..."
-                        disabled={!isConnected || isGenerating}
-                        rows={1}
-                        className="flex-1 resize-none rounded-md border-0 bg-ws-bg-secondary px-3 py-2 text-[13px] text-ws-fg-primary placeholder:text-ws-fg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ws-accent disabled:cursor-not-allowed disabled:opacity-50"
-                    />
-                    <Button
-                        size="icon"
-                        onClick={handleSend}
-                        disabled={!isConnected || isGenerating || !inputValue.trim()}
-                        className="h-9 w-9 shrink-0"
-                    >
-                        {isGenerating ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                            <Send className="h-4 w-4" />
+                    {/* 消息列表 */}
+                    <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
+                        {messages.length === 0 && (
+                            <div className="flex h-full items-center justify-center">
+                                <div className="text-center">
+                                    <h3 className="font-semibold text-sm text-ws-fg-primary">
+                                        AI Assistant
+                                    </h3>
+                                    <p className="mt-1 text-ws-fg-muted text-xs">
+                                        Select text in the editor and send a message
+                                    </p>
+                                </div>
+                            </div>
                         )}
-                    </Button>
-                </div>
-            </div>
+
+                        {messages.map(msg => (
+                            <MessageBubble key={msg.id} message={msg} />
+                        ))}
+                        <div ref={messagesEndRef} />
+                    </div>
+
+                    {/* 输入区域 */}
+                    <div className="flex flex-col gap-2 border-ws-border border-t p-3">
+                        {/* 选中文本上下文指示 */}
+                        {showContextBadge && selectedText && (
+                            <ContextBadge
+                                selectedText={selectedText}
+                                documentTitle={documentTitle}
+                                onClear={() => setShowContextBadge(false)}
+                            />
+                        )}
+
+                        {isGenerating && (
+                            <div className="flex items-center justify-between px-1">
+                                <div className="flex items-center gap-2 text-ws-fg-muted text-xs">
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    <span>AI is thinking...</span>
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleStop}
+                                    className="h-6 px-2 text-xs"
+                                >
+                                    Stop
+                                </Button>
+                            </div>
+                        )}
+
+                        <div className="flex items-end gap-2">
+                            <textarea
+                                value={inputValue}
+                                onChange={e => setInputValue(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                placeholder="Ask AI anything..."
+                                disabled={!isConnected || isGenerating}
+                                rows={1}
+                                className="flex-1 resize-none rounded-md border-0 bg-ws-bg-secondary px-3 py-2 text-[13px] text-ws-fg-primary placeholder:text-ws-fg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ws-accent disabled:cursor-not-allowed disabled:opacity-50"
+                            />
+                            <Button
+                                size="icon"
+                                onClick={handleSend}
+                                disabled={!isConnected || isGenerating || !inputValue.trim()}
+                                className="h-9 w-9 shrink-0"
+                            >
+                                {isGenerating ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Send className="h-4 w-4" />
+                                )}
+                            </Button>
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 }

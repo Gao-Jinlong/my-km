@@ -23,6 +23,7 @@ interface WorkspaceState {
 
     // AI Panel state
     aiPanelCollapsed: boolean;
+    aiViewMode: 'chat' | 'list'; // chat = message view, list = conversation list
 
     // Tab configuration
     sidebarTabs: SidebarTabConfig[];
@@ -40,6 +41,7 @@ interface WorkspaceState {
     setSidebarCollapsed: (collapsed: boolean) => void;
     toggleAIPanel: () => void;
     setAIPanelCollapsed: (collapsed: boolean) => void;
+    setAIPanelViewMode: (mode: 'chat' | 'list') => void;
 
     // Tab management actions
     setSidebarTabs: (tabs: SidebarTabConfig[]) => void;
@@ -78,6 +80,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             sidebarActiveTab: 'files',
             sidebarCollapsed: false,
             aiPanelCollapsed: false,
+            aiViewMode: 'chat',
             sidebarTabs: initializeDefaultTabs(),
             sidebarTabOrder: ['files', 'search'],
             tabPanelStates: new Map(),
@@ -97,6 +100,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             toggleAIPanel: () => set(state => ({ aiPanelCollapsed: !state.aiPanelCollapsed })),
 
             setAIPanelCollapsed: collapsed => set({ aiPanelCollapsed: collapsed }),
+
+            setAIPanelViewMode: mode => set({ aiViewMode: mode }),
 
             // Tab management actions
             setSidebarTabs: tabs => set({ sidebarTabs: tabs }),
@@ -204,6 +209,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 sidebarActiveTab: state.sidebarActiveTab,
                 sidebarCollapsed: state.sidebarCollapsed,
                 aiPanelCollapsed: state.aiPanelCollapsed,
+                aiViewMode: state.aiViewMode,
                 sidebarTabs: state.sidebarTabs,
                 sidebarTabOrder: state.sidebarTabOrder,
                 // 注意：Map 不能直接序列化，需要转换
