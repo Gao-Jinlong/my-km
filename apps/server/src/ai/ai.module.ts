@@ -1,26 +1,34 @@
+import { ChatGraph } from '@my-km/langgraph-workflows';
 import { Module, OnModuleInit } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AiController } from './ai.controller';
-import { AiGateway } from './ai.gateway';
 import { AiService } from './ai.service';
 import { ConnectionManager } from './connection/connection-manager';
 import { ConversationService } from './conversation/conversation.service';
 import { AiRateLimiter } from './dispatch/rate-limiter.guard';
 import { RequestDispatcher } from './dispatch/request-dispatcher';
+import { AiGateway } from './gateway/ai-ws.gateway';
 import { MessageService } from './message/message.service';
-import { AILoopOrchestrator } from './orchestrator/ai-loop.orchestrator';
 import { AnthropicProvider } from './provider/anthropic.provider';
+import { DashscopeProvider } from './provider/dashscope.provider';
+import { LLMFactory } from './provider/llm-factory';
 import { OpenAIProvider } from './provider/openai.provider';
-import { ProviderRouter } from './provider/provider.router';
+import type { LLMConfig, LLMProvider } from './provider/provider.types';
+import { ProviderRegistry } from './provider/provider-registry';
+import { ZhipuProvider } from './provider/zhipu.provider';
 import { AISessionManager } from './session/ai-session-manager';
 import { ToolDispatcher } from './tools/tool.dispatcher';
+import { ConversationOrchestrator } from './workflow-runtime/conversation-orchestrator';
+import { GraphRegistry } from './workflow-runtime/graph-registry';
+import { LLMResolver } from './workflow-runtime/llm-resolver';
+import { WorkflowExecutor } from './workflow-runtime/workflow-executor';
 
 /**
  * AI 模块
  *
- * 初始化 LLM provider 和工具定义。
- * 支持多 provider: Anthropic, OpenAI
+ * 初始化 LLM provider 注册表和工作流引擎。
+ * 支持多 provider: Anthropic, OpenAI, Zhipu, DashScope
  */
 @Module({
     imports: [PrismaModule, ConfigModule],
@@ -32,48 +40,78 @@ import { ToolDispatcher } from './tools/tool.dispatcher';
         MessageService,
         AISessionManager,
         ConnectionManager,
-        AILoopOrchestrator,
-        ProviderRouter,
         ToolDispatcher,
         RequestDispatcher,
         AiRateLimiter,
+        // New architecture
+        ProviderRegistry,
+        LLMFactory,
+        LLMResolver,
+        GraphRegistry,
+        WorkflowExecutor,
+        ConversationOrchestrator,
     ],
-    exports: [AiService, ConversationService, MessageService],
+    exports: [
+        AiService,
+        ConversationService,
+        MessageService,
+        // New architecture exports
+        ProviderRegistry,
+        LLMFactory,
+        LLMResolver,
+        GraphRegistry,
+        WorkflowExecutor,
+        ConversationOrchestrator,
+    ],
 })
 export class AiModule implements OnModuleInit {
     constructor(
-        private aiService: AiService,
         private configService: ConfigService,
+        private providerRegistry: ProviderRegistry,
+        private graphRegistry: GraphRegistry,
     ) {}
 
     async onModuleInit() {
-        const provider = this.configService.get<string>('AI_PROVIDER', 'anthropic');
-        const apiKey = this.configService.get<string>(
-            provider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY',
-        );
+        // 注册所有已配置的 provider 到 ProviderRegistry
+        this.registerProvider('anthropic', AnthropicProvider);
+        this.registerProvider('openai', OpenAIProvider);
+        this.registerProvider('zhipu', ZhipuProvider);
+        this.registerProvider('dashscope', DashscopeProvider);
 
+        // 注册内置图定义
+        this.graphRegistry.register(new ChatGraph());
+    }
+
+    /**
+     * 注册 provider（如果 API Key 存在）
+     */
+    private registerProvider(
+        name: string,
+        ProviderClass: new (config: LLMConfig) => LLMProvider,
+    ): void {
+        const apiKey = this.getApiKeyForProvider(name);
+        console.log('🚀 ~ AiModule ~ registerProvider ~ apiKey:', apiKey);
         if (!apiKey) {
-            console.warn(`⚠️  ${provider.toUpperCase()}_API_KEY not set — AI module disabled`);
+            console.warn(`⚠️  ${name.toUpperCase()}_API_KEY not set — skipping ${name}`);
             return;
         }
+        this.providerRegistry.register(name, config => {
+            return new ProviderClass({ ...config, apiKey });
+        });
+    }
 
-        if (provider === 'anthropic') {
-            const anthropicProvider = new AnthropicProvider(
-                apiKey,
-                this.configService.get<string>('ANTHROPIC_MODEL'),
-            );
-            this.aiService.setProvider(anthropicProvider);
-        } else if (provider === 'openai') {
-            const openaiProvider = new OpenAIProvider(
-                apiKey,
-                this.configService.get<string>('OPENAI_MODEL'),
-            );
-            this.aiService.setProvider(openaiProvider);
-        } else {
-            console.warn(`⚠️  Unknown AI provider: ${provider}`);
+    private getApiKeyForProvider(name: string): string | undefined {
+        switch (name) {
+            case 'anthropic':
+                return this.configService.get<string>('ANTHROPIC_API_KEY');
+            case 'openai':
+                return this.configService.get<string>('OPENAI_API_KEY');
+            case 'zhipu':
+                return this.configService.get<string>('ZHIPUAI_API_KEY');
+            case 'dashscope':
+                return this.configService.get<string>('DASHSCOPE_API_KEY');
+            default:
+                return undefined;
         }
-
-        // TODO: 从 shared 导入工具定义并设置
-        // this.aiService.setToolDefinitions([...]);
     }
 }

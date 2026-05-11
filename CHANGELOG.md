@@ -2,6 +2,26 @@
 
 所有重要的项目变更都将记录在此文件中。
 
+## [0.2.0] - 2026-05-11
+
+### Added
+- **AI 模块架构重构** — 多 LLM 协作 + LangGraph 工作流引擎
+  - LLM 抽象层：`LLMProvider` 接口 + `LLMFactory` 按需实例化 + `ProviderRegistry` 运行时注册
+  - 支持 Anthropic、OpenAI、智谱 AI 三种 Provider
+  - 工作流运行时：`ConversationOrchestrator` + `WorkflowExecutor` + `LLMResolver`
+  - LangGraph 隔离包：`packages/langgraph-workflows/`，纯函数式代码无 NestJS 依赖
+  - 节点级 LLM 路由：工作流中每个节点可独立指定 LLM
+  - WebSocket 网关支持传递 `llmConfigMap` 和 `graphName`
+  - 架构文档：`docs/backend/ai-architecture-v2.md`
+
+### Changed
+- **LangGraph 节点实现** — 节点处理器从占位实现改为实际 LLM 调用逻辑
+  - `llm-node.ts`：通过 configurable.llmCaller 注入 LLM 调用函数，处理流式输出
+  - `tool-node.ts`：处理工具结果，清空 pendingToolCalls
+  - `chat-graph.ts`：使用 addConditionalEdges 根据 hasToolCalls 条件路由
+- **WorkflowExecutor** — 实现完整执行流程：LLMCaller 闭包创建 + 工具调用外层循环 + 流式输出推送
+- **遗留代码清理** — 删除 ai-loop.orchestrator.ts、provider.router.ts、ai.gateway.ts 等 5 个文件
+
 ## [0.1.0] - 2026-03-30
 
 ### Added

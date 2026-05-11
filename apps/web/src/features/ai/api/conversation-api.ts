@@ -5,7 +5,7 @@
  * Uses native fetch with the server at http://localhost:3001.
  */
 
-const API_BASE = import.meta.env.VITE_AI_API_URL ?? 'http://localhost:3001';
+const API_BASE = process.env.NEXT_PUBLIC_AI_API_URL ?? 'http://localhost:3001';
 
 export interface ConversationRecord {
     id: string;

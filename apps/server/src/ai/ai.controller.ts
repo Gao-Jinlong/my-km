@@ -80,7 +80,7 @@ export class AiController {
     async createConversation(@Body() body: CreateConversationBody) {
         const conversation = await this.conversationService.create({
             id: body.id,
-            title: body.title || null,
+            title: body.title,
         });
 
         return { conversation };

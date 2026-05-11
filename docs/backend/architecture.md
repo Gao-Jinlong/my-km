@@ -59,6 +59,94 @@ Response
 
 ---
 
+## AI 模块架构（多 LLM + LangGraph）
+
+详细架构文档见 [AI Architecture v2](./ai-architecture-v2.md)。
+
+以下为概览。
+
+AI 模块采用三层架构，实现 LLM 与对话完全解耦，支持多 LLM 协作和节点级路由。
+
+```
+apps/server/src/ai/
+├── provider/              # LLM 抽象层
+│   ├── provider.types.ts  #   LLMProvider 接口 + LLMConfig
+│   ├── provider-registry.ts # Provider 注册表
+│   ├── llm-factory.ts     #   按需实例化 + 缓存
+│   ├── anthropic.provider.ts # Anthropic 实现
+│   ├── openai.provider.ts    # OpenAI 实现
+│   └── zhipu.provider.ts     # 智谱 AI 实现
+├── workflow-runtime/      # 工作流运行时（NestJS 侧）
+│   ├── conversation-orchestrator.ts # 对话编排
+│   ├── workflow-executor.ts       # 工作流执行
+│   ├── llm-resolver.ts            # 节点级 LLM 解析
+│   ├── graph-registry.ts          # 图注册与查找
+│   └── workflow.types.ts          # 运行时类型
+├── dispatch/              # 请求分发
+│   ├── request-dispatcher.ts # 消息路由 + 速率限制
+│   └── rate-limiter.guard.ts
+├── connection/            # 连接管理
+│   └── connection-manager.ts
+├── session/               # 会话管理
+│   └── ai-session-manager.ts
+├── message/               # 消息服务
+│   └── message.service.ts
+├── conversation/          # 对话服务
+│   └── conversation.service.ts
+├── tools/                 # 工具管理
+│   ├── tool.dispatcher.ts
+│   └── tool.registry.ts
+└── gateway/               # WebSocket 网关
+    └── ai-ws.gateway.ts
+
+packages/langgraph-workflows/  # LangGraph 工作流包（纯函数式）
+├── src/
+│   ├── graphs/
+│   │   ├── base-graph.ts   # 图定义接口
+│   │   └── chat-graph.ts   # 标准对话工作流
+│   ├── nodes/
+│   │   ├── llm-node.ts     # LLM 调用节点
+│   │   ├── tool-node.ts    # 工具执行节点
+│   │   └── router-node.ts  # 条件路由节点
+│   └── types/
+│       └── workflow.types.ts # 工作流状态定义
+```
+
+### 数据流
+
+```
+前端 (WS) ──▶ AiGateway
+                   │
+                   ▼
+              RequestDispatcher
+              (验证 + 速率限制 + 会话管理)
+                   │
+                   ▼
+              ConversationOrchestrator
+              (消息持久化 + 历史构建)
+                   │
+                   ▼
+              WorkflowExecutor
+              (LangGraph 图执行)
+                   │
+        ┌──────────┼──────────┐
+        ▼          ▼          ▼
+   LLMResolver  LLMFactory  ConnectionManager
+   (节点路由)   (实例化)     (WS 推送)
+        │          │
+        ▼          ▼
+   LLMProvider (Anthropic/OpenAI/Zhipu)
+```
+
+### 核心设计
+
+- **LLM 与对话解耦**: LLM 是执行资源，通过 `LLMConfig` 按需实例化
+- **节点级路由**: 工作流中每个节点可独立指定 LLM（通过 `llmConfigMap`）
+- **运行时配置**: 前端可在发送消息时指定 `llmConfigMap` 和 `graphName`
+- **LangGraph 隔离**: 图定义在 `packages/langgraph-workflows/` 中，纯函数式无 NestJS 依赖
+
+---
+
 ## 数据模型 (Prisma)
 
 ```

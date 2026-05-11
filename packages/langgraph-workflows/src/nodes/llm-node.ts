@@ -1,0 +1,63 @@
+/**
+ * LLM 调用节点
+ *
+ * 从 configurable 上下文获取 LLM 调用函数，实际调用 LLM
+ * 并处理流式输出和工具调用。
+ */
+
+import type { GraphConfig, WorkflowState } from '../types/workflow.types';
+
+export function createLLMNode() {
+    return async (
+        state: WorkflowState,
+        context?: { configurable?: Partial<GraphConfig> },
+    ): Promise<Partial<WorkflowState>> => {
+        const llmCaller = context?.configurable?.llmCaller;
+        const onChunk = context?.configurable?.onChunk;
+        const abortSignal = context?.configurable?.abortSignal;
+
+        if (!llmCaller) {
+            return { error: 'LLM caller not provided in configurable context' };
+        }
+
+        // 构建消息列表（从状态中的 messages 字符串数组转为 LLM 格式）
+        const messages = state.messages.map(m => ({ role: 'user' as const, content: m }));
+
+        // 如果有工具结果，追加 tool_result 消息
+        if (state.pendingToolCalls && state.pendingToolCalls.length > 0) {
+            // 工具结果已在上一步被添加到 messages 中
+        }
+
+        let assistantText = '';
+        const toolCalls: Array<{ id: string; name: string; arguments: Record<string, unknown> }> =
+            [];
+
+        try {
+            // 调用 LLM（流式）
+            for await (const event of llmCaller(messages, abortSignal)) {
+                if (event.type === 'text_chunk') {
+                    assistantText += event.content ?? '';
+                    onChunk?.(event.content ?? '');
+                } else if (event.type === 'tool_call' && event.toolCall) {
+                    toolCalls.push(event.toolCall);
+                } else if (event.type === 'done') {
+                    break;
+                }
+
+                if (abortSignal?.aborted) {
+                    return { isDone: true, lastAssistantMessage: assistantText };
+                }
+            }
+        } catch (error) {
+            return { error: error instanceof Error ? error.message : 'LLM call failed' };
+        }
+
+        return {
+            lastAssistantMessage: assistantText,
+            hasToolCalls: toolCalls.length > 0,
+            pendingToolCalls: toolCalls,
+            // 追加助手消息到消息历史
+            messages: [assistantText || '(tool calls only)'],
+        };
+    };
+}

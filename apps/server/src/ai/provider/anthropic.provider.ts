@@ -7,16 +7,23 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import type { LLMMessage, LLMOutput, ToolDefinition } from '../ai.types';
-import type { LLMProvider } from './provider.types';
+import type { LLMConfig, LLMProvider } from './provider.types';
 
 export class AnthropicProvider implements LLMProvider {
     readonly name = 'anthropic';
     private client: Anthropic;
-    private model: string;
+    readonly model: string;
+    private maxTokens: number;
+    private temperature: number;
 
-    constructor(apiKey: string, model?: string) {
+    constructor(config: LLMConfig) {
+        const apiKey = config.apiKey ?? process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) throw new Error('Anthropic API key is required');
+
         this.client = new Anthropic({ apiKey });
-        this.model = model ?? 'claude-sonnet-4-20250514';
+        this.model = config.model ?? 'claude-sonnet-4-20250514';
+        this.maxTokens = (config.maxTokens as number) ?? 4096;
+        this.temperature = (config.temperature as number) ?? 0.7;
     }
 
     async *chat(
@@ -35,7 +42,8 @@ export class AnthropicProvider implements LLMProvider {
         const stream = await this.client.messages.create(
             {
                 model: this.model,
-                max_tokens: 4096,
+                max_tokens: this.maxTokens,
+                temperature: this.temperature,
                 messages: anthropicMessages as Anthropic.MessageParam[],
                 tools: tools?.map(
                     t =>

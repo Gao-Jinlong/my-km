@@ -1709,135 +1709,6 @@
         },
         {
           "type": "frame",
-          "id": "gpzaH",
-          "name": "Status Bar",
-          "width": "fill_container",
-          "height": 22,
-          "fill": "#ffffff",
-          "stroke": {
-            "thickness": {
-              "top": 1
-            },
-            "fill": "#d0d7de"
-          },
-          "padding": [
-            0,
-            12
-          ],
-          "justifyContent": "space_between",
-          "alignItems": "center",
-          "children": [
-            {
-              "type": "frame",
-              "id": "ylhr7",
-              "name": "statusLeft",
-              "gap": 12,
-              "alignItems": "center",
-              "children": [
-                {
-                  "type": "frame",
-                  "id": "niSIA",
-                  "name": "slBranch",
-                  "gap": 4,
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "icon_font",
-                      "id": "geZ6e",
-                      "name": "slBI",
-                      "width": 12,
-                      "height": 12,
-                      "iconFontName": "git-branch",
-                      "iconFontFamily": "lucide",
-                      "fill": "#636c76"
-                    },
-                    {
-                      "type": "text",
-                      "id": "b5Ofg",
-                      "name": "slBT",
-                      "fill": "#636c76",
-                      "content": "main",
-                      "fontFamily": "Inter",
-                      "fontSize": 11,
-                      "fontWeight": "normal"
-                    }
-                  ]
-                },
-                {
-                  "type": "icon_font",
-                  "id": "7fVdK",
-                  "name": "slSync",
-                  "width": 11,
-                  "height": 11,
-                  "iconFontName": "refresh-cw",
-                  "iconFontFamily": "lucide",
-                  "fill": "#636c76"
-                },
-                {
-                  "type": "text",
-                  "id": "66EyC",
-                  "name": "slPos",
-                  "fill": "#636c76",
-                  "content": "Ln 1, Col 1",
-                  "fontFamily": "Inter",
-                  "fontSize": 11,
-                  "fontWeight": "normal"
-                },
-                {
-                  "type": "text",
-                  "id": "qiwnw",
-                  "name": "slCount",
-                  "fill": "#636c76",
-                  "content": "128 chars",
-                  "fontFamily": "Inter",
-                  "fontSize": 11,
-                  "fontWeight": "normal"
-                }
-              ]
-            },
-            {
-              "type": "frame",
-              "id": "4fxfN",
-              "name": "statusRight",
-              "gap": 12,
-              "alignItems": "center",
-              "children": [
-                {
-                  "type": "text",
-                  "id": "AwFBr",
-                  "name": "srEnc",
-                  "fill": "#636c76",
-                  "content": "UTF-8",
-                  "fontFamily": "Inter",
-                  "fontSize": 11,
-                  "fontWeight": "normal"
-                },
-                {
-                  "type": "text",
-                  "id": "D2nbS",
-                  "name": "srLang",
-                  "fill": "#636c76",
-                  "content": "Markdown",
-                  "fontFamily": "Inter",
-                  "fontSize": 11,
-                  "fontWeight": "normal"
-                },
-                {
-                  "type": "icon_font",
-                  "id": "JnQBW",
-                  "name": "srBell",
-                  "width": 12,
-                  "height": 12,
-                  "iconFontName": "bell",
-                  "iconFontFamily": "lucide",
-                  "fill": "#636c76"
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "type": "frame",
           "id": "TJ1yP",
           "name": "Main Body",
           "width": "fill_container",
@@ -2902,6 +2773,75 @@
               "children": [
                 {
                   "type": "frame",
+                  "id": "h6lzt",
+                  "name": "Chat Header",
+                  "width": "fill_container",
+                  "height": 48,
+                  "stroke": {
+                    "thickness": {
+                      "bottom": 1
+                    },
+                    "fill": "#d0d7de"
+                  },
+                  "padding": [
+                    0,
+                    12
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "oJ0IN",
+                      "name": "Chat Title",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon_font",
+                          "id": "t7dTE2",
+                          "width": 18,
+                          "height": 18,
+                          "iconFontName": "sparkles",
+                          "iconFontFamily": "lucide",
+                          "fill": "#0969da"
+                        },
+                        {
+                          "type": "text",
+                          "id": "rKb4t",
+                          "fill": "#1f2328",
+                          "content": "API 重构讨论",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "qV8nX",
+                      "name": "Close Button",
+                      "width": 28,
+                      "height": 28,
+                      "cornerRadius": 4,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon_font",
+                          "id": "ywyDx",
+                          "width": 16,
+                          "height": 16,
+                          "iconFontName": "x",
+                          "iconFontFamily": "lucide",
+                          "fill": "#636c76"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
                   "id": "f4SFv4",
                   "name": "Message List Section",
                   "width": "fill_container",
@@ -3322,75 +3262,6 @@
                       ]
                     }
                   ]
-                },
-                {
-                  "type": "frame",
-                  "id": "h6lzt",
-                  "name": "Chat Header",
-                  "width": "fill_container",
-                  "height": 48,
-                  "stroke": {
-                    "thickness": {
-                      "bottom": 1
-                    },
-                    "fill": "#d0d7de"
-                  },
-                  "padding": [
-                    0,
-                    12
-                  ],
-                  "justifyContent": "space_between",
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "frame",
-                      "id": "oJ0IN",
-                      "name": "Chat Title",
-                      "gap": 8,
-                      "alignItems": "center",
-                      "children": [
-                        {
-                          "type": "icon_font",
-                          "id": "t7dTE2",
-                          "width": 18,
-                          "height": 18,
-                          "iconFontName": "sparkles",
-                          "iconFontFamily": "lucide",
-                          "fill": "#0969da"
-                        },
-                        {
-                          "type": "text",
-                          "id": "rKb4t",
-                          "fill": "#1f2328",
-                          "content": "API 重构讨论",
-                          "fontFamily": "Inter",
-                          "fontSize": 14,
-                          "fontWeight": "600"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "frame",
-                      "id": "qV8nX",
-                      "name": "Close Button",
-                      "width": 28,
-                      "height": 28,
-                      "cornerRadius": 4,
-                      "justifyContent": "center",
-                      "alignItems": "center",
-                      "children": [
-                        {
-                          "type": "icon_font",
-                          "id": "ywyDx",
-                          "width": 16,
-                          "height": 16,
-                          "iconFontName": "x",
-                          "iconFontFamily": "lucide",
-                          "fill": "#636c76"
-                        }
-                      ]
-                    }
-                  ]
                 }
               ]
             },
@@ -3401,6 +3272,13 @@
               "width": 280,
               "height": "fill_container",
               "fill": "#ffffff",
+              "stroke": {
+                "align": "inside",
+                "thickness": {
+                  "left": 1
+                },
+                "fill": "#d0d7de"
+              },
               "layout": "vertical",
               "children": [
                 {
@@ -3465,98 +3343,6 @@
                           "width": 16,
                           "height": 16,
                           "iconFontName": "x",
-                          "iconFontFamily": "lucide",
-                          "fill": "#636c76"
-                        }
-                      ]
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "e0Hcv",
-                  "name": "Section Divider",
-                  "width": "fill_container",
-                  "height": 1,
-                  "fill": "#d0d7de"
-                },
-                {
-                  "type": "frame",
-                  "id": "exUMY",
-                  "name": "New Conv Bar",
-                  "width": "fill_container",
-                  "height": 40,
-                  "stroke": {
-                    "thickness": {
-                      "bottom": 1
-                    },
-                    "fill": "#d0d7de"
-                  },
-                  "gap": 8,
-                  "padding": [
-                    0,
-                    12
-                  ],
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "frame",
-                      "id": "QyNsQ",
-                      "name": "New Conversation Button",
-                      "height": 32,
-                      "fill": "#f6f8fa",
-                      "cornerRadius": 6,
-                      "stroke": {
-                        "thickness": 1,
-                        "fill": "#d0d7de"
-                      },
-                      "gap": 6,
-                      "padding": [
-                        0,
-                        12
-                      ],
-                      "justifyContent": "center",
-                      "alignItems": "center",
-                      "children": [
-                        {
-                          "type": "icon_font",
-                          "id": "NvbTI",
-                          "name": "plusIcon",
-                          "width": 14,
-                          "height": 14,
-                          "iconFontName": "plus",
-                          "iconFontFamily": "lucide",
-                          "fill": "#0969da"
-                        },
-                        {
-                          "type": "text",
-                          "id": "M1o7EH",
-                          "name": "newConvText",
-                          "fill": "#0969da",
-                          "content": "New Conversation",
-                          "fontFamily": "Inter",
-                          "fontSize": 13,
-                          "fontWeight": "500"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "frame",
-                      "id": "t1Hv3",
-                      "name": "Search Button",
-                      "width": 28,
-                      "height": 28,
-                      "cornerRadius": 4,
-                      "justifyContent": "center",
-                      "alignItems": "center",
-                      "children": [
-                        {
-                          "type": "icon_font",
-                          "id": "UbyT4",
-                          "name": "searchIcon",
-                          "width": 16,
-                          "height": 16,
-                          "iconFontName": "search",
                           "iconFontFamily": "lucide",
                           "fill": "#636c76"
                         }
@@ -3763,6 +3549,219 @@
                       ]
                     }
                   ]
+                },
+                {
+                  "type": "frame",
+                  "id": "exUMY",
+                  "name": "New Conv Bar",
+                  "width": "fill_container",
+                  "height": 40,
+                  "stroke": {
+                    "thickness": {
+                      "bottom": 1
+                    },
+                    "fill": "#d0d7de"
+                  },
+                  "gap": 8,
+                  "padding": [
+                    0,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "QyNsQ",
+                      "name": "New Conversation Button",
+                      "height": 32,
+                      "fill": "#f6f8fa",
+                      "cornerRadius": 6,
+                      "stroke": {
+                        "thickness": 1,
+                        "fill": "#d0d7de"
+                      },
+                      "gap": 6,
+                      "padding": [
+                        0,
+                        12
+                      ],
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon_font",
+                          "id": "NvbTI",
+                          "name": "plusIcon",
+                          "width": 14,
+                          "height": 14,
+                          "iconFontName": "plus",
+                          "iconFontFamily": "lucide",
+                          "fill": "#0969da"
+                        },
+                        {
+                          "type": "text",
+                          "id": "M1o7EH",
+                          "name": "newConvText",
+                          "fill": "#0969da",
+                          "content": "New Conversation",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "t1Hv3",
+                      "name": "Search Button",
+                      "width": 28,
+                      "height": 28,
+                      "cornerRadius": 4,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon_font",
+                          "id": "UbyT4",
+                          "name": "searchIcon",
+                          "width": 16,
+                          "height": 16,
+                          "iconFontName": "search",
+                          "iconFontFamily": "lucide",
+                          "fill": "#636c76"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "gpzaH",
+          "name": "Status Bar",
+          "width": "fill_container",
+          "height": 22,
+          "fill": "#ffffff",
+          "stroke": {
+            "thickness": {
+              "top": 1
+            },
+            "fill": "#d0d7de"
+          },
+          "padding": [
+            0,
+            12
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "ylhr7",
+              "name": "statusLeft",
+              "gap": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "niSIA",
+                  "name": "slBranch",
+                  "gap": 4,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "geZ6e",
+                      "name": "slBI",
+                      "width": 12,
+                      "height": 12,
+                      "iconFontName": "git-branch",
+                      "iconFontFamily": "lucide",
+                      "fill": "#636c76"
+                    },
+                    {
+                      "type": "text",
+                      "id": "b5Ofg",
+                      "name": "slBT",
+                      "fill": "#636c76",
+                      "content": "main",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "icon_font",
+                  "id": "7fVdK",
+                  "name": "slSync",
+                  "width": 11,
+                  "height": 11,
+                  "iconFontName": "refresh-cw",
+                  "iconFontFamily": "lucide",
+                  "fill": "#636c76"
+                },
+                {
+                  "type": "text",
+                  "id": "66EyC",
+                  "name": "slPos",
+                  "fill": "#636c76",
+                  "content": "Ln 1, Col 1",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "qiwnw",
+                  "name": "slCount",
+                  "fill": "#636c76",
+                  "content": "128 chars",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "4fxfN",
+              "name": "statusRight",
+              "gap": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "AwFBr",
+                  "name": "srEnc",
+                  "fill": "#636c76",
+                  "content": "UTF-8",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "D2nbS",
+                  "name": "srLang",
+                  "fill": "#636c76",
+                  "content": "Markdown",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "icon_font",
+                  "id": "JnQBW",
+                  "name": "srBell",
+                  "width": 12,
+                  "height": 12,
+                  "iconFontName": "bell",
+                  "iconFontFamily": "lucide",
+                  "fill": "#636c76"
                 }
               ]
             }

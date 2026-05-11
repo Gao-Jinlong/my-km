@@ -2,23 +2,22 @@
  * RequestDispatcher — 请求分发
  *
  * 负责：
- * - 消息类型路由
- * - 会话查找/创建
- * - 并发控制
- * - 上下文组装
+ * - 消息验证和速率限制
+ * - 会话创建和并发控制
+ * - 调用 ConversationOrchestrator 执行对话
  *
  * 请求分发流程:
- * ┌───────────┐    ┌──────────────┐    ┌───────────────┐    ┌──────────────┐
- * │  Message   │───▶│  Validate    │───▶│  Find/Create  │───▶│  AILoop      │
- * │  Received  │    │  + RateLimit │    │  AISession    │    │  Orchestrator│
- * └───────────┘    └──────────────┘    └───────────────┘    └──────────────┘
+ * ┌───────────┐    ┌──────────────┐    ┌───────────────┐    ┌──────────────────┐
+ * │  Message   │───▶│  Validate    │───▶│  Create       │───▶│  Conversation    │
+ * │  Received  │    │  + RateLimit │    │  AISession    │    │  Orchestrator    │
+ * └───────────┘    └──────────────┘    └───────────────┘    └──────────────────┘
  */
 
 import { Injectable, Logger } from '@nestjs/common';
 import { ConnectionManager } from '../connection/connection-manager';
 import { ConversationService } from '../conversation/conversation.service';
-import { AILoopOrchestrator } from '../orchestrator/ai-loop.orchestrator';
 import { AISessionManager } from '../session/ai-session-manager';
+import { ConversationOrchestrator } from '../workflow-runtime/conversation-orchestrator';
 import { AiRateLimiter } from './rate-limiter.guard';
 
 export interface DispatchContext {
@@ -26,8 +25,16 @@ export interface DispatchContext {
     clientId: string;
     content: string;
     context?: Record<string, unknown>;
-    model?: string;
-    provider?: string;
+    llmConfigMap?: Record<
+        string,
+        {
+            provider: string;
+            model: string;
+            temperature?: number;
+            maxTokens?: number;
+        }
+    >;
+    graphName?: string;
 }
 
 @Injectable()
@@ -36,7 +43,7 @@ export class RequestDispatcher {
 
     constructor(
         private sessionManager: AISessionManager,
-        private loopOrchestrator: AILoopOrchestrator,
+        private orchestrator: ConversationOrchestrator,
         private connectionManager: ConnectionManager,
         private conversationService: ConversationService,
         private rateLimiter: AiRateLimiter,
@@ -79,8 +86,11 @@ export class RequestDispatcher {
         });
 
         try {
-            // 3. 执行 AI 循环
-            await this.loopOrchestrator.execute(session, content);
+            // 3. 执行对话编排
+            await this.orchestrator.dispatch(session, content, {
+                llmConfigMap: ctx.llmConfigMap,
+                graphName: ctx.graphName,
+            });
         } catch (error) {
             this.logger.error(`Dispatch failed for session ${session.id}:`, error);
             this.connectionManager.emitToConversation(conversationId, 'error', {

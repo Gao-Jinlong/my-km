@@ -17,7 +17,7 @@ import { ConversationList } from './conversation-list';
 import { MessageBubble } from './message-bubble';
 
 export function AIPanel() {
-    const { aiPanelCollapsed, toggleAIPanel, aiViewMode, setAIPanelViewMode } = useWorkspaceStore();
+    const { toggleAIPanel, aiViewMode, setAIPanelViewMode } = useWorkspaceStore();
     const [inputValue, setInputValue] = useState('');
     const [showContextBadge, setShowContextBadge] = useState(true);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -53,8 +53,7 @@ export function AIPanel() {
 
         const doConnect = async () => {
             try {
-                const meta = import.meta as { env?: { VITE_AI_WS_URL?: string } };
-                const wsUrl = meta.env?.VITE_AI_WS_URL ?? 'http://localhost:3001/ai';
+                const wsUrl = process.env.NEXT_PUBLIC_AI_WS_URL ?? 'http://localhost:3001/ai';
                 await connect(wsUrl);
 
                 const conversationId = `conv-${nanoid(8)}`;
@@ -125,10 +124,6 @@ export function AIPanel() {
         },
         [joinConversation, setAIPanelViewMode],
     );
-
-    if (aiPanelCollapsed) {
-        return null;
-    }
 
     return (
         <div className="flex h-full flex-col bg-ws-bg-primary">

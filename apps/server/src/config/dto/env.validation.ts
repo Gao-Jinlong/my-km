@@ -87,7 +87,7 @@ export class EnvironmentVariables {
     @IsOptional()
     LOG_MAX_FILES?: string;
 
-    // ============ AI Provider (Optional) ============
+    // ============ AI Providers ============
 
     /**
      * 智谱 AI API Key
@@ -98,12 +98,46 @@ export class EnvironmentVariables {
     ZHIPUAI_API_KEY?: string;
 
     /**
-     * AI 提供商
-     * @default zhipu
+     * Anthropic API Key
+     */
+    @IsString()
+    @IsOptional()
+    ANTHROPIC_API_KEY?: string;
+
+    /**
+     * OpenAI API Key
+     */
+    @IsString()
+    @IsOptional()
+    OPENAI_API_KEY?: string;
+
+    /**
+     * Alibaba Cloud DashScope API Key
+     */
+    @IsString()
+    @IsOptional()
+    DASHSCOPE_API_KEY?: string;
+
+    /**
+     * AI 提供商 (default: zhipu)
      */
     @IsString()
     @IsOptional()
     AI_PROVIDER?: string;
+
+    /**
+     * Anthropic 默认模型
+     */
+    @IsString()
+    @IsOptional()
+    ANTHROPIC_MODEL?: string;
+
+    /**
+     * OpenAI 默认模型
+     */
+    @IsString()
+    @IsOptional()
+    OPENAI_MODEL?: string;
 
     // ============ CORS (Optional) ============
 

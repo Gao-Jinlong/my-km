@@ -31,6 +31,18 @@ interface ClientMsg {
     toolCallId?: string;
     result?: unknown;
     error?: string;
+    /** 运行时 LLM 配置映射（节点 ID -> LLM 配置） */
+    llmConfigMap?: Record<
+        string,
+        {
+            provider: string;
+            model: string;
+            temperature?: number;
+            maxTokens?: number;
+        }
+    >;
+    /** 使用的工作流图名称 */
+    graphName?: string;
 }
 
 @WebSocketGateway({
@@ -153,6 +165,8 @@ export class AiGateway {
                 clientId: client.id,
                 content: data.content,
                 context: data.context,
+                llmConfigMap: data.llmConfigMap,
+                graphName: data.graphName,
             });
         } catch (error) {
             if ((error as Error).name === 'AbortError') {

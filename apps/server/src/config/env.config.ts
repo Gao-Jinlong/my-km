@@ -105,14 +105,30 @@ export class EnvConfig implements OnModuleInit {
         return this.config.LOG_MAX_FILES || '14d';
     }
 
-    // ============ AI Provider ============
+    // ============ AI Providers ============
 
     get zhipuaiApiKey(): string | undefined {
         return this.config.ZHIPUAI_API_KEY;
     }
 
+    get anthropicApiKey(): string | undefined {
+        return this.config.ANTHROPIC_API_KEY;
+    }
+
+    get openaiApiKey(): string | undefined {
+        return this.config.OPENAI_API_KEY;
+    }
+
     get aiProvider(): string | undefined {
         return this.config.AI_PROVIDER;
+    }
+
+    get anthropicModel(): string | undefined {
+        return this.config.ANTHROPIC_MODEL;
+    }
+
+    get openaiModel(): string | undefined {
+        return this.config.OPENAI_MODEL;
     }
 
     // ============ CORS ============

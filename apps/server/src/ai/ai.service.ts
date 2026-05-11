@@ -6,8 +6,8 @@
  * - 注入新服务（MessageService、ConversationService 等）
  * - 逐步将逻辑委托给新的模块化组件
  *
- * 注意：在完整迁移到 AILoopOrchestrator 之前，
- * 这个类保留现有的 handleUserMessage 实现以保持向后兼容。
+ * 注意：新请求应通过 RequestDispatcher.dispatch() 进入，
+ * 此服务仅为向后兼容，将在后续版本中移除。
  */
 
 import { Injectable, Logger } from '@nestjs/common';
@@ -16,7 +16,6 @@ import type { InFlightToolCall, LLMMessage, ToolDefinition } from './ai.types';
 import { ConnectionManager } from './connection/connection-manager';
 import { ConversationService } from './conversation/conversation.service';
 import { MessageService } from './message/message.service';
-import { ProviderRouter } from './provider/provider.router';
 import type { LLMProvider } from './provider/provider.types';
 import type { AISessionManager } from './session/ai-session-manager';
 import { ToolDispatcher } from './tools/tool.dispatcher';
@@ -32,7 +31,6 @@ export class AiService {
         private messageService: MessageService,
         _conversationService: ConversationService,
         private connectionManager: ConnectionManager,
-        private providerRouter: ProviderRouter,
         private toolDispatcher: ToolDispatcher,
     ) {}
 
@@ -41,7 +39,6 @@ export class AiService {
      */
     setProvider(provider: LLMProvider): void {
         this.provider = provider;
-        this.providerRouter.register(provider.name, provider, true);
         this.logger.log(`LLM provider set to: ${provider.name}`);
     }
 
@@ -56,7 +53,7 @@ export class AiService {
     /**
      * 处理用户消息（保留向后兼容）
      *
-     * 注意：在完整迁移到 AILoopOrchestrator 后，此方法将被废弃，
+     * 注意：此方法已被废弃，新请求应通过 RequestDispatcher.dispatch() 进入。
      * 请求应通过 RequestDispatcher.dispatch() 进入。
      */
     async handleUserMessage(

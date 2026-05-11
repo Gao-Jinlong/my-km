@@ -1,26 +1,29 @@
 /**
- * OpenAI LLM Provider
+ * Zhipu AI (智谱) LLM Provider
  *
- * 使用 openai SDK 实现流式输出和 tool call。
+ * Zhipu API 兼容 OpenAI 接口格式，直接使用 OpenAI SDK。
  */
 
 import OpenAI from 'openai';
 import type { LLMMessage, LLMOutput, ToolDefinition } from '../ai.types';
 import type { LLMConfig, LLMProvider } from './provider.types';
 
-export class OpenAIProvider implements LLMProvider {
-    readonly name = 'openai';
+export class ZhipuProvider implements LLMProvider {
+    readonly name = 'zhipu';
     private client: OpenAI;
     readonly model: string;
     private maxTokens: number;
     private temperature: number;
 
     constructor(config: LLMConfig) {
-        const apiKey = config.apiKey ?? process.env.OPENAI_API_KEY;
-        if (!apiKey) throw new Error('OpenAI API key is required');
+        const apiKey = config.apiKey ?? process.env.ZHIPUAI_API_KEY;
+        if (!apiKey) throw new Error('Zhipu API key is required');
 
-        this.client = new OpenAI({ apiKey });
-        this.model = config.model ?? 'glm-5.1';
+        this.client = new OpenAI({
+            apiKey,
+            baseURL: 'https://open.bigmodel.cn/api/paas/v4',
+        });
+        this.model = config.model ?? 'glm-4-flash';
         this.maxTokens = (config.maxTokens as number) ?? 4096;
         this.temperature = (config.temperature as number) ?? 0.7;
     }
@@ -30,7 +33,6 @@ export class OpenAIProvider implements LLMProvider {
         tools?: ToolDefinition[],
         abortSignal?: AbortSignal,
     ): AsyncIterable<LLMOutput> {
-        // 转换消息格式为 OpenAI API 格式
         const openaiMessages: OpenAI.ChatCompletionMessageParam[] = messages.map(msg => {
             if (typeof msg.content === 'string') {
                 return {
@@ -44,7 +46,6 @@ export class OpenAIProvider implements LLMProvider {
             } as OpenAI.ChatCompletionMessageParam;
         });
 
-        // 转换工具定义为 OpenAI 格式
         const openaiTools: OpenAI.ChatCompletionTool[] | undefined = tools?.map(t => ({
             type: 'function' as const,
             function: {
@@ -68,25 +69,20 @@ export class OpenAIProvider implements LLMProvider {
             },
         );
 
-        // 处理流式输出
         let currentToolUse: { id?: string; name?: string; input: string } | null = null;
 
         for await (const chunk of stream) {
             const delta = chunk.choices[0]?.delta;
             if (!delta) continue;
 
-            // 文本内容
             if (delta.content) {
                 yield { type: 'text_chunk', content: delta.content };
             }
 
-            // Tool call 开始
             if (delta.tool_calls && delta.tool_calls.length > 0) {
                 const tc = delta.tool_calls[0];
                 if (tc.id) {
-                    // 新的 tool call 开始
                     if (currentToolUse?.id && currentToolUse.name) {
-                        // 发射上一个 tool call
                         let parsedArgs: object = {};
                         try {
                             parsedArgs = currentToolUse.input
@@ -110,13 +106,11 @@ export class OpenAIProvider implements LLMProvider {
                         input: tc.function?.arguments ?? '',
                     };
                 } else if (currentToolUse) {
-                    // 累积 tool_use 参数
                     currentToolUse.input += tc.function?.arguments ?? '';
                 }
             }
         }
 
-        // 发射最后一个 tool call（如果有）
         if (currentToolUse?.id && currentToolUse.name) {
             let parsedArgs: object = {};
             try {
