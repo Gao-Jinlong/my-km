@@ -73,6 +73,14 @@ function createSubscriber(
         }),
     );
 
+    // 流式文本片段（更新当前 assistant 消息内容，触发 re-render）
+    disposables.push(
+        harness.onStreamChunk(() => {
+            snap = { ...snap, messages: [...harness.messages] };
+            update();
+        }),
+    );
+
     return () => {
         for (const d of disposables) d.dispose();
     };

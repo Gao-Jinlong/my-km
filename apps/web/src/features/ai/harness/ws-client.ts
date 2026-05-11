@@ -15,6 +15,7 @@ import type { ServerMessage } from '../types/ai.types';
  */
 export interface WSClient {
     connect(url: string): Promise<void>;
+    ensureConnected(url: string): Promise<void>;
     disconnect(): void;
     send(message: object): void;
     joinConversation(conversationId: string): void;
@@ -26,6 +27,8 @@ export interface WSClient {
         error?: string,
     ): void;
     stopGenerating(conversationId: string): void;
+    startIdleTimer(onIdle: () => void): void;
+    stopIdleTimer(): void;
     get isConnected(): boolean;
     get onConnectionChange(): Event<{ connected: boolean }>;
     get onStreamChunk(): Event<{ content: string }>;
@@ -39,6 +42,8 @@ export interface WSClient {
 
 class WSClientImpl extends Disposable implements WSClient {
     private _socket: Socket | null = null;
+    private _idleTimer: ReturnType<typeof setTimeout> | null = null;
+    private readonly _IDLE_TIMEOUT_MS = 30_000;
 
     // 事件发射器
     private _onStreamChunk = new Emitter<{ content: string }>();
@@ -104,8 +109,29 @@ class WSClientImpl extends Disposable implements WSClient {
     }
 
     disconnect(): void {
+        this.stopIdleTimer();
         this._socket?.disconnect();
         this._socket = null;
+    }
+
+    async ensureConnected(url: string): Promise<void> {
+        if (this.isConnected) {
+            this.stopIdleTimer();
+            return;
+        }
+        await this.connect(url);
+    }
+
+    startIdleTimer(onIdle: () => void): void {
+        this.stopIdleTimer();
+        this._idleTimer = setTimeout(onIdle, this._IDLE_TIMEOUT_MS);
+    }
+
+    stopIdleTimer(): void {
+        if (this._idleTimer) {
+            clearTimeout(this._idleTimer);
+            this._idleTimer = null;
+        }
     }
 
     send(message: object): void {
@@ -201,6 +227,7 @@ class WSClientImpl extends Disposable implements WSClient {
     }
 
     override dispose(): void {
+        this.stopIdleTimer();
         this.disconnect();
         this._onStreamChunk.dispose();
         this._onToolCall.dispose();

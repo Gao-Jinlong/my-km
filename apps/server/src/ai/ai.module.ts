@@ -90,7 +90,6 @@ export class AiModule implements OnModuleInit {
         ProviderClass: new (config: LLMConfig) => LLMProvider,
     ): void {
         const apiKey = this.getApiKeyForProvider(name);
-        console.log('🚀 ~ AiModule ~ registerProvider ~ apiKey:', apiKey);
         if (!apiKey) {
             console.warn(`⚠️  ${name.toUpperCase()}_API_KEY not set — skipping ${name}`);
             return;

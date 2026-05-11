@@ -28,7 +28,7 @@ export interface AIHarnessService {
     connect(wsUrl: string): Promise<void>;
     disconnect(): void;
     joinConversation(conversationId: string): void;
-    sendMessage(content: string): void;
+    sendMessage(content: string): Promise<void>;
     stopGenerating(): void;
 
     // 工具相关
@@ -94,12 +94,22 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
      * 将子模块事件代理到 Harness
      */
     private _setupEventProxy(): void {
-        this._store.add(this._wsClient.onStreamChunk(e => this._onStreamChunk.fire(e)));
+        this._store.add(
+            this._wsClient.onStreamChunk(e => {
+                this._conversationState.appendStreamChunk(e.content);
+                this._onStreamChunk.fire(e);
+            }),
+        );
         this._store.add(this._wsClient.onToolCall(e => this._onToolCall.fire(e)));
         this._store.add(
             this._wsClient.onStreamDone(() => {
                 this._conversationState.stopGenerating();
                 this._onStreamDone.fire();
+
+                // 启动 idle timer，超时后自动断开
+                this._wsClient.startIdleTimer(() => {
+                    this._wsClient.disconnect();
+                });
             }),
         );
         this._store.add(this._wsClient.onError(e => this._onError.fire(e)));
@@ -146,11 +156,13 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
                     const result = await this._toolRegistry.execute(name, args as object);
                     const conversationId = this._conversationState.conversationId;
                     if (conversationId) {
+                        this._wsClient.stopIdleTimer();
                         this._wsClient.sendToolResult(conversationId, id, result);
                     }
                 } catch (error) {
                     const conversationId = this._conversationState.conversationId;
                     if (conversationId) {
+                        this._wsClient.stopIdleTimer();
                         this._wsClient.sendToolResult(
                             conversationId,
                             id,
@@ -196,36 +208,42 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
         this._wsClient.joinConversation(conversationId);
     }
 
-    sendMessage(content: string): void {
+    async sendMessage(content: string): Promise<void> {
         const conversationId = this._conversationState.conversationId;
         if (!conversationId) {
             console.warn('[AI Harness] Cannot send message: no active conversation');
             return;
         }
 
-        // 先添加用户消息到本地状态
+        // Ensure connected before sending (on-demand connection)
+        const wsUrl = process.env.NEXT_PUBLIC_AI_WS_URL ?? 'http://localhost:3001/ai';
+        await this._wsClient.ensureConnected(wsUrl);
+
+        // Join conversation (idempotent via socket.io rooms)
+        this._wsClient.joinConversation(conversationId);
+
+        // Cancel any pending idle disconnect
+        this._wsClient.stopIdleTimer();
+
+        // 乐观更新：先添加用户消息和生成状态，给用户即时反馈
+        const userMsgId = `user-${Date.now()}`;
         this._conversationState.addMessage({
-            id: `user-${Date.now()}`,
+            id: userMsgId,
             role: 'user',
             content,
             createdAt: new Date().toISOString(),
         });
-
-        // 立即开始生成状态
         this._conversationState.startGenerating();
 
-        // 获取当前对话的上下文（取当前活跃编辑器）
-        const context = this._contextCollector
-            .getContext(conversationId.replace('doc-', ''))
-            .catch(() => null);
-
         // 异步获取上下文并发送
-        context
+        this._contextCollector
+            .getContext(conversationId.replace('doc-', ''))
             .then(ctx => {
                 this._wsClient.sendMessage(content, ctx, conversationId);
             })
             .catch(() => {
-                // context 获取失败不影响已添加的用户消息
+                // context 获取失败：回滚乐观状态
+                this._conversationState.removeMessage(userMsgId);
                 this._conversationState.stopGenerating();
             });
     }

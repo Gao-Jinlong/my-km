@@ -20,8 +20,8 @@ export function createLLMNode() {
             return { error: 'LLM caller not provided in configurable context' };
         }
 
-        // 构建消息列表（从状态中的 messages 字符串数组转为 LLM 格式）
-        const messages = state.messages.map(m => ({ role: 'user' as const, content: m }));
+        // 构建消息列表（状态中已存 WorkflowMessage，直接使用）
+        const messages = state.messages as Array<{ role: string; content: unknown }>;
 
         // 如果有工具结果，追加 tool_result 消息
         if (state.pendingToolCalls && state.pendingToolCalls.length > 0) {
@@ -57,7 +57,9 @@ export function createLLMNode() {
             hasToolCalls: toolCalls.length > 0,
             pendingToolCalls: toolCalls,
             // 追加助手消息到消息历史
-            messages: [assistantText || '(tool calls only)'],
+            messages: [
+                { role: 'assistant' as const, content: assistantText || '(tool calls only)' },
+            ],
         };
     };
 }

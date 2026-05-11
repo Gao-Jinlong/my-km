@@ -113,8 +113,11 @@ export interface WorkflowMessage {
  */
 export const WorkflowStateAnnotation = Annotation.Root({
     /** 用户输入消息 */
-    messages: Annotation<string[]>({
-        reducer: (existing: string[], update: string[]) => [...existing, ...update],
+    messages: Annotation<WorkflowMessage[]>({
+        reducer: (existing: WorkflowMessage[], update: WorkflowMessage[]) => [
+            ...existing,
+            ...update,
+        ],
         default: () => [],
     }),
     /** 当前对话 ID */

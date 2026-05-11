@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import type { PanelImperativeHandle } from 'react-resizable-panels';
 import { Group, Panel, Separator } from 'react-resizable-panels';
 import { PANEL_SIZES } from '@/lib/workspace/constants';
 import { getContainer } from '@/platform/bootstrap';
@@ -27,8 +28,11 @@ const LAYOUT_VERSION = '1.0.0';
 const VERSION_KEY = 'workspace-layout-version';
 
 export function WorkspaceContent() {
-    const { sidebarCollapsed, aiPanelCollapsed, setSidebarCollapsed } = useWorkspaceStore();
+    const { sidebarCollapsed, aiPanelCollapsed, setSidebarCollapsed, setAIPanelCollapsed } =
+        useWorkspaceStore();
     const panelServiceRef = useRef<PanelService | null>(null);
+    const sidebarPanelRef = useRef<PanelImperativeHandle | null>(null);
+    const aiPanelRef = useRef<PanelImperativeHandle | null>(null);
 
     // 初始化面板服务
     useEffect(() => {
@@ -76,16 +80,42 @@ export function WorkspaceContent() {
         };
     }, [setSidebarCollapsed]);
 
-    // 处理面板大小变化
-    const handleSidebarResize = (panelSize: import('react-resizable-panels').PanelSize) => {
-        const size = typeof panelSize === 'number' ? panelSize : 0;
-        panelServiceRef.current?.setSize('sidebar', size, true);
-    };
+    // Sync store collapse state with Panel imperative API
+    useEffect(() => {
+        if (sidebarCollapsed) {
+            sidebarPanelRef.current?.collapse();
+        } else {
+            sidebarPanelRef.current?.expand();
+        }
+    }, [sidebarCollapsed]);
 
-    const handleAIPanelResize = (panelSize: import('react-resizable-panels').PanelSize) => {
-        const size = typeof panelSize === 'number' ? panelSize : 0;
-        panelServiceRef.current?.setSize('ai-panel', size, true);
-    };
+    useEffect(() => {
+        if (aiPanelCollapsed) {
+            aiPanelRef.current?.collapse();
+        } else {
+            aiPanelRef.current?.expand();
+        }
+    }, [aiPanelCollapsed]);
+
+    // 处理面板大小变化
+    const handleSidebarResize = useCallback(
+        (panelSize: import('react-resizable-panels').PanelSize) => {
+            const size = typeof panelSize === 'number' ? panelSize : panelSize.asPercentage;
+            panelServiceRef.current?.setSize('sidebar', size, true);
+        },
+        [],
+    );
+
+    const handleAIPanelResize = useCallback(
+        (panelSize: import('react-resizable-panels').PanelSize) => {
+            const size = typeof panelSize === 'number' ? panelSize : panelSize.asPercentage;
+            if (size < 10) {
+                setAIPanelCollapsed(true);
+            }
+            panelServiceRef.current?.setSize('ai-panel', size, true);
+        },
+        [setAIPanelCollapsed],
+    );
 
     // 一次性清理：如果版本不匹配，清除旧的 panel 布局数据
     useEffect(() => {
@@ -131,13 +161,12 @@ export function WorkspaceContent() {
                                 collapsible={true}
                                 collapsedSize={PANEL_SIZES.SIDEBAR.COLLAPSED}
                                 onResize={handleSidebarResize}
+                                panelRef={sidebarPanelRef}
                             >
                                 <Sidebar collapsed={sidebarCollapsed} />
                             </Panel>
 
-                            {!sidebarCollapsed && (
-                                <Separator className="w-px bg-ws-border transition-colors hover:bg-ws-accent/50" />
-                            )}
+                            <Separator className="w-px bg-ws-border transition-colors hover:bg-ws-accent/50" />
 
                             {/* Editor Area */}
                             <Panel
@@ -148,9 +177,7 @@ export function WorkspaceContent() {
                                 <EditorArea />
                             </Panel>
 
-                            {!aiPanelCollapsed && (
-                                <Separator className="w-px bg-ws-border transition-colors hover:bg-ws-accent/50" />
-                            )}
+                            <Separator className="w-px bg-ws-border transition-colors hover:bg-ws-accent/50" />
                             <Panel
                                 id="ai-panel"
                                 defaultSize={PANEL_SIZES.AI_PANEL.DEFAULT}
@@ -159,6 +186,7 @@ export function WorkspaceContent() {
                                 collapsible={true}
                                 collapsedSize={PANEL_SIZES.AI_PANEL.COLLAPSED}
                                 onResize={handleAIPanelResize}
+                                panelRef={aiPanelRef}
                             >
                                 <AIPanel />
                             </Panel>

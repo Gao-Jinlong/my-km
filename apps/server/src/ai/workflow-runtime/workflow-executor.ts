@@ -26,7 +26,7 @@
  *                         └─────────────┘
  */
 
-import type { GraphConfig, WorkflowState } from '@my-km/langgraph-workflows';
+import type { GraphConfig, WorkflowMessage, WorkflowState } from '@my-km/langgraph-workflows';
 import { Injectable, Logger } from '@nestjs/common';
 import type { LLMMessage, ToolDefinition } from '../ai.types';
 import { ConnectionManager } from '../connection/connection-manager';
@@ -84,7 +84,7 @@ export class WorkflowExecutor {
 
         // 初始状态
         const initialState: Partial<WorkflowState> = {
-            messages: [ctx.content],
+            messages: [{ role: 'user', content: ctx.content }],
             conversationId: ctx.conversationId,
             lastAssistantMessage: '',
             hasToolCalls: false,
@@ -102,10 +102,10 @@ export class WorkflowExecutor {
             while (round < this.maxToolRounds) {
                 round++;
 
-                // 执行 LangGraph 图
+                // 执行 LangGraph 图 — stream() 返回 Promise，需先 await
                 let lastState: Partial<WorkflowState> | null = null;
-
-                for await (const state of graph.stream(initialState, { configurable })) {
+                const stream = await graph.stream(initialState, { configurable });
+                for await (const state of stream) {
                     lastState = state as Partial<WorkflowState>;
 
                     // 检查中止信号
@@ -191,9 +191,28 @@ export class WorkflowExecutor {
 
                 // 将助手消息和工具结果追加到状态消息中，用于下一轮
                 initialState.messages = [
-                    ctx.content,
-                    ...(lastState.lastAssistantMessage ? [lastState.lastAssistantMessage] : []),
-                    ...Object.values(results).map(r => JSON.stringify(r)),
+                    { role: 'user', content: ctx.content } as WorkflowMessage,
+                    ...(lastState.lastAssistantMessage
+                        ? [
+                              {
+                                  role: 'assistant',
+                                  content: lastState.lastAssistantMessage,
+                              } as WorkflowMessage,
+                          ]
+                        : []),
+                    ...Object.entries(results).map(([toolId, r]) => {
+                        const resultStr = typeof r === 'string' ? r : JSON.stringify(r);
+                        return {
+                            role: 'tool',
+                            content: [
+                                {
+                                    type: 'tool_result',
+                                    tool_use_id: toolId,
+                                    content: resultStr,
+                                },
+                            ],
+                        } as WorkflowMessage;
+                    }),
                 ];
                 initialState.pendingToolCalls = [];
                 initialState.hasToolCalls = false;
@@ -244,9 +263,7 @@ export class WorkflowExecutor {
             this.logger.log(`Graph compiled: ${cacheKey}`);
         }
 
-        return this.graphCache.get(cacheKey) as NonNullable<
-            ReturnType<typeof this.graphRegistry.get>
-        >;
+        return this.graphCache.get(cacheKey);
     }
 
     /**

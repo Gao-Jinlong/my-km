@@ -18,6 +18,7 @@ export interface ConversationState {
     get conversationId(): string | null;
     setConversationId(id: string | null): void;
     addMessage(message: MessageWire): void;
+    removeMessage(id: string): void;
     appendStreamChunk(content: string): void;
     startGenerating(): void;
     stopGenerating(): void;
@@ -66,6 +67,20 @@ class ConversationStateImpl extends Disposable implements ConversationState {
     }
 
     /**
+     * 移除指定 ID 的消息（回滚用）
+     */
+    removeMessage(id: string): void {
+        const idx = this._messages.findIndex(m => m.id === id);
+        if (idx >= 0) {
+            this._messages.splice(idx, 1);
+            this._onStateChange.fire({
+                messages: [...this._messages],
+                isGenerating: this._isGenerating,
+            });
+        }
+    }
+
+    /**
      * 开始生成助手消息
      */
     startGenerating(): void {
@@ -99,6 +114,11 @@ class ConversationStateImpl extends Disposable implements ConversationState {
      * 停止生成
      */
     stopGenerating(): void {
+        // 清理空助手消息（服务端错误或连接断开时残留）
+        if (this._currentAssistantMessage && !this._currentAssistantMessage.content) {
+            const idx = this._messages.indexOf(this._currentAssistantMessage);
+            if (idx >= 0) this._messages.splice(idx, 1);
+        }
         this._isGenerating = false;
         this._currentAssistantMessage = null;
         this._onStateChange.fire({ messages: [...this._messages], isGenerating: false });

@@ -5,7 +5,7 @@
  * 实际的工具调用等待由 WorkflowExecutor 处理（暂停/恢复循环）。
  */
 
-import type { WorkflowState } from '../types/workflow.types';
+import type { WorkflowMessage, WorkflowState } from '../types/workflow.types';
 
 export function createToolNode() {
     return async (state: WorkflowState): Promise<Partial<WorkflowState>> => {
@@ -13,13 +13,21 @@ export function createToolNode() {
             return { hasToolCalls: false };
         }
 
-        // 工具结果消息格式：
-        // { role: 'tool', content: [{ type: 'tool_result', tool_use_id, content }] }
-        const toolResultMessages: string[] = [];
+        // 构建 tool_result 消息（WorkflowMessage 格式）
+        const toolResultMessages: WorkflowMessage[] = [];
 
-        for (const [_toolId, result] of Object.entries(state.toolResults || {})) {
+        for (const [toolId, result] of Object.entries(state.toolResults || {})) {
             const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
-            toolResultMessages.push(resultStr);
+            toolResultMessages.push({
+                role: 'tool',
+                content: [
+                    {
+                        type: 'tool_result',
+                        tool_use_id: toolId,
+                        content: resultStr,
+                    },
+                ],
+            });
         }
 
         return {
@@ -28,6 +36,8 @@ export function createToolNode() {
             hasToolCalls: false,
             // 工具结果已存入 toolResults，由下一轮 LLM 调用消费
             toolResults: {},
+            // 追加 tool_result 消息到状态
+            messages: toolResultMessages,
         };
     };
 }

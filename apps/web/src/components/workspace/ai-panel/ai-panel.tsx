@@ -30,7 +30,6 @@ export function AIPanel() {
         selectedText,
         documentTitle,
         error,
-        connect,
         joinConversation,
         sendMessage,
         stopGenerating,
@@ -41,7 +40,7 @@ export function AIPanel() {
     const [generatingConversationId, setGeneratingConversationId] = useState<string | undefined>();
     const [activeConversationId, setActiveConversationId] = useState<string | undefined>();
 
-    // 初始化：注册工具、连接 WebSocket、加入对话
+    // 初始化：注册工具
     useEffect(() => {
         if (isInitializedRef.current) return;
         isInitializedRef.current = true;
@@ -51,20 +50,11 @@ export function AIPanel() {
             registerTools(registerDefaultTools);
         });
 
-        const doConnect = async () => {
-            try {
-                const wsUrl = process.env.NEXT_PUBLIC_AI_WS_URL ?? 'http://localhost:3001/ai';
-                await connect(wsUrl);
-
-                const conversationId = `conv-${nanoid(8)}`;
-                joinConversation(conversationId);
-                setActiveConversationId(conversationId);
-            } catch (error) {
-                console.error('Failed to connect to AI service:', error);
-            }
-        };
-        doConnect();
-    }, [connect, joinConversation, registerTools]);
+        // 不再在 mount 时连接，改为发送消息时按需连接
+        const conversationId = `conv-${nanoid(8)}`;
+        setActiveConversationId(conversationId);
+        joinConversation(conversationId);
+    }, [registerTools, joinConversation]);
 
     // Track generating state
     useEffect(() => {
@@ -85,11 +75,11 @@ export function AIPanel() {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     });
 
-    const handleSend = useCallback(() => {
+    const handleSend = useCallback(async () => {
         const trimmed = inputValue.trim();
         if (!trimmed || isGenerating) return;
 
-        sendMessage(trimmed);
+        await sendMessage(trimmed);
         setInputValue('');
     }, [inputValue, isGenerating, sendMessage]);
 
@@ -147,10 +137,10 @@ export function AIPanel() {
                     <div className="flex h-6 items-center justify-center border-ws-border border-b px-4">
                         <div className="flex items-center gap-1.5">
                             <div
-                                className={`h-1.5 w-1.5 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}
+                                className={`h-1.5 w-1.5 rounded-full ${isConnected ? 'bg-green-500' : 'bg-gray-400'}`}
                             />
                             <span className="text-[10px] text-ws-fg-muted">
-                                {isConnected ? 'Connected' : 'Connecting...'}
+                                {isConnected ? 'Connected' : 'Ready'}
                             </span>
                         </div>
                     </div>
@@ -217,14 +207,14 @@ export function AIPanel() {
                                 onChange={e => setInputValue(e.target.value)}
                                 onKeyDown={handleKeyDown}
                                 placeholder="Ask AI anything..."
-                                disabled={!isConnected || isGenerating}
+                                disabled={isGenerating}
                                 rows={1}
                                 className="flex-1 resize-none rounded-md border-0 bg-ws-bg-secondary px-3 py-2 text-[13px] text-ws-fg-primary placeholder:text-ws-fg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ws-accent disabled:cursor-not-allowed disabled:opacity-50"
                             />
                             <Button
                                 size="icon"
                                 onClick={handleSend}
-                                disabled={!isConnected || isGenerating || !inputValue.trim()}
+                                disabled={isGenerating || !inputValue.trim()}
                                 className="h-9 w-9 shrink-0"
                             >
                                 {isGenerating ? (

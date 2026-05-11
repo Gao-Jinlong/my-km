@@ -55,18 +55,16 @@ export class RequestDispatcher {
     async dispatch(ctx: DispatchContext): Promise<void> {
         const { conversationId, clientId, content } = ctx;
 
-        // 1. 速率限制检查
-        const conversation = await this.conversationService.findById(conversationId);
+        // 1. 查找对话（不存在则自动创建，兼容 join 尚未到达的竞态）
+        let conversation = await this.conversationService.findById(conversationId);
         if (!conversation) {
-            this.logger.warn(
-                `[${clientId}] dispatch rejected: conversation ${conversationId} not found`,
+            this.logger.log(
+                `[${clientId}] conversation not found in dispatch, creating: ${conversationId}`,
             );
-            this.connectionManager.emitToClient(clientId, 'error', {
-                type: 'error',
-                message: 'Conversation not found. Please join a conversation first.',
-                code: 'CONVERSATION_NOT_FOUND',
+            conversation = await this.conversationService.create({
+                id: conversationId,
+                userId: undefined,
             });
-            return;
         }
 
         const userId = conversation.userId ?? null;

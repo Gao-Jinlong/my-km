@@ -56,8 +56,7 @@ export class ConversationOrchestrator {
             content,
         });
 
-        // 2. 构建上下文（历史消息用于 LLM，但当前由 workflowExecutor 自行构建）
-        await this.messageService.buildLLMHistory(conversationId, opts.tokenLimit);
+        // 2. 构建上下文（历史消息由 workflowExecutor 负责构建）
 
         // 3. 构建工作流执行上下文
         const workflowCtx: WorkflowExecutionContext = {
