@@ -60,7 +60,7 @@ export function Service(options: { id?: string; singleton?: boolean } = {}) {
  * ```
  */
 export function Inject(serviceId?: string | (abstract new (...args: never[]) => unknown)) {
-    return (target: object, propertyKey: string | symbol, parameterIndex: number) => {
+    return (target: object, propertyKey: string | symbol | undefined, parameterIndex: number) => {
         // 从反射元数据获取参数类型
         const paramTypes = Reflect.getMetadata('design:paramtypes', target, propertyKey);
         const paramType = paramTypes?.[parameterIndex];
@@ -114,7 +114,7 @@ export function Inject(serviceId?: string | (abstract new (...args: never[]) => 
  * ```
  */
 export function Optional() {
-    return (target: object, _propertyKey: string | symbol, parameterIndex: number) => {
+    return (target: object, _propertyKey: string | symbol | undefined, parameterIndex: number) => {
         let existingOptional = Reflect.getMetadata('di:optional', target);
         if (!existingOptional) {
             existingOptional = [];

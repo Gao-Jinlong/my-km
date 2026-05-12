@@ -28,6 +28,7 @@ import { MessageChannelService } from './message-channel/service';
 import { MonitorService } from './monitor/service';
 import { IndexedDBWriter } from './monitor/writers/indexeddb';
 import { PanelService } from './panel/service';
+import { createWSClientService, WSClientService } from './ws-client';
 
 /**
  * 应用服务容器类型
@@ -47,6 +48,7 @@ export interface AppServices {
     keyboardShortcutService: KeyboardShortcutService;
     panelService: PanelService;
     conditionalService: ConditionalService;
+    wsClient: WSClientService;
     aiHarness: AIHarnessService;
 }
 
@@ -72,8 +74,13 @@ function createServiceContainer(): ServiceContainer {
     container.register(PanelService);
     container.register(ConditionalService);
 
-    // AI Harness（通过工厂函数创建，使用 registerInstance 注册）
-    const aiHarness = createAIHarnessService();
+    // WSClientService（工厂模式创建，registerInstance 注册为单例）
+    const wsUrl = process.env.NEXT_PUBLIC_AI_WS_URL ?? 'http://localhost:3001/ai';
+    const wsClient = createWSClientService(wsUrl);
+    container.registerInstance(WSClientService.name, wsClient);
+
+    // AI Harness（使用注入的 WSClientService）
+    const aiHarness = createAIHarnessService(wsClient);
     container.registerInstance('aiHarness', aiHarness);
 
     return container;

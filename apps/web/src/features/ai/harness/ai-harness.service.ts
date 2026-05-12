@@ -8,11 +8,12 @@
 import { Emitter, type Event } from '@/base/common/event';
 import type { EditorService } from '@/features/editor/service';
 import { ServiceBase } from '@/platform/base/service-base';
+import { Inject } from '@/platform/di';
+import { WSClientService } from '@/platform/ws-client';
 import type { AIContextWire, MessageWire, ToolHandler } from '../types/ai.types';
 import { type ContextCollector, createContextCollector } from './context-collector';
 import { type ConversationState, createConversationState } from './conversation-state';
 import { createToolRegistry, type ToolRegistry } from './tool-registry';
-import { createWSClient, type WSClient } from './ws-client';
 
 /**
  * AIHarnessService 接口
@@ -40,6 +41,7 @@ export interface AIHarnessService {
     get isGenerating(): boolean;
     get conversationId(): string | null;
     get selectedText(): string | null;
+    get wsClient(): WSClientService;
 
     // 事件
     get onStreamChunk(): Event<{ content: string }>;
@@ -56,7 +58,7 @@ export interface AIHarnessService {
 
 class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
     private _contextCollector: ContextCollector;
-    private _wsClient: WSClient;
+    private _wsClient: WSClientService;
     private _toolRegistry: ToolRegistry;
     private _conversationState: ConversationState;
 
@@ -77,11 +79,11 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
     private _selectedText: string | null = null;
     private _currentDocTitle: string | null = null;
 
-    constructor() {
+    constructor(@Inject(WSClientService) wsClient: WSClientService) {
         super();
         // 创建子模块
         this._contextCollector = createContextCollector();
-        this._wsClient = createWSClient();
+        this._wsClient = wsClient;
         this._toolRegistry = createToolRegistry();
         this._conversationState = createConversationState();
 
@@ -105,11 +107,6 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
             this._wsClient.onStreamDone(() => {
                 this._conversationState.stopGenerating();
                 this._onStreamDone.fire();
-
-                // 启动 idle timer，超时后自动断开
-                this._wsClient.startIdleTimer(() => {
-                    this._wsClient.disconnect();
-                });
             }),
         );
         this._store.add(this._wsClient.onError(e => this._onError.fire(e)));
@@ -195,12 +192,13 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
 
     // ========== 对话相关 ==========
 
-    async connect(wsUrl: string): Promise<void> {
-        await this._wsClient.connect(wsUrl);
+    async connect(_wsUrl: string): Promise<void> {
+        // URL 已由 WSClientService 内部管理，此处确保连接即可
+        await this._wsClient.ensureConnected();
     }
 
     disconnect(): void {
-        this._wsClient.disconnect();
+        this._wsClient.release();
     }
 
     joinConversation(conversationId: string): void {
@@ -215,9 +213,8 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
             return;
         }
 
-        // Ensure connected before sending (on-demand connection)
-        const wsUrl = process.env.NEXT_PUBLIC_AI_WS_URL ?? 'http://localhost:3001/ai';
-        await this._wsClient.ensureConnected(wsUrl);
+        // Ensure connected before sending (connection managed by WSClientService refCount)
+        await this._wsClient.ensureConnected();
 
         // Join conversation (idempotent via socket.io rooms)
         this._wsClient.joinConversation(conversationId);
@@ -284,6 +281,10 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
         return this._selectedText;
     }
 
+    get wsClient(): WSClientService {
+        return this._wsClient;
+    }
+
     // ========== 事件 ==========
 
     get onStreamChunk(): Event<{ content: string }> {
@@ -338,6 +339,6 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
 /**
  * 创建 AIHarnessService 实例
  */
-export function createAIHarnessService(): AIHarnessService {
-    return new AIHarnessServiceImpl();
+export function createAIHarnessService(wsClient: WSClientService): AIHarnessService {
+    return new AIHarnessServiceImpl(wsClient);
 }

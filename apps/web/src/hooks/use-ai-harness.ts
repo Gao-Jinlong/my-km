@@ -110,7 +110,10 @@ export function useAIHarness() {
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
-            return createSubscriber(harness, snap => {
+            // 组件挂载时增加引用
+            harness.wsClient.acquire();
+
+            const unsubscribe = createSubscriber(harness, snap => {
                 snapshotRef.current = snap;
                 // 错误自动清除：新错误触发时清除旧 timer
                 if (snap.error && autoClearTimerRef.current) {
@@ -124,6 +127,12 @@ export function useAIHarness() {
                 }
                 onStoreChange();
             });
+
+            return () => {
+                unsubscribe();
+                // 组件卸载时减少引用，归零时 WSClientService 自动断开
+                harness.wsClient.release();
+            };
         },
         [harness],
     );

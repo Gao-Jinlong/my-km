@@ -1,49 +1,31 @@
 /**
- * WSClient — AI WebSocket 连接管理子模块
+ * WSClientService — AI WebSocket 连接管理 Service
  *
  * 使用 socket.io-client 与服务端通信。
- * 通过 Emitter 向 Harness 发事件，不直接调用其他子模块。
+ * 通过 acquire()/release() 引用计数自动管理连接生命周期。
+ * 当引用计数归零时，启动 idle timer 后自动断开连接。
  */
 
 import { io, type Socket } from 'socket.io-client';
 import { Emitter, type Event } from '@/base/common/event';
-import { Disposable } from '@/base/common/lifecycle';
-import type { ServerMessage } from '../types/ai.types';
+import type { ServerMessage } from '@/features/ai/types/ai.types';
+import { ServiceBase } from '@/platform/base/service-base';
+import { Service } from '@/platform/di';
 
 /**
- * WSClient 接口
+ * WSClientService — 全局单例 WebSocket 连接管理
+ *
+ * 引用计数机制：
+ * - acquire(): refCount++，首次引用时自动连接
+ * - release(): refCount--，归零时启动 30s idle timer 后断开
  */
-export interface WSClient {
-    connect(url: string): Promise<void>;
-    ensureConnected(url: string): Promise<void>;
-    disconnect(): void;
-    send(message: object): void;
-    joinConversation(conversationId: string): void;
-    sendMessage(content: string, context: unknown, conversationId: string): void;
-    sendToolResult(
-        conversationId: string,
-        toolCallId: string,
-        result: unknown,
-        error?: string,
-    ): void;
-    stopGenerating(conversationId: string): void;
-    startIdleTimer(onIdle: () => void): void;
-    stopIdleTimer(): void;
-    get isConnected(): boolean;
-    get onConnectionChange(): Event<{ connected: boolean }>;
-    get onStreamChunk(): Event<{ content: string }>;
-    get onToolCall(): Event<{ id: string; name: string; args: object }>;
-    get onStreamDone(): Event<void>;
-    get onError(): Event<{ message: string; code: string }>;
-    get onHistory(): Event<{ messages: unknown[] }>;
-    get onToolTimeout(): Event<{ toolCallId: string; message: string }>;
-    dispose(): void;
-}
-
-class WSClientImpl extends Disposable implements WSClient {
+@Service({ singleton: true })
+export class WSClientService extends ServiceBase {
     private _socket: Socket | null = null;
     private _idleTimer: ReturnType<typeof setTimeout> | null = null;
     private readonly _IDLE_TIMEOUT_MS = 30_000;
+    private readonly _url: string;
+    private _refCount = 0;
 
     // 事件发射器
     private _onStreamChunk = new Emitter<{ content: string }>();
@@ -54,15 +36,61 @@ class WSClientImpl extends Disposable implements WSClient {
     private _onToolTimeout = new Emitter<{ toolCallId: string; message: string }>();
     private _onConnectionChange = new Emitter<{ connected: boolean }>();
 
+    constructor(url: string) {
+        super();
+        this._url = url;
+    }
+
+    get refCount(): number {
+        return this._refCount;
+    }
+
     get isConnected(): boolean {
         return this._socket?.connected ?? false;
     }
 
-    async connect(url: string): Promise<void> {
+    /**
+     * 增加引用计数。首次引用时自动建立连接。
+     */
+    acquire(): void {
+        this._refCount++;
+        if (this._refCount === 1) {
+            this._connect();
+        }
+    }
+
+    /**
+     * 减少引用计数。归零时启动 idle timer 后自动断开连接。
+     */
+    release(): void {
+        if (this._refCount <= 0) return;
+        this._refCount--;
+        if (this._refCount === 0) {
+            this.startIdleTimer(() => this._disconnect());
+        }
+    }
+
+    /**
+     * 确保已连接。如果已连接则清除 idle timer，否则建立连接。
+     */
+    async ensureConnected(): Promise<void> {
+        if (this.isConnected) {
+            this.stopIdleTimer();
+            return;
+        }
+        await this._connect();
+    }
+
+    /**
+     * 建立 WebSocket 连接
+     */
+    private _connect(): Promise<void> {
+        if (this._socket?.connected) return Promise.resolve();
+
         return new Promise((resolve, reject) => {
             try {
-                console.log(`[AI WS] Connecting to ${url}...`);
-                this._socket = io(url, {
+                console.log(`[AI WS] Connecting to ${this._url}...`);
+                this._socket = io(this._url, {
                     autoConnect: true,
                     reconnection: true,
                     reconnectionDelay: 3000,
@@ -108,32 +136,18 @@ class WSClientImpl extends Disposable implements WSClient {
         });
     }
 
-    disconnect(): void {
+    /**
+     * 断开 WebSocket 连接
+     */
+    private _disconnect(): void {
         this.stopIdleTimer();
         this._socket?.disconnect();
         this._socket = null;
     }
 
-    async ensureConnected(url: string): Promise<void> {
-        if (this.isConnected) {
-            this.stopIdleTimer();
-            return;
-        }
-        await this.connect(url);
-    }
-
-    startIdleTimer(onIdle: () => void): void {
-        this.stopIdleTimer();
-        this._idleTimer = setTimeout(onIdle, this._IDLE_TIMEOUT_MS);
-    }
-
-    stopIdleTimer(): void {
-        if (this._idleTimer) {
-            clearTimeout(this._idleTimer);
-            this._idleTimer = null;
-        }
-    }
-
+    /**
+     * 发送原始消息
+     */
     send(message: object): void {
         if (!this._socket || !this._socket.connected) {
             throw new Error('WebSocket is not connected');
@@ -141,16 +155,25 @@ class WSClientImpl extends Disposable implements WSClient {
         this._socket.emit('message', message);
     }
 
+    /**
+     * 加入对话房间
+     */
     joinConversation(conversationId: string): void {
         console.log(`[AI WS] Joining conversation: ${conversationId}`);
         this._socket?.emit('join', { type: 'join', conversationId });
     }
 
+    /**
+     * 发送用户消息
+     */
     sendMessage(content: string, context: unknown, conversationId: string): void {
         console.log(`[AI WS] Sending message, length: ${content.length}`);
         this._socket?.emit('message', { type: 'message', conversationId, content, context });
     }
 
+    /**
+     * 发送工具执行结果
+     */
     sendToolResult(
         conversationId: string,
         toolCallId: string,
@@ -167,12 +190,34 @@ class WSClientImpl extends Disposable implements WSClient {
         });
     }
 
+    /**
+     * 停止 AI 生成
+     */
     stopGenerating(conversationId: string): void {
         console.log(`[AI WS] Stop generating`);
         this._socket?.emit('stop', { type: 'stop', conversationId });
     }
 
-    // 事件访问器
+    /**
+     * 启动 idle timer，超时后执行回调
+     */
+    startIdleTimer(onIdle: () => void): void {
+        this.stopIdleTimer();
+        this._idleTimer = setTimeout(onIdle, this._IDLE_TIMEOUT_MS);
+    }
+
+    /**
+     * 停止 idle timer
+     */
+    stopIdleTimer(): void {
+        if (this._idleTimer) {
+            clearTimeout(this._idleTimer);
+            this._idleTimer = null;
+        }
+    }
+
+    // ===== 事件访问器 =====
+
     get onConnectionChange(): Event<{ connected: boolean }> {
         return this._onConnectionChange.event;
     }
@@ -194,6 +239,8 @@ class WSClientImpl extends Disposable implements WSClient {
     get onToolTimeout(): Event<{ toolCallId: string; message: string }> {
         return this._onToolTimeout.event;
     }
+
+    // ===== 内部方法 =====
 
     private _handleMessage(data: unknown): void {
         try {
@@ -227,8 +274,11 @@ class WSClientImpl extends Disposable implements WSClient {
     }
 
     override dispose(): void {
+        // 释放所有引用，触发 idle disconnect
+        while (this._refCount > 0) {
+            this.release();
+        }
         this.stopIdleTimer();
-        this.disconnect();
         this._onStreamChunk.dispose();
         this._onToolCall.dispose();
         this._onStreamDone.dispose();
@@ -240,6 +290,9 @@ class WSClientImpl extends Disposable implements WSClient {
     }
 }
 
-export function createWSClient(): WSClient {
-    return new WSClientImpl();
+/**
+ * 工厂函数 — 用于 bootstrap.ts 中手动创建并 registerInstance
+ */
+export function createWSClientService(url: string): WSClientService {
+    return new WSClientService(url);
 }

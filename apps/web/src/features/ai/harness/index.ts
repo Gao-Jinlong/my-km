@@ -2,4 +2,3 @@ export { type AIHarnessService, createAIHarnessService } from './ai-harness.serv
 export { type ContextCollector, createContextCollector } from './context-collector';
 export { type ConversationState, createConversationState } from './conversation-state';
 export { createToolRegistry, type ToolRegistry } from './tool-registry';
-export { createWSClient, type WSClient } from './ws-client';
