@@ -22,7 +22,8 @@
             "Bash(git add:*)",
             "Bash(git commit:*)",
             "mcp__sentrux__scan",
-            "mcp__sentrux__health"
+            "mcp__sentrux__health",
+            "Bash(Select-String -Pattern '\"test\"' -Context 0,1)"
         ]
     }
 }
