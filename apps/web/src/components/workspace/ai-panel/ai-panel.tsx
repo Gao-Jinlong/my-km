@@ -9,7 +9,9 @@ import { Loader2, Send } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import type { AIHarnessService } from '@/features/ai/harness';
 import { useAIHarness } from '@/hooks/use-ai-harness';
+import { getContainer } from '@/platform/bootstrap';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import { AIHeader } from './ai-header';
 import { ContextBadge } from './context-badge';
@@ -41,7 +43,7 @@ export function AIPanel() {
     const [generatingConversationId, setGeneratingConversationId] = useState<string | undefined>();
     const [activeConversationId, setActiveConversationId] = useState<string | undefined>();
 
-    // 初始化：注册工具
+    // 初始化：注册工具 + 对话恢复
     useEffect(() => {
         if (isInitializedRef.current) return;
         isInitializedRef.current = true;
@@ -51,11 +53,27 @@ export function AIPanel() {
             registerTools(registerDefaultTools);
         });
 
-        // 不再在 mount 时连接，改为发送消息时按需连接
-        const conversationId = `conv-${nanoid(8)}`;
-        setActiveConversationId(conversationId);
-        joinConversation(conversationId);
-    }, [registerTools, joinConversation]);
+        // Conversation recovery: check localStorage for saved conversation
+        const harness = getContainer().get<AIHarnessService>('aiHarness');
+        const savedId = (() => {
+            try {
+                return localStorage.getItem('activeConversationId');
+            } catch {
+                return null;
+            }
+        })();
+
+        if (savedId) {
+            // Restore existing conversation
+            setActiveConversationId(savedId);
+            harness.restoreConversation(savedId);
+        } else {
+            // Create new conversation
+            const conversationId = `conv-${nanoid(8)}`;
+            setActiveConversationId(conversationId);
+            joinConversation(conversationId);
+        }
+    }, [joinConversation, registerTools]);
 
     // Track generating state
     useEffect(() => {
