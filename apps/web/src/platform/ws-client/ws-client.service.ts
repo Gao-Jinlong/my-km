@@ -35,6 +35,13 @@ export class WSClientService extends ServiceBase {
     private _onHistory = new Emitter<{ messages: unknown[] }>();
     private _onToolTimeout = new Emitter<{ toolCallId: string; message: string }>();
     private _onConnectionChange = new Emitter<{ connected: boolean }>();
+    private _onCreated = new Emitter<{ conversationId: string }>();
+    private _onStatus = new Emitter<{ conversationId: string; status: string; message?: string }>();
+    private _onDone = new Emitter<{
+        conversationId: string;
+        finishReason: string;
+        error?: string;
+    }>();
 
     constructor(url: string) {
         super();
@@ -164,11 +171,28 @@ export class WSClientService extends ServiceBase {
     }
 
     /**
+     * 创建新对话并发送消息
+     */
+    sendCreateAndSend(content: string, context: unknown): void {
+        if (!this._socket || !this._socket.connected) {
+            throw new Error('WebSocket is not connected');
+        }
+        this._socket.emit('create_and_send', { type: 'create_and_send', content, context });
+    }
+
+    /**
+     * 加入对话房间（别名方法，与 joinConversation 行为一致）
+     */
+    sendJoin(conversationId: string): void {
+        this._socket?.emit('join', { type: 'join', conversationId });
+    }
+
+    /**
      * 发送用户消息
      */
     sendMessage(content: string, context: unknown, conversationId: string): void {
         console.log(`[AI WS] Sending message, length: ${content.length}`);
-        this._socket?.emit('message', { type: 'message', conversationId, content, context });
+        this._socket?.emit('message', { type: 'send_message', conversationId, content, context });
     }
 
     /**
@@ -239,6 +263,15 @@ export class WSClientService extends ServiceBase {
     get onToolTimeout(): Event<{ toolCallId: string; message: string }> {
         return this._onToolTimeout.event;
     }
+    get onCreated(): Event<{ conversationId: string }> {
+        return this._onCreated.event;
+    }
+    get onStatus(): Event<{ conversationId: string; status: string; message?: string }> {
+        return this._onStatus.event;
+    }
+    get onDone(): Event<{ conversationId: string; finishReason: string; error?: string }> {
+        return this._onDone.event;
+    }
 
     // ===== 内部方法 =====
 
@@ -246,26 +279,54 @@ export class WSClientService extends ServiceBase {
         try {
             const msg = data as ServerMessage;
             switch (msg.type) {
-                case 'stream_chunk':
-                    this._onStreamChunk.fire({ content: msg.content });
-                    break;
-                case 'tool_call':
-                    this._onToolCall.fire({ id: msg.id, name: msg.name, args: msg.arguments });
-                    break;
-                case 'stream_done':
-                    this._onStreamDone.fire();
-                    break;
-                case 'error':
-                    this._onError.fire({ message: msg.message, code: msg.code });
-                    this._onStreamDone.fire();
+                case 'created':
+                    this._onCreated.fire({ conversationId: msg.conversationId });
                     break;
                 case 'history':
                     this._onHistory.fire({ messages: msg.messages });
                     break;
-                case 'tool_timeout':
-                    this._onToolTimeout.fire({ toolCallId: msg.toolCallId, message: msg.message });
+                case 'text_chunk':
+                    this._onStreamChunk.fire({ content: msg.content });
                     break;
+                case 'tool_call':
+                    this._onToolCall.fire({
+                        id: msg.toolCallId,
+                        name: msg.toolName,
+                        args: msg.input as object,
+                    });
+                    break;
+                case 'status':
+                    this._onStatus.fire({
+                        conversationId: msg.conversationId,
+                        status: msg.status,
+                        message: msg.message,
+                    });
+                    break;
+                case 'done':
+                    this._onDone.fire({
+                        conversationId: msg.conversationId,
+                        finishReason: msg.finishReason,
+                        error: msg.error,
+                    });
+                    this._onStreamDone.fire();
+                    break;
+                case 'error':
+                    this._onError.fire({ message: msg.message, code: msg.code });
+                    break;
+                // Legacy events
                 case 'joined':
+                    break;
+                case 'tool_timeout':
+                    this._onToolTimeout.fire({
+                        toolCallId: (msg as any).toolCallId,
+                        message: (msg as any).message,
+                    });
+                    break;
+                case 'stream_chunk':
+                    this._onStreamChunk.fire({ content: (msg as any).content });
+                    break;
+                case 'stream_done':
+                    this._onStreamDone.fire();
                     break;
             }
         } catch (error) {
@@ -286,6 +347,9 @@ export class WSClientService extends ServiceBase {
         this._onHistory.dispose();
         this._onToolTimeout.dispose();
         this._onConnectionChange.dispose();
+        this._onCreated.dispose();
+        this._onStatus.dispose();
+        this._onDone.dispose();
         super.dispose();
     }
 }
