@@ -1,73 +1,73 @@
-# AI Conversation Flow Redesign Implementation Plan
+# AI 对话流程重构实施计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **执行者必读：** 实现本计划必须使用子技能 `superpowers:subagent-driven-development`（推荐）或 `superpowers:executing-plans`，按任务逐步执行。步骤使用复选框（`- [ ]`）语法跟踪进度。
 
-**Goal:** Replace the current AI conversation flow with a state machine driven two-layer architecture, with unified event protocol, tool routing by danger level, and conversation recovery via localStorage.
+**目标：** 用状态机驱动的两层架构替换当前的 AI 对话流程，包含统一事件协议、按危险等级路由工具、以及通过 localStorage 实现对话恢复。
 
-**Architecture:** Backend ConversationStateMachine manages dialog lifecycle (Idle → BuildingContext → Processing → ToolWaiting/ToolExecuting → Done). Frontend Event Hub dispatches events by type name. WS Service manages connection lifecycle automatically. Tool Router routes LLM tool calls by execution target and danger level.
+**架构：** 后端 ConversationStateMachine 管理对话生命周期（Idle → BuildingContext → Processing → ToolWaiting/ToolExecuting → Done）。前端 Event Hub 按类型名分发事件。WS Service 自动管理连接生命周期。Tool Router 按执行目标和危险等级路由 LLM 工具调用。
 
-**Tech Stack:** TypeScript, NestJS (backend), socket.io/socket.io-client, LangGraph (preserved as workflow engine), Jest (server tests), Vitest (web tests), Prisma
-
----
-
-## File Structure
-
-### New Files
-| File | Responsibility |
-|------|---------------|
-| `apps/server/src/ai/gateway/conversation-statemachine.ts` | Core state machine: Idle/BuildingContext/Processing/ToolWaiting/ToolExecuting/Done |
-| `apps/server/src/ai/gateway/conversation-statemachine.types.ts` | State machine types: ConversationState enum, ConversationFSM interface, transition events |
-| `apps/server/src/ai/tools/tool-router.ts` | Routes LLM tool calls by execution target (backend/frontend) and danger level (low/high) |
-| `apps/server/src/ai/gateway/ai-ws-events.types.ts` | Shared WS event types (ClientMessage/ServerMessage discriminated unions) |
-
-### Modified Files
-| File | Change |
-|------|--------|
-| `apps/web/src/features/ai/types/ai.types.ts` | Replace ClientMessage/ServerMessage with new event protocol |
-| `apps/web/src/platform/ws-client/ws-client.service.ts` | Add new event emitters, update send methods for new protocol |
-| `apps/web/src/features/ai/harness/ai-harness.service.ts` | Add Event Hub pattern, conversation recovery, tool confirmation UI |
-| `apps/web/src/features/ai/harness/conversation-state.ts` | Add generating state tracking for UI disable |
-| `apps/server/src/ai/gateway/ai-ws.gateway.ts` | Replace old event handlers with new protocol, wire to StateMachine |
-| `apps/server/src/ai/tools/tool.types.ts` | Add `execution` and `danger` fields to RegisteredTool |
-| `apps/server/src/ai/workflow-runtime/workflow-executor.ts` | Wire to StateMachine instead of manual tool loop, remove dead currentMessages |
-| `apps/server/src/ai/workflow-runtime/conversation-orchestrator.ts` | Delegate to StateMachine, remove direct session management |
-
-### Unchanged Files (read-only reference)
-| File | Why |
-|------|-----|
-| `apps/server/src/ai/session/ai-session-manager.ts` | Keep for now, StateMachine wraps it |
-| `apps/server/src/ai/message/message.service.ts` | Keep as-is, StateMachine calls it |
-| `apps/server/src/ai/conversation/conversation.service.ts` | Keep as-is |
-| `apps/server/src/ai/dispatch/request-dispatcher.ts` | Will be simplified, not removed |
-| `packages/langgraph-workflows/` | Keep as-is, graph definitions unchanged |
-| `apps/server/src/ai/provider/` | Keep as-is |
-| `apps/server/src/ai/connection/connection-manager.ts` | Keep as-is |
-| `apps/server/src/ai/tools/tool.dispatcher.ts` | Keep waitForResults mechanism, ToolRouter uses it |
-| `apps/server/src/ai/tools/tool.registry.ts` | Keep, merge definitions into single source |
+**技术栈：** TypeScript、NestJS（后端）、socket.io/socket.io-client、LangGraph（保留为工作流引擎）、Jest（服务端测试）、Vitest（Web 测试）、Prisma
 
 ---
 
-### Task 1: Define Server-Side WS Event Types
+## 文件结构
 
-**Files:**
-- Create: `apps/server/src/ai/gateway/ai-ws-events.types.ts`
+### 新建文件
+| 文件 | 职责 |
+|------|------|
+| `apps/server/src/ai/gateway/conversation-statemachine.ts` | 核心状态机：Idle/BuildingContext/Processing/ToolWaiting/ToolExecuting/Done |
+| `apps/server/src/ai/gateway/conversation-statemachine.types.ts` | 状态机类型：ConversationState 枚举、ConversationFSM 接口、转换事件 |
+| `apps/server/src/ai/tools/tool-router.ts` | 按执行目标（后端/前端）和危险等级（低/高）路由 LLM 工具调用 |
+| `apps/server/src/ai/gateway/ai-ws-events.types.ts` | 共享 WS 事件类型（ClientMessage/ServerMessage 判别联合类型） |
 
-- [ ] **Step 1: Write the new WS event types**
+### 修改文件
+| 文件 | 变更 |
+|------|------|
+| `apps/web/src/features/ai/types/ai.types.ts` | 用新事件协议替换 ClientMessage/ServerMessage |
+| `apps/web/src/platform/ws-client/ws-client.service.ts` | 添加新事件发射器，更新发送方法适配新协议 |
+| `apps/web/src/features/ai/harness/ai-harness.service.ts` | 添加 Event Hub 模式、对话恢复、工具确认 UI |
+| `apps/web/src/features/ai/harness/conversation-state.ts` | 添加生成中状态跟踪，用于禁用发送按钮 |
+| `apps/server/src/ai/gateway/ai-ws.gateway.ts` | 用新协议替换旧事件处理器，接入 StateMachine |
+| `apps/server/src/ai/tools/tool.types.ts` | 为 RegisteredTool 添加 `execution` 和 `danger` 字段 |
+| `apps/server/src/ai/workflow-runtime/workflow-executor.ts` | 接入 StateMachine 替代手动工具循环，移除废弃的 currentMessages |
+| `apps/server/src/ai/workflow-runtime/conversation-orchestrator.ts` | 委托给 StateMachine，移除直接的会话管理 |
 
-Create `apps/server/src/ai/gateway/ai-ws-events.types.ts`:
+### 不变文件（仅供参考）
+| 文件 | 原因 |
+|------|------|
+| `apps/server/src/ai/session/ai-session-manager.ts` | 暂保留，StateMachine 封装它 |
+| `apps/server/src/ai/message/message.service.ts` | 保持不变，StateMachine 调用它 |
+| `apps/server/src/ai/conversation/conversation.service.ts` | 保持不变 |
+| `apps/server/src/ai/dispatch/request-dispatcher.ts` | 将简化，不移除 |
+| `packages/langgraph-workflows/` | 保持不变，图定义不变 |
+| `apps/server/src/ai/provider/` | 保持不变 |
+| `apps/server/src/ai/connection/connection-manager.ts` | 保持不变 |
+| `apps/server/src/ai/tools/tool.dispatcher.ts` | 保留 waitForResults 机制，ToolRouter 使用它 |
+| `apps/server/src/ai/tools/tool.registry.ts` | 保留，将定义合并为单一来源 |
+
+---
+
+### 任务 1：定义服务端 WS 事件类型 ✅ 已完成
+
+**文件：**
+- 新建：`apps/server/src/ai/gateway/ai-ws-events.types.ts`
+
+- [ ] **步骤 1：编写新的 WS 事件类型**
+
+创建 `apps/server/src/ai/gateway/ai-ws-events.types.ts`：
 
 ```typescript
 /**
- * AI WebSocket Event Types — Server-Client Protocol
+ * AI WebSocket 事件类型 — 服务端-客户端协议
  *
- * ClientMessage: Frontend → Backend
- * ServerMessage: Backend → Frontend
+ * ClientMessage: 前端 → 后端
+ * ServerMessage: 后端 → 前端
  *
- * All events use discriminated union with `type` field.
+ * 所有事件均使用带 `type` 字段的判别联合类型。
  */
 
 /**
- * Editor context (collected by frontend, sent with messages)
+ * 编辑器上下文（由前端收集，随消息发送）
  */
 export interface EditorContext {
     documentId: string;
@@ -80,7 +80,7 @@ export interface EditorContext {
 }
 
 /**
- * Message wire format for history
+ * 消息线格式（用于历史记录）
  */
 export interface MessageWire {
     id: string;
@@ -91,7 +91,7 @@ export interface MessageWire {
     createdAt: string;
 }
 
-// === Client → Server ===
+// === 客户端 → 服务端 ===
 
 export type ClientMessage =
     | { type: 'create_and_send'; content: string; context?: EditorContext }
@@ -100,7 +100,7 @@ export type ClientMessage =
     | { type: 'stop'; conversationId: string }
     | { type: 'join'; conversationId: string };
 
-// === Server → Client ===
+// === 服务端 → 客户端 ===
 
 export type StatusType = 'thinking' | 'tool_executing' | 'generating';
 export type FinishReason = 'complete' | 'max_turns' | 'stopped' | 'error' | 'interrupted';
@@ -129,12 +129,12 @@ export type ServerMessage =
     | { type: 'error'; conversationId: string; code: ErrorCode; message: string };
 ```
 
-- [ ] **Step 2: Verify types compile**
+- [ ] **步骤 2：验证类型编译通过**
 
-Run: `cd apps/server && npx tsc --noEmit src/ai/gateway/ai-ws-events.types.ts`
-Expected: No errors (imports may resolve from project tsconfig)
+运行：`cd apps/server && npx tsc --noEmit src/ai/gateway/ai-ws-events.types.ts`
+预期：无错误（导入项可能从项目 tsconfig 解析）
 
-- [ ] **Step 3: Commit**
+- [ ] **步骤 3：提交**
 
 ```bash
 git add apps/server/src/ai/gateway/ai-ws-events.types.ts
@@ -147,14 +147,14 @@ types are explicitly enumerated."
 
 ---
 
-### Task 2: Add Tool Metadata (execution + danger)
+### 任务 2：添加工具元数据（execution + danger） ✅ 已完成
 
-**Files:**
-- Modify: `apps/server/src/ai/tools/tool.types.ts`
+**文件：**
+- 修改：`apps/server/src/ai/tools/tool.types.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **步骤 1：编写失败测试**
 
-Create `apps/server/src/ai/tools/__tests__/tool-metadata.spec.ts`:
+创建 `apps/server/src/ai/tools/__tests__/tool-metadata.spec.ts`：
 
 ```typescript
 import { ToolExecution, ToolDanger, RegisteredTool } from '../tool.types';
@@ -191,14 +191,14 @@ describe('RegisteredTool metadata', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：运行测试验证失败**
 
-Run: `cd apps/server && npx jest src/ai/tools/__tests__/tool-metadata.spec.ts`
-Expected: FAIL — TypeScript compilation error (execution/danger don't exist on RegisteredTool)
+运行：`cd apps/server && npx jest src/ai/tools/__tests__/tool-metadata.spec.ts`
+预期：失败 — TypeScript 编译错误（execution/danger 在 RegisteredTool 上不存在）
 
-- [ ] **Step 3: Update tool.types.ts**
+- [ ] **步骤 3：更新 tool.types.ts**
 
-Modify `apps/server/src/ai/tools/tool.types.ts`:
+修改 `apps/server/src/ai/tools/tool.types.ts`：
 
 ```typescript
 /**
@@ -208,13 +208,13 @@ Modify `apps/server/src/ai/tools/tool.types.ts`:
 import type { ToolDefinition } from '../ai.types';
 
 /**
- * Where the tool is executed
+ * 工具执行位置
  */
 export type ToolExecution = 'backend' | 'frontend';
 
 /**
- * Danger level for backend tools (controls user confirmation)
- * Only meaningful when execution === 'backend'
+ * 后端工具危险等级（控制用户确认）
+ * 仅在 execution === 'backend' 时有意义
  */
 export type ToolDanger = 'low' | 'high';
 
@@ -232,12 +232,12 @@ export interface RegisteredTool {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **步骤 4：运行测试验证通过**
 
-Run: `cd apps/server && npx jest src/ai/tools/__tests__/tool-metadata.spec.ts`
-Expected: PASS
+运行：`cd apps/server && npx jest src/ai/tools/__tests__/tool-metadata.spec.ts`
+预期：通过
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add apps/server/src/ai/tools/tool.types.ts apps/server/src/ai/tools/__tests__/tool-metadata.spec.ts
@@ -249,15 +249,15 @@ and danger level (low/high) for automatic routing."
 
 ---
 
-### Task 3: Create ToolRouter
+### 任务 3：创建 ToolRouter ✅ 已完成
 
-**Files:**
-- Create: `apps/server/src/ai/tools/tool-router.ts`
-- Create: `apps/server/src/ai/tools/__tests__/tool-router.spec.ts`
+**文件：**
+- 新建：`apps/server/src/ai/tools/tool-router.ts`
+- 新建：`apps/server/src/ai/tools/__tests__/tool-router.spec.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **步骤 1：编写失败测试**
 
-Create `apps/server/src/ai/tools/__tests__/tool-router.spec.ts`:
+创建 `apps/server/src/ai/tools/__tests__/tool-router.spec.ts`：
 
 ```typescript
 import { ToolRouter, ToolRouteDecision } from '../tool-router';
@@ -329,23 +329,23 @@ describe('ToolRouter', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：运行测试验证失败**
 
-Run: `cd apps/server && npx jest src/ai/tools/__tests__/tool-router.spec.ts`
-Expected: FAIL — module not found
+运行：`cd apps/server && npx jest src/ai/tools/__tests__/tool-router.spec.ts`
+预期：失败 — 模块未找到
 
-- [ ] **Step 3: Implement ToolRouter**
+- [ ] **步骤 3：实现 ToolRouter**
 
-Create `apps/server/src/ai/tools/tool-router.ts`:
+创建 `apps/server/src/ai/tools/tool-router.ts`：
 
 ```typescript
 /**
- * ToolRouter — routes LLM tool calls by execution target and danger level.
+ * ToolRouter — 按执行目标和危险等级路由 LLM 工具调用。
  *
- * Decision matrix:
- * - backend + low  → auto_execute (run on server, inject result to LLM)
- * - backend + high → frontend_confirm (emit tool_call to client, wait for confirmation)
- * - frontend       → frontend_direct (emit tool_call to client, execute immediately)
+ * 决策矩阵：
+ * - backend + low  → auto_execute（服务端执行，注入结果到 LLM）
+ * - backend + high → frontend_confirm（向客户端发送 tool_call，等待确认）
+ * - frontend       → frontend_direct（向客户端发送 tool_call，立即执行）
  */
 
 import { Injectable } from '@nestjs/common';
@@ -377,8 +377,8 @@ export class ToolRouter {
     }
 
     /**
-     * Route a tool call and emit the decision.
-     * Returns immediately — actual execution is async via events.
+     * 路由工具调用并发出决策。
+     * 立即返回 — 实际执行通过事件异步完成。
      */
     route(toolName: string, input: unknown, conversationId: string, toolCallId: string): void {
         const tool = this._tools.get(toolName);
@@ -403,13 +403,13 @@ export class ToolRouter {
 
         if (execution === 'backend' && danger === 'low') {
             mode = 'auto_execute';
-            // Emit for auto-execution
+            // 发出自动执行事件
             this._onAutoExecute.fire({ toolName, input, conversationId, toolCallId });
         } else if (execution === 'backend' && danger === 'high') {
             mode = 'frontend_confirm';
             requiresConfirmation = true;
         } else {
-            // frontend execution
+            // 前端执行
             mode = 'frontend_direct';
         }
 
@@ -433,12 +433,12 @@ export class ToolRouter {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **步骤 4：运行测试验证通过**
 
-Run: `cd apps/server && npx jest src/ai/tools/__tests__/tool-router.spec.ts`
-Expected: PASS
+运行：`cd apps/server && npx jest src/ai/tools/__tests__/tool-router.spec.ts`
+预期：通过
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add apps/server/src/ai/tools/tool-router.ts apps/server/src/ai/tools/__tests__/tool-router.spec.ts
@@ -450,20 +450,20 @@ confirmation. Frontend tools emit directly to client."
 
 ---
 
-### Task 4: Create Conversation StateMachine
+### 任务 4：创建 Conversation StateMachine ✅ 已完成
 
-**Files:**
-- Create: `apps/server/src/ai/gateway/conversation-statemachine.types.ts`
-- Create: `apps/server/src/ai/gateway/conversation-statemachine.ts`
-- Create: `apps/server/src/ai/gateway/__tests__/conversation-statemachine.spec.ts`
+**文件：**
+- 新建：`apps/server/src/ai/gateway/conversation-statemachine.types.ts`
+- 新建：`apps/server/src/ai/gateway/conversation-statemachine.ts`
+- 新建：`apps/server/src/ai/gateway/__tests__/conversation-statemachine.spec.ts`
 
-- [ ] **Step 1: Write the state machine types**
+- [ ] **步骤 1：编写状态机类型**
 
-Create `apps/server/src/ai/gateway/conversation-statemachine.types.ts`:
+创建 `apps/server/src/ai/gateway/conversation-statemachine.types.ts`：
 
 ```typescript
 /**
- * Conversation State Machine types
+ * 对话状态机类型
  */
 
 export enum ConversationState {
@@ -491,19 +491,19 @@ export interface StateTransition {
     conversationId: string;
 }
 
-// Valid transitions matrix
+// 有效转换矩阵
 const VALID_TRANSITIONS: Record<ConversationState, ConversationState[]> = {
     [ConversationState.Idle]: [ConversationState.BuildingContext],
     [ConversationState.BuildingContext]: [ConversationState.Processing, ConversationState.Done],
     [ConversationState.Processing]: [
-        ConversationState.Processing, // streaming continues
+        ConversationState.Processing, // 流式传输继续
         ConversationState.ToolWaiting,
         ConversationState.ToolExecuting,
         ConversationState.Done,
     ],
     [ConversationState.ToolWaiting]: [ConversationState.ToolExecuting, ConversationState.Done],
     [ConversationState.ToolExecuting]: [ConversationState.Processing, ConversationState.Done],
-    [ConversationState.Done]: [], // terminal state
+    [ConversationState.Done]: [], // 终止状态
 };
 
 export function isValidTransition(from: ConversationState, to: ConversationState): boolean {
@@ -511,9 +511,9 @@ export function isValidTransition(from: ConversationState, to: ConversationState
 }
 ```
 
-- [ ] **Step 2: Write the failing test**
+- [ ] **步骤 2：编写失败测试**
 
-Create `apps/server/src/ai/gateway/__tests__/conversation-statemachine.spec.ts`:
+创建 `apps/server/src/ai/gateway/__tests__/conversation-statemachine.spec.ts`：
 
 ```typescript
 import { ConversationStateMachine, ConversationContext } from '../conversation-statemachine';
@@ -530,7 +530,7 @@ describe('ConversationStateMachine', () => {
     };
 
     beforeEach(() => {
-        // Use events module pattern — create minimal mock
+        // 使用事件模块模式 — 创建最小 mock
         sm = new ConversationStateMachine(new EventEmitter() as any);
         (sm as any)._onTransition?.on?.('data', (t: any) => transitions.push(t));
         transitions = [];
@@ -600,9 +600,9 @@ describe('ConversationStateMachine', () => {
 
         it('rejects invalid transition', () => {
             const session = sm.create(mockCtx);
-            // Cannot go from Idle directly to Done without going through BuildingContext first
-            // Actually Idle → Done IS valid via BuildingContext → Done path
-            // Let's test Processing → Idle which is invalid
+            // 不能从 Idle 直接到 Done（需经过 BuildingContext）
+            // 实际上 Idle → Done 通过 BuildingContext → Done 路径是有效的
+            // 测试 Processing → Idle 这个无效转换
             sm.receiveMessage(session.id, 'Hello');
             sm.contextReady(session.id);
             expect(() => {
@@ -622,22 +622,22 @@ describe('ConversationStateMachine', () => {
 });
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [ ] **步骤 3：运行测试验证失败**
 
-Run: `cd apps/server && npx jest src/ai/gateway/__tests__/conversation-statemachine.spec.ts`
-Expected: FAIL — module not found
+运行：`cd apps/server && npx jest src/ai/gateway/__tests__/conversation-statemachine.spec.ts`
+预期：失败 — 模块未找到
 
-- [ ] **Step 4: Implement ConversationStateMachine**
+- [ ] **步骤 4：实现 ConversationStateMachine**
 
-Create `apps/server/src/ai/gateway/conversation-statemachine.ts`:
+创建 `apps/server/src/ai/gateway/conversation-statemachine.ts`：
 
 ```typescript
 /**
- * ConversationStateMachine — manages the lifecycle of a single AI conversation.
+ * ConversationStateMachine — 管理单个 AI 对话的生命周期。
  *
- * States: Idle → BuildingContext → Processing → [ToolWaiting → ToolExecuting → Processing]* → Done
+ * 状态流转：Idle → BuildingContext → Processing → [ToolWaiting → ToolExecuting → Processing]* → Done
  *
- * Emits events on state transitions for the gateway to react to.
+ * 在状态转换时发出事件，供网关响应。
  */
 
 import { Injectable } from '@nestjs/common';
@@ -656,7 +656,7 @@ export interface ToolCallInfo {
     requiresConfirmation: boolean;
 }
 
-// Internal event bus for state machine transitions
+// 状态机内部事件总线
 type SMEvent =
     | { type: 'transition'; from: ConversationState; to: ConversationState; conversationId: string }
     | { type: 'emit'; message: ServerMessage }
@@ -682,21 +682,21 @@ export class ConversationStateMachine {
             try {
                 h(event);
             } catch (e) {
-                // Don't let handler errors break the state machine
+                // 不要让处理器错误破坏状态机
                 console.error('[StateMachine] Handler error:', e);
             }
         }
     }
 
     create(ctx: ConversationContext): ConversationFSM {
-        // Prevent duplicate active sessions
+        // 防止重复活动会话
         const existingSessionId = this._byConversation.get(ctx.conversationId);
         if (existingSessionId) {
             const existing = this._sessions.get(existingSessionId);
             if (existing && existing.state !== ConversationState.Done) {
                 throw new Error(`Conversation ${ctx.conversationId} already has an active session`);
             }
-            // Previous session is Done, allow new one
+            // 上一个会话已完成，允许新建
             this._byConversation.delete(ctx.conversationId);
             this._sessions.delete(existingSessionId);
         }
@@ -737,7 +737,7 @@ export class ConversationStateMachine {
 
     textChunk(sessionId: string, content: string): void {
         const session = this._getOrThrow(sessionId);
-        // Stays in Processing, emit chunk
+        // 保持在 Processing 状态，发出文本块
         this._emit({
             type: 'emit',
             message: { type: 'text_chunk', conversationId: session.conversationId, content },
@@ -748,7 +748,7 @@ export class ConversationStateMachine {
         const session = this._getOrThrow(sessionId);
         if (info.requiresConfirmation) {
             this._transition(session, ConversationState.ToolWaiting);
-            // Emit tool_call event to client
+            // 向客户端发出 tool_call 事件
             this._emit({
                 type: 'emit',
                 message: {
@@ -762,7 +762,7 @@ export class ConversationStateMachine {
             });
         } else {
             this._transition(session, ConversationState.ToolExecuting);
-            // Tool will auto-execute
+            // 工具将自动执行
         }
     }
 
@@ -797,7 +797,7 @@ export class ConversationStateMachine {
 
     error(sessionId: string, code: ServerMessage extends { type: 'error'; code: infer C } ? C : string, message: string): void {
         const session = this._sessions.get(sessionId);
-        if (!session) return; // Session may already be cleaned up
+        if (!session) return; // 会话可能已清理
         session.abortController.abort();
         this._transition(session, ConversationState.Done);
         this._emit({
@@ -813,7 +813,7 @@ export class ConversationStateMachine {
 
     private _transition(session: ConversationFSM, to: ConversationState): void {
         const from = session.state;
-        if (from === to) return; // No-op
+        if (from === to) return; // 无操作
 
         if (!isValidTransition(from, to)) {
             throw new Error(
@@ -852,12 +852,12 @@ export class ConversationStateMachine {
 }
 ```
 
-- [ ] **Step 5: Run tests and fix any failures**
+- [ ] **步骤 5：运行测试并修复失败**
 
-Run: `cd apps/server && npx jest src/ai/gateway/__tests__/conversation-statemachine.spec.ts`
-Expected: PASS (fix any issues)
+运行：`cd apps/server && npx jest src/ai/gateway/__tests__/conversation-statemachine.spec.ts`
+预期：通过（修复任何问题）
 
-- [ ] **Step 6: Commit**
+- [ ] **步骤 6：提交**
 
 ```bash
 git add apps/server/src/ai/gateway/conversation-statemachine.types.ts apps/server/src/ai/gateway/conversation-statemachine.ts apps/server/src/ai/gateway/__tests__/conversation-statemachine.spec.ts
@@ -870,14 +870,14 @@ sessions per conversation."
 
 ---
 
-### Task 5: Update Frontend Types (ai.types.ts)
+### 任务 5：更新前端类型（ai.types.ts） ✅ 已完成
 
-**Files:**
-- Modify: `apps/web/src/features/ai/types/ai.types.ts`
+**文件：**
+- 修改：`apps/web/src/features/ai/types/ai.types.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **步骤 1：编写失败测试**
 
-Create `apps/web/src/features/ai/types/__tests__/ai-types.test.ts`:
+创建 `apps/web/src/features/ai/types/__tests__/ai-types.test.ts`：
 
 ```typescript
 import type { ClientMessage, ServerMessage } from '../ai.types';
@@ -966,27 +966,27 @@ describe('ServerMessage discriminated union', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：运行测试验证失败**
 
-Run: `cd apps/web && npx vitest run src/features/ai/types/__tests__/ai-types.test.ts`
-Expected: FAIL — type errors (new types don't exist yet)
+运行：`cd apps/web && npx vitest run src/features/ai/types/__tests__/ai-types.test.ts`
+预期：失败 — 类型错误（新类型尚不存在）
 
-- [ ] **Step 3: Update ai.types.ts**
+- [ ] **步骤 3：更新 ai.types.ts**
 
-Modify `apps/web/src/features/ai/types/ai.types.ts`. Replace the existing `ClientMessage` and `ServerMessage` types with the new protocol:
+修改 `apps/web/src/features/ai/types/ai.types.ts`。用新协议替换现有的 `ClientMessage` 和 `ServerMessage` 类型：
 
 ```typescript
 /**
  * AI 模块共享类型定义
  *
- * Updated 2026-05-12: New event protocol with discriminated unions.
- * All events include conversationId. Events are single-responsibility.
+ * 更新于 2026-05-12：基于判别联合类型的新事件协议。
+ * 所有事件均包含 conversationId。事件遵循单一职责原则。
  */
 
 import type { FormatState, Position } from '@/features/editor/types';
 
 /**
- * Editor context (collected by frontend, sent with messages)
+ * 编辑器上下文（由前端收集，随消息发送）
  */
 export interface EditorContext {
     documentId: string;
@@ -999,7 +999,7 @@ export interface EditorContext {
 }
 
 /**
- * Message wire format for history
+ * 消息线格式（用于历史记录）
  */
 export interface MessageWire {
     id: string;
@@ -1010,7 +1010,7 @@ export interface MessageWire {
     createdAt: string;
 }
 
-// === Client → Server ===
+// === 客户端 → 服务端 ===
 
 export type ClientMessage =
     | { type: 'create_and_send'; content: string; context?: EditorContext }
@@ -1019,7 +1019,7 @@ export type ClientMessage =
     | { type: 'stop'; conversationId: string }
     | { type: 'join'; conversationId: string };
 
-// === Server → Client ===
+// === 服务端 → 客户端 ===
 
 export type StatusType = 'thinking' | 'tool_executing' | 'generating';
 export type FinishReason = 'complete' | 'max_turns' | 'stopped' | 'error' | 'interrupted';
@@ -1047,8 +1047,8 @@ export type ServerMessage =
     | { type: 'done'; conversationId: string; finishReason: FinishReason; error?: string }
     | { type: 'error'; conversationId: string; code: ErrorCode; message: string };
 
-// === Legacy type kept for backward compatibility during migration ===
-/** @deprecated Use ServerMessage instead */
+// === 遗留类型（迁移期间向后兼容）===
+/** @deprecated 使用 ServerMessage 替代 */
 export type LegacyServerMessage = {
     type: 'joined' | 'history' | 'stream_chunk' | 'stream_done' | 'tool_call' | 'tool_timeout' | 'error';
 } & Record<string, unknown>;
@@ -1064,14 +1064,14 @@ export interface ToolHandler<TArgs = object, TResult = unknown> {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **步骤 4：运行测试验证通过**
 
-Run: `cd apps/web && npx vitest run src/features/ai/types/__tests__/ai-types.test.ts`
-Expected: PASS
+运行：`cd apps/web && npx vitest run src/features/ai/types/__tests__/ai-types.test.ts`
+预期：通过
 
-Also run type check: `cd apps/web && npx tsc --noEmit` — may show errors in files importing old ServerMessage fields. These will be fixed in Task 6.
+同时运行类型检查：`cd apps/web && npx tsc --noEmit` — 可能显示导入旧 ServerMessage 字段的文件的错误。这些将在任务 6 中修复。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add apps/web/src/features/ai/types/ai.types.ts apps/web/src/features/ai/types/__tests__/ai-types.test.ts
@@ -1084,14 +1084,14 @@ requiresConfirmation flag."
 
 ---
 
-### Task 6: Update WS Client Service for New Protocol
+### 任务 6：为新协议更新 WS 客户端服务 ✅ 已完成
 
-**Files:**
-- Modify: `apps/web/src/platform/ws-client/ws-client.service.ts`
+**文件：**
+- 修改：`apps/web/src/platform/ws-client/ws-client.service.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **步骤 1：编写失败测试**
 
-Add to `apps/web/src/features/ai/harness/__tests__/ws-client.test.ts` (append to existing tests):
+添加到 `apps/web/src/features/ai/harness/__tests__/ws-client.test.ts`（追加到现有测试之后）：
 
 ```typescript
 describe('WSClientService new protocol', () => {
@@ -1156,22 +1156,22 @@ describe('WSClientService new protocol', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：运行测试验证失败**
 
-Run: `cd apps/web && npx vitest run src/features/ai/harness/__tests__/ws-client.test.ts`
-Expected: FAIL — onCreated, onStatus, onDone, sendCreateAndSend don't exist
+运行：`cd apps/web && npx vitest run src/features/ai/harness/__tests__/ws-client.test.ts`
+预期：失败 — onCreated、onStatus、onDone、sendCreateAndSend 不存在
 
-- [ ] **Step 3: Update WSClientService**
+- [ ] **步骤 3：更新 WSClientService**
 
-Modify `apps/web/src/platform/ws-client/ws-client.service.ts`. Add these new event emitters, handlers, and send methods:
+修改 `apps/web/src/platform/ws-client/ws-client.service.ts`。添加这些新的事件发射器、处理器和发送方法：
 
 ```typescript
-// Add new emitters at class level (after existing ones around line 36):
+// 在类级别添加新发射器（在约第 36 行现有发射器之后）：
 private _onCreated = new Emitter<{ conversationId: string }>();
 private _onStatus = new Emitter<{ conversationId: string; status: string; message?: string }>();
 private _onDone = new Emitter<{ conversationId: string; finishReason: string; error?: string }>();
 
-// Add new event accessors (after existing ones around line 240):
+// 添加新事件访问器（在约第 240 行现有访问器之后）：
 get onCreated(): Event<{ conversationId: string }> {
     return this._onCreated.event;
 }
@@ -1182,7 +1182,7 @@ get onDone(): Event<{ conversationId: string; finishReason: string; error?: stri
     return this._onDone.event;
 }
 
-// Add new send methods (after stopGenerating around line 199):
+// 添加新发送方法（在约第 199 行 stopGenerating 之后）：
 sendCreateAndSend(content: string, context: unknown): void {
     if (!this._socket || !this._socket.connected) {
         throw new Error('WebSocket is not connected');
@@ -1194,7 +1194,7 @@ sendJoin(conversationId: string): void {
     this._socket?.emit('join', { type: 'join', conversationId });
 }
 
-// Update _handleMessage to handle new events:
+// 更新 _handleMessage 以处理新事件：
 private _handleMessage(data: unknown): void {
     try {
         const msg = data as ServerMessage;
@@ -1233,14 +1233,14 @@ private _handleMessage(data: unknown): void {
             case 'error':
                 this._onError.fire({ message: msg.message, code: msg.code });
                 break;
-            // Legacy events (for backward compat during migration)
+            // 遗留事件（迁移期间向后兼容）
             case 'joined':
                 break;
             case 'tool_timeout':
                 this._onToolTimeout.fire({ toolCallId: (msg as any).toolCallId, message: (msg as any).message });
                 break;
             default:
-                // Exhaustiveness check — if new event type added but not handled
+                // 穷举检查 — 如果添加了新事件类型但未处理
                 const _exhaustiveCheck: never = msg;
                 console.warn('[WS] Unhandled message type:', (_exhaustiveCheck as any).type);
         }
@@ -1249,23 +1249,23 @@ private _handleMessage(data: unknown): void {
     }
 }
 
-// Add new emitters to dispose() (at the end of dispose method):
+// 在 dispose() 末尾添加新发射器的清理（在 dispose 方法末尾）：
 this._onCreated.dispose();
 this._onStatus.dispose();
 this._onDone.dispose();
 ```
 
-Also add the `ServerMessage` import at the top:
+同时添加 `ServerMessage` 导入：
 ```typescript
 import type { ServerMessage } from '@/features/ai/types/ai.types';
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **步骤 4：运行测试验证通过**
 
-Run: `cd apps/web && npx vitest run src/features/ai/harness/__tests__/ws-client.test.ts`
-Expected: PASS
+运行：`cd apps/web && npx vitest run src/features/ai/harness/__tests__/ws-client.test.ts`
+预期：通过
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add apps/web/src/platform/ws-client/ws-client.service.ts apps/web/src/features/ai/harness/__tests__/ws-client.test.ts
@@ -1278,43 +1278,43 @@ union routing."
 
 ---
 
-### Task 7: Update AI Harness for Event Hub + Conversation Recovery
+### 任务 7：更新 AI Harness — Event Hub + 对话恢复 ✅ 已完成
 
-**Files:**
-- Modify: `apps/web/src/features/ai/harness/ai-harness.service.ts`
-- Modify: `apps/web/src/features/ai/harness/conversation-state.ts`
+**文件：**
+- 修改：`apps/web/src/features/ai/harness/ai-harness.service.ts`
+- 修改：`apps/web/src/features/ai/harness/conversation-state.ts`
 
-- [ ] **Step 1: Add generating state tracking to ConversationState**
+- [ ] **步骤 1：为 ConversationState 添加生成中状态跟踪**
 
-Modify `apps/web/src/features/ai/harness/conversation-state.ts`. Add a `isProcessing` getter that tracks when the conversation is in a generating/processing state (for disabling the send button):
+修改 `apps/web/src/features/ai/harness/conversation-state.ts`。添加 `isProcessing` getter，用于跟踪对话处于生成/处理中状态（用于禁用发送按钮）：
 
 ```typescript
-// Add to ConversationState interface (around line 28):
+// 添加到 ConversationState 接口（约第 28 行）：
 readonly isProcessing: boolean;
 
-// Add private field in ConversationStateImpl class:
+// 在 ConversationStateImpl 类中添加私有字段：
 private _isProcessing = false;
 
-// Update startGenerating() to set _isProcessing = true:
+// 更新 startGenerating() 设置 _isProcessing = true：
 startGenerating(): void {
     this._isGenerating = true;
     this._isProcessing = true;
-    // ... rest of existing code
+    // ... 其余现有代码
 }
 
-// Update stopGenerating() to set _isProcessing = false:
+// 更新 stopGenerating() 设置 _isProcessing = false：
 stopGenerating(): void {
     this._isProcessing = false;
     this._isGenerating = false;
-    // ... rest of existing code
+    // ... 其余现有代码
 }
 
-// Add getter:
+// 添加 getter：
 get isProcessing(): boolean {
     return this._isProcessing;
 }
 
-// Update onStateChange fire to include isProcessing:
+// 更新 onStateChange 触发以包含 isProcessing：
 this._onStateChange.fire({
     messages: this._messages,
     isGenerating: this._isGenerating,
@@ -1322,41 +1322,41 @@ this._onStateChange.fire({
 });
 ```
 
-- [ ] **Step 2: Update AIHarnessService interface**
+- [ ] **步骤 2：更新 AIHarnessService 接口**
 
-Modify `apps/web/src/features/ai/harness/ai-harness.service.ts`. Update the interface:
+修改 `apps/web/src/features/ai/harness/ai-harness.service.ts`。更新接口：
 
 ```typescript
-// Replace in AIHarnessService interface:
-// Conversation related methods:
+// 替换 AIHarnessService 接口中的内容：
+// 对话相关方法：
 connect(wsUrl: string): Promise<void>;
 disconnect(): void;
 joinConversation(conversationId: string): void;
-sendMessage(content: string, conversationId?: string): Promise<string | null>; // Returns conversationId
-sendCreateAndSend(content: string): Promise<string | null>; // For new conversations
-restoreConversation(conversationId: string): void; // Conversation recovery
+sendMessage(content: string, conversationId?: string): Promise<string | null>; // 返回 conversationId
+sendCreateAndSend(content: string): Promise<string | null>; // 用于新对话
+restoreConversation(conversationId: string): void; // 对话恢复
 stopGenerating(): void;
 
-// Add new event:
+// 添加新事件：
 get onStatus(): Event<{ conversationId: string; status: string; message?: string }>;
 get onCreated(): Event<{ conversationId: string }>;
 get onDone(): Event<{ conversationId: string; finishReason: string; error?: string }>;
 
-// Add state access:
+// 添加状态访问：
 get isProcessing(): boolean;
 ```
 
-- [ ] **Step 3: Update AIHarnessServiceImpl implementation**
+- [ ] **步骤 3：更新 AIHarnessServiceImpl 实现**
 
-Replace the relevant sections in `AIHarnessServiceImpl`:
+替换 `AIHarnessServiceImpl` 的相关部分：
 
 ```typescript
-// Add new emitters (after existing ones):
+// 添加新发射器（在现有发射器之后）：
 private _onStatus = new Emitter<{ conversationId: string; status: string; message?: string }>();
 private _onCreated = new Emitter<{ conversationId: string }>();
 private _onDone = new Emitter<{ conversationId: string; finishReason: string; error?: string }>();
 
-// Update _setupEventProxy to handle new events:
+// 更新 _setupEventProxy 以处理新事件：
 private _setupEventProxy(): void {
     this._store.add(
         this._wsClient.onStreamChunk(e => {
@@ -1386,7 +1386,7 @@ private _setupEventProxy(): void {
             }),
         ),
     );
-    // NEW: Handle created event
+    // 新：处理 created 事件
     this._store.add(
         this._wsClient.onCreated(e => {
             this._conversationState.setConversationId(e.conversationId);
@@ -1394,13 +1394,13 @@ private _setupEventProxy(): void {
             this._onCreated.fire(e);
         }),
     );
-    // NEW: Handle status event
+    // 新：处理 status 事件
     this._store.add(
         this._wsClient.onStatus(e => {
             this._onStatus.fire(e);
         }),
     );
-    // NEW: Handle done event
+    // 新：处理 done 事件
     this._store.add(
         this._wsClient.onDone(e => {
             this._conversationState.stopGenerating();
@@ -1423,12 +1423,12 @@ private _setupEventProxy(): void {
     this._store.add(this._wsClient.onConnectionChange(e => this._onConnectionChange.fire(e)));
 }
 
-// Add localStorage helpers:
+// 添加 localStorage 辅助方法：
 private _saveActiveConversationId(id: string): void {
     try {
         localStorage.setItem('activeConversationId', id);
     } catch {
-        // localStorage may be unavailable
+        // localStorage 可能不可用
     }
 }
 
@@ -1436,11 +1436,11 @@ private _clearActiveConversationId(): void {
     try {
         localStorage.removeItem('activeConversationId');
     } catch {
-        // localStorage may be unavailable
+        // localStorage 可能不可用
     }
 }
 
-// Replace sendMessage and add new methods:
+// 替换 sendMessage 并添加新方法：
 async sendMessage(content: string, conversationId?: string): Promise<string | null> {
     const targetConv = conversationId ?? this._conversationState.conversationId;
     if (targetConv) {
@@ -1496,18 +1496,18 @@ async sendCreateAndSend(content: string): Promise<string | null> {
     const ctx = await this._contextCollector.getContext('');
     this._wsClient.sendCreateAndSend(content, ctx);
 
-    // conversationId will be set when 'created' event arrives
+    // conversationId 将在 'created' 事件到达时设置
     return null;
 }
 
-// Add restoreConversation:
+// 添加 restoreConversation：
 restoreConversation(conversationId: string): void {
     this._conversationState.setConversationId(conversationId);
     this._wsClient.sendJoin(conversationId);
-    // History will arrive via 'history' event and be loaded by _setupEventProxy
+    // 历史将通过 'history' 事件到达并由 _setupEventProxy 加载
 }
 
-// Update stopGenerating:
+// 更新 stopGenerating：
 stopGenerating(): void {
     const conversationId = this._conversationState.conversationId;
     if (conversationId) {
@@ -1516,7 +1516,7 @@ stopGenerating(): void {
     this._conversationState.stopGenerating();
 }
 
-// Add getters:
+// 添加 getter：
 get isProcessing(): boolean {
     return this._conversationState.isProcessing;
 }
@@ -1530,15 +1530,15 @@ get onDone(): Event<{ conversationId: string; finishReason: string; error?: stri
     return this._onDone.event;
 }
 
-// Update dispose to dispose new emitters:
+// 更新 dispose 以释放新发射器：
 this._onStatus.dispose();
 this._onCreated.dispose();
 this._onDone.dispose();
 ```
 
-- [ ] **Step 4: Write tests for new harness behavior**
+- [ ] **步骤 4：为新 Harness 行为编写测试**
 
-Add to `apps/web/src/features/ai/harness/__tests__/harness.test.ts`:
+添加到 `apps/web/src/features/ai/harness/__tests__/harness.test.ts`：
 
 ```typescript
 describe('AIHarnessService conversation recovery', () => {
@@ -1578,12 +1578,12 @@ describe('AIHarnessService isProcessing state', () => {
 });
 ```
 
-- [ ] **Step 5: Run type check**
+- [ ] **步骤 5：运行类型检查**
 
-Run: `cd apps/web && npx tsc --noEmit`
-Expected: No errors (fix any type mismatches)
+运行：`cd apps/web && npx tsc --noEmit`
+预期：无错误（修复任何类型不匹配）
 
-- [ ] **Step 6: Commit**
+- [ ] **步骤 6：提交**
 
 ```bash
 git add apps/web/src/features/ai/harness/ai-harness.service.ts apps/web/src/features/ai/harness/conversation-state.ts apps/web/src/features/ai/harness/__tests__/harness.test.ts
@@ -1596,15 +1596,15 @@ disable. Send methods auto-create or reuse conversations."
 
 ---
 
-### Task 8: Rewrite AI Gateway with New Protocol + StateMachine
+### 任务 8：用新协议 + StateMachine 重写 AI Gateway ✅ 已完成
 
-**Files:**
-- Modify: `apps/server/src/ai/gateway/ai-ws.gateway.ts`
-- Modify: `apps/server/src/ai/ai.module.ts` (register new providers)
+**文件：**
+- 修改：`apps/server/src/ai/gateway/ai-ws.gateway.ts`
+- 修改：`apps/server/src/ai/ai.module.ts`（注册新提供者）
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **步骤 1：编写失败测试**
 
-Create `apps/server/src/ai/gateway/__tests__/ai-ws-gateway.spec.ts`:
+创建 `apps/server/src/ai/gateway/__tests__/ai-ws-gateway.spec.ts`：
 
 ```typescript
 import { Test, TestingModule } from '@nestjs/testing';
@@ -1662,7 +1662,7 @@ describe('AiGateway new protocol', () => {
         }).compile();
 
         const gw = module.get(AiGateway);
-        // Trigger create_and_send handler
+        // 触发 create_and_send 处理器
         await gw['handleCreateAndSend'](mockClient, {
             type: 'create_and_send',
             content: 'Hello',
@@ -1705,7 +1705,7 @@ describe('AiGateway new protocol', () => {
     });
 
     it('rejects duplicate active session (CONVERSATION_BUSY)', async () => {
-        // Setup: conversation already has active session
+        // 设置：对话已有活动会话
         const module = await Test.createTestingModule({
             providers: [
                 AiGateway,
@@ -1744,71 +1744,71 @@ describe('AiGateway new protocol', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：运行测试验证失败**
 
-Run: `cd apps/server && npx jest src/ai/gateway/__tests__/ai-ws-gateway.spec.ts`
-Expected: FAIL — handlers don't exist yet
+运行：`cd apps/server && npx jest src/ai/gateway/__tests__/ai-ws-gateway.spec.ts`
+预期：失败 — 处理器尚不存在
 
-- [ ] **Step 3: Rewrite ai-ws.gateway.ts**
+- [ ] **步骤 3：重写 ai-ws.gateway.ts**
 
-Modify `apps/server/src/ai/gateway/ai-ws.gateway.ts`. Replace the existing handlers with the new protocol handlers:
+修改 `apps/server/src/ai/gateway/ai-ws.gateway.ts`。用新协议处理器替换现有处理器：
 
 ```typescript
-// At the top, add imports:
+// 在文件顶部，添加导入：
 import { ConversationStateMachine } from './conversation-statemachine';
 import type { ClientMessage, ServerMessage } from './ai-ws-events.types';
 
-// Inject ConversationStateMachine in the constructor:
+// 在构造函数中注入 ConversationStateMachine：
 constructor(
-    // ... existing injections
+    // ... 现有注入
     @Inject(ConversationStateMachine) private readonly stateMachine: ConversationStateMachine,
 ) {
     // ...
 }
 
-// Set up state machine event handler in handleConnection:
+// 在 handleConnection 中或之后设置状态机事件处理器：
 @WebSocketGateway({
     namespace: 'ai',
     cors: { origin: process.env.FRONTEND_URL || 'http://localhost:4000' },
 })
 export class AiGateway {
-    // In handleConnection or afterPropertiesSet:
+    // 在 handleConnection 或 afterPropertiesSet 中：
     private _setupStateMachineHandler(): void {
         this.stateMachine.onEvent(event => {
             if (event.type === 'emit') {
-                // Emit to the client that owns this conversation
+                // 向拥有此对话的客户端发出
                 this.server.to(event.message.conversationId).emit(event.message.type, event.message);
             }
         });
     }
 
-    // Replace existing event handlers:
+    // 替换现有事件处理器：
 
     @SubscribeMessage('create_and_send')
     async handleCreateAndSend(client: Socket, data: ClientMessage & { type: 'create_and_send' }): Promise<void> {
         try {
-            // Create conversation
+            // 创建对话
             const conversation = await this.conversationService.create({
                 title: data.content.substring(0, 50),
             });
 
-            // Register client with connection manager
+            // 注册客户端到连接管理器
             this.connectionManager.registerClient(client.id, conversation.id);
             client.join(conversation.id);
 
-            // Create session
+            // 创建会话
             const session = this.sessionManager.create({
                 conversationId: conversation.id,
                 clientId: client.id,
             });
 
-            // Emit created
+            // 发出 created
             client.emit('created', { type: 'created', conversationId: conversation.id });
 
-            // Create state machine session
+            // 创建状态机会话
             this.stateMachine.create({ conversationId: conversation.id, clientId: client.id });
 
-            // Dispatch the message
+            // 分发消息
             await this.requestDispatcher.dispatch({
                 socket: client,
                 client,
@@ -1830,7 +1830,7 @@ export class AiGateway {
     @SubscribeMessage('send_message')
     async handleSendMessage(client: Socket, data: ClientMessage & { type: 'send_message' }): Promise<void> {
         try {
-            // Check conversation exists
+            // 检查对话是否存在
             const conversation = await this.conversationService.findById(data.conversationId);
             if (!conversation) {
                 client.emit('error', {
@@ -1842,17 +1842,17 @@ export class AiGateway {
                 return;
             }
 
-            // Register client and join room (idempotent)
+            // 注册客户端并加入房间（幂等）
             this.connectionManager.registerClient(client.id, data.conversationId);
             client.join(data.conversationId);
 
-            // Create session (throws if already active)
+            // 创建会话（如果已活动则抛出）
             const session = this.sessionManager.create({
                 conversationId: data.conversationId,
                 clientId: client.id,
             });
 
-            // Dispatch
+            // 分发
             await this.requestDispatcher.dispatch({
                 socket: client,
                 client,
@@ -1898,7 +1898,7 @@ export class AiGateway {
             this.connectionManager.registerClient(client.id, data.conversationId);
             client.join(data.conversationId);
 
-            // Load and emit history
+            // 加载并发出历史
             const messages = await this.messageService.findByConversationId(data.conversationId);
             client.emit('history', {
                 type: 'history',
@@ -1937,22 +1937,22 @@ export class AiGateway {
         this.toolDispatcher.deliverResult(data.conversationId, data.toolCallId, data.result);
     }
 
-    // Keep handleConnection and handleDisconnect as they are
+    // 保留 handleConnection 和 handleDisconnect 不变
 }
 ```
 
-Note: This is a significant rewrite. The old `handleMessage`, `handleJoin` logic gets replaced. The key changes:
-1. `create_and_send` creates conversation, emits `created`, then dispatches
-2. `send_message` validates conversation exists, rejects with `CONVERSATION_NOT_FOUND` if not
-3. `join` only loads history (no auto-create)
-4. Duplicate session detection returns `CONVERSATION_BUSY`
+注意：这是一次重大重写。旧的 `handleMessage`、`handleJoin` 逻辑被替换。关键变更：
+1. `create_and_send` 创建对话，发出 `created`，然后分发
+2. `send_message` 验证对话是否存在，不存在则返回 `CONVERSATION_NOT_FOUND`
+3. `join` 仅加载历史（不自动创建）
+4. 重复会话检测返回 `CONVERSATION_BUSY`
 
-- [ ] **Step 4: Run tests and fix**
+- [ ] **步骤 4：运行测试并修复**
 
-Run: `cd apps/server && npx jest src/ai/gateway/__tests__/ai-ws-gateway.spec.ts`
-Expected: PASS (fix any issues)
+运行：`cd apps/server && npx jest src/ai/gateway/__tests__/ai-ws-gateway.spec.ts`
+预期：通过（修复任何问题）
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add apps/server/src/ai/gateway/ai-ws.gateway.ts apps/server/src/ai/gateway/__tests__/ai-ws-gateway.spec.ts apps/server/src/ai/ai.module.ts
@@ -1965,23 +1965,23 @@ Errors use explicit codes (CONVERSATION_NOT_FOUND, CONVERSATION_BUSY)."
 
 ---
 
-### Task 9: Wire WorkflowExecutor to StateMachine
+### 任务 9：将 WorkflowExecutor 接入 StateMachine ✅ 已完成
 
-**Files:**
-- Modify: `apps/server/src/ai/workflow-runtime/workflow-executor.ts`
-- Modify: `apps/server/src/ai/workflow-runtime/conversation-orchestrator.ts`
+**文件：**
+- 修改：`apps/server/src/ai/workflow-runtime/workflow-executor.ts`
+- 修改：`apps/server/src/ai/workflow-runtime/conversation-orchestrator.ts`
 
-- [ ] **Step 1: Update WorkflowExecutor to use StateMachine**
+- [ ] **步骤 1：更新 WorkflowExecutor 以使用 StateMachine**
 
-Modify `apps/server/src/ai/workflow-runtime/workflow-executor.ts`. The key change: instead of the manual `while` loop for tool calls, the executor now works with the StateMachine. The StateMachine drives the flow; the executor responds to state transitions.
+修改 `apps/server/src/ai/workflow-runtime/workflow-executor.ts`。关键变更：不再使用手动的 `while` 循环处理工具调用，而是让执行器与 StateMachine 协同工作。StateMachine 驱动流程，执行器响应状态转换。
 
-The minimal change approach: keep the existing execute() method but have it report status to the StateMachine instead of managing its own loop:
+最小变更方案：保留现有的 execute() 方法，但让它向 StateMachine 报告状态，而非管理自己的循环：
 
 ```typescript
-// In the execute() method, after graph.stream() returns:
-// Instead of manual tool loop, let StateMachine handle transitions:
+// 在 execute() 方法中，graph.stream() 返回后：
+// 不再使用手动工具循环，让 StateMachine 处理转换：
 
-// When LLM produces tool_calls:
+// 当 LLM 产生 tool_calls 时：
 this.stateMachine.toolCall(sessionId, {
     toolCallId: tc.id,
     toolName: tc.name,
@@ -1989,25 +1989,25 @@ this.stateMachine.toolCall(sessionId, {
     requiresConfirmation: this.toolRouter.needsConfirmation(tc.name),
 });
 
-// When tool result arrives (via StateMachine's onAutoExecute or tool_result delivery):
+// 当工具结果到达时（通过 StateMachine 的 onAutoExecute 或 tool_result 传递）：
 this.stateMachine.toolResult(sessionId, toolCallId);
-// ... execute tool ...
+// ... 执行工具 ...
 this.stateMachine.toolDone(sessionId);
-// ... re-invoke graph with tool results ...
+// ... 用工具结果重新调用图 ...
 
-// When LLM finishes:
+// 当 LLM 完成时：
 this.stateMachine.llmDone(sessionId);
 ```
 
-The full implementation requires careful integration. The approach:
-1. Inject `ToolRouter` and `ConversationStateMachine` into `WorkflowExecutor`
-2. Replace the `while (toolCallCount < maxToolRounds)` loop with StateMachine-driven flow
-3. The StateMachine emits events; the executor listens and acts
+完整实现需要仔细集成。方法：
+1. 将 `ToolRouter` 和 `ConversationStateMachine` 注入 `WorkflowExecutor`
+2. 用 StateMachine 驱动的流替换 `while (toolCallCount < maxToolRounds)` 循环
+3. StateMachine 发出事件，执行器监听并执行
 
-Since this is complex, the implementation code for the modified `execute()` method:
+由于这很复杂，修改后的 `execute()` 方法实现代码如下：
 
 ```typescript
-// Updated execute method — key changes only (keep surrounding code):
+// 更新后的 execute 方法 — 仅显示关键变更（保留周围代码）：
 async execute(ctx: WorkflowExecutionContext, graphName?: string): Promise<void> {
     const { conversationId, sessionId, content, llmConfigMap, defaultLlmConfig, tokenLimit } = ctx;
     const graphDef = this.graphRegistry.getGraph(graphName ?? 'ChatGraph');
@@ -2015,7 +2015,7 @@ async execute(ctx: WorkflowExecutionContext, graphName?: string): Promise<void> 
     const llmCaller = this.createLLMCaller(llmConfigMap, defaultLlmConfig);
     const abortSignal = this.sessionManager.findById(sessionId)?.abortController.signal;
 
-    // Build initial state
+    // 构建初始状态
     const history = await this.messageService.buildLLMHistory(conversationId, tokenLimit);
     const initialState: WorkflowState = {
         messages: [...history, { role: 'user' as const, content }],
@@ -2023,14 +2023,14 @@ async execute(ctx: WorkflowExecutionContext, graphName?: string): Promise<void> 
         hasToolCalls: false,
     };
 
-    // Save user message
+    // 保存用户消息
     await this.messageService.create({
         conversationId,
         role: 'user',
         content,
     });
 
-    // Track accumulated assistant text
+    // 跟踪累积的助手文本
     let assistantText = '';
     let roundCount = 0;
     const maxToolRounds = 10;
@@ -2040,26 +2040,26 @@ async execute(ctx: WorkflowExecutionContext, graphName?: string): Promise<void> 
 
         roundCount++;
 
-        // Stream the graph
+        // 流式处理图
         let lastState: WorkflowState | null = null;
         for await (const event of graph.stream(initialState, {
             configurable: { llmCaller, llmConfigMap, abortSignal },
         })) {
             lastState = event;
 
-            // Stream text chunks to client
+            // 流式传输文本块到客户端
             if (event.assistantText) {
                 assistantText += event.assistantText;
-                // StateMachine emits text_chunk
+                // StateMachine 发出 text_chunk
                 this.stateMachine.textChunk(sessionId, event.assistantText);
             }
         }
 
         if (!lastState) break;
 
-        // Check for tool calls
+        // 检查工具调用
         if (lastState.pendingToolCalls && lastState.pendingToolCalls.length > 0) {
-            // Route each tool call
+            // 路由每个工具调用
             for (const tc of lastState.pendingToolCalls) {
                 this.toolRouter.route(tc.name, tc.input, conversationId, tc.id);
                 this.stateMachine.toolCall(sessionId, {
@@ -2070,7 +2070,7 @@ async execute(ctx: WorkflowExecutionContext, graphName?: string): Promise<void> 
                 });
             }
 
-            // Wait for tool results (frontend or auto-executed)
+            // 等待工具结果（前端或自动执行）
             const toolResults = await this.toolDispatcher.waitForResults(
                 sessionId,
                 conversationId,
@@ -2079,7 +2079,7 @@ async execute(ctx: WorkflowExecutionContext, graphName?: string): Promise<void> 
             );
 
             if (!toolResults) {
-                // Timeout — inject error results and continue
+                // 超时 — 注入错误结果并继续
                 for (const tc of lastState.pendingToolCalls) {
                     this.connectionManager.broadcastToConversation(conversationId, {
                         type: 'error',
@@ -2090,7 +2090,7 @@ async execute(ctx: WorkflowExecutionContext, graphName?: string): Promise<void> 
                 }
             }
 
-            // Append tool results to messages
+            // 追加工具结果到消息
             const toolMessages: LLMMessage[] = lastState.pendingToolCalls.map(tc => ({
                 role: 'tool',
                 content: JSON.stringify(toolResults?.[tc.id] ?? { error: 'Tool execution failed' }),
@@ -2100,15 +2100,15 @@ async execute(ctx: WorkflowExecutionContext, graphName?: string): Promise<void> 
             this.stateMachine.toolResult(sessionId, lastState.pendingToolCalls[0].id);
             this.stateMachine.toolDone(sessionId);
 
-            // Continue loop — next iteration calls LLM with tool results
+            // 继续循环 — 下一轮用工具结果调用 LLM
             continue;
         }
 
-        // No tool calls — LLM is done
+        // 无工具调用 — LLM 完成
         break;
     }
 
-    // Save assistant message
+    // 保存助手消息
     if (assistantText) {
         await this.messageService.create({
             conversationId,
@@ -2118,7 +2118,7 @@ async execute(ctx: WorkflowExecutionContext, graphName?: string): Promise<void> 
         });
     }
 
-    // Signal done
+    // 发送完成信号
     if (roundCount >= maxToolRounds) {
         this.stateMachine.error(sessionId, 'LLM_TIMEOUT', 'Maximum tool call rounds reached');
     } else {
@@ -2127,11 +2127,11 @@ async execute(ctx: WorkflowExecutionContext, graphName?: string): Promise<void> 
 }
 ```
 
-Add StateMachine and ToolRouter to the constructor:
+将 StateMachine 和 ToolRouter 添加到构造函数：
 
 ```typescript
 constructor(
-    // ... existing
+    // ... 现有
     @Inject(ConversationStateMachine) private readonly stateMachine: ConversationStateMachine,
     @Inject(ToolRouter) private readonly toolRouter: ToolRouter,
 ) {
@@ -2139,33 +2139,33 @@ constructor(
 }
 ```
 
-- [ ] **Step 2: Update ai.module.ts to provide new services**
+- [ ] **步骤 2：更新 ai.module.ts 以注册新服务**
 
-Modify `apps/server/src/ai/ai.module.ts` to register the new services:
+修改 `apps/server/src/ai/ai.module.ts`，注册新服务：
 
 ```typescript
 import { ConversationStateMachine } from './gateway/conversation-statemachine';
 import { ToolRouter } from './tools/tool-router';
 
-// Add to providers:
+// 添加到 providers：
 providers: [
-    // ... existing providers
+    // ... 现有 providers
     ConversationStateMachine,
     ToolRouter,
 ]
 ```
 
-- [ ] **Step 3: Run type check**
+- [ ] **步骤 3：运行类型检查**
 
-Run: `cd apps/server && npx tsc --noEmit`
-Expected: No errors (fix any issues)
+运行：`cd apps/server && npx tsc --noEmit`
+预期：无错误（修复任何问题）
 
-- [ ] **Step 4: Run existing tests**
+- [ ] **步骤 4：运行现有测试**
 
-Run: `cd apps/server && npx jest`
-Expected: All tests pass (fix any regressions)
+运行：`cd apps/server && npx jest`
+预期：所有测试通过（修复任何回归）
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add apps/server/src/ai/workflow-runtime/workflow-executor.ts apps/server/src/ai/workflow-runtime/conversation-orchestrator.ts apps/server/src/ai/ai.module.ts
@@ -2178,40 +2178,40 @@ to StateMachine."
 
 ---
 
-### Task 10: Update AI Panel UI for isProcessing State
+### 任务 10：更新 AI 面板 UI 以响应 isProcessing 状态 ✅ 已完成
 
-**Files:**
-- Modify: `apps/web/src/components/workspace/ai-panel/ai-panel.tsx` (or wherever the send button lives)
+**文件：**
+- 修改：`apps/web/src/components/workspace/ai-panel/ai-panel.tsx`（或发送按钮所在位置）
 
-- [ ] **Step 1: Disable send button during processing**
+- [ ] **步骤 1：在处理期间禁用发送按钮**
 
-Find the send button in the AI panel component and wire up the `isProcessing` state:
+找到 AI 面板组件中的发送按钮，接入 `isProcessing` 状态：
 
 ```typescript
-// In the AI panel component (ai-panel.tsx or similar):
-const harness = useAIHarness(); // or however harness is accessed
+// 在 AI 面板组件中（ai-panel.tsx 或类似文件）：
+const harness = useAIHarness(); // 或通过其他方式获取 harness
 
-// The send button should be disabled when harness.isProcessing is true
+// 当 harness.isProcessing 为 true 时，发送按钮应被禁用
 <button
     disabled={harness.isGenerating || harness.isProcessing}
     onClick={handleSend}
     // ...
 >
-    {harness.isProcessing ? 'Generating...' : 'Send'}
+    {harness.isProcessing ? '生成中...' : '发送'}
 </button>
 ```
 
-If the component uses the `useAIHarness` hook with `useSyncExternalStore`, the `isProcessing` state will be available through the harness snapshot.
+如果组件使用 `useAIHarness` 钩子配合 `useSyncExternalStore`，`isProcessing` 状态将通过 harness 快照获取。
 
-- [ ] **Step 2: Verify UI behavior**
+- [ ] **步骤 2：验证 UI 行为**
 
-Run: `cd apps/web && npm run dev`
-Open the AI panel, send a message, verify:
-- Send button is disabled while generating
-- Send button re-enables when generation completes
-- Status events show appropriate UI feedback
+运行：`cd apps/web && npm run dev`
+打开 AI 面板，发送消息，验证：
+- 生成期间发送按钮被禁用
+- 生成完成后发送按钮重新启用
+- 状态事件显示适当的 UI 反馈
 
-- [ ] **Step 3: Commit**
+- [ ] **步骤 3：提交**
 
 ```bash
 git add apps/web/src/components/workspace/ai-panel/ai-panel.tsx
@@ -2223,18 +2223,18 @@ in BuildingContext/Processing/ToolWaiting states."
 
 ---
 
-### Task 11: Integrate Conversation Recovery on App Load
+### 任务 11：在应用加载时集成对话恢复 ✅ 已完成
 
-**Files:**
-- Modify: `apps/web/src/features/ai/harness/ai-harness.service.ts` (already partially done in Task 7)
-- Modify: wherever the AI panel or app initializes the harness
+**文件：**
+- 修改：`apps/web/src/features/ai/harness/ai-harness.service.ts`（任务 7 中已部分完成）
+- 修改：初始化 harness 的 AI 面板或应用位置
 
-- [ ] **Step 1: Add auto-restore on harness init**
+- [ ] **步骤 1：在 harness 初始化时自动恢复**
 
-The harness should check localStorage for a saved conversation ID on initialization and restore it. This is done by the component that creates/uses the harness:
+harness 应在初始化时检查 localStorage 中是否有保存的对话 ID 并恢复它。这由创建/使用 harness 的组件完成：
 
 ```typescript
-// In the component that initializes the harness (likely ai-panel.tsx or bootstrap):
+// 在初始化 harness 的组件中（可能是 ai-panel.tsx 或 bootstrap）：
 useEffect(() => {
     const savedId = localStorage.getItem('activeConversationId');
     if (savedId) {
@@ -2243,10 +2243,10 @@ useEffect(() => {
 }, []);
 ```
 
-Or, add it to the harness constructor:
+或者，添加到 harness 构造函数：
 
 ```typescript
-// In AIHarnessServiceImpl constructor, after _setupEventProxy:
+// 在 AIHarnessServiceImpl 构造函数中，_setupEventProxy 之后：
 this._restoreLastConversation();
 
 private _restoreLastConversation(): void {
@@ -2254,24 +2254,24 @@ private _restoreLastConversation(): void {
         const savedId = localStorage.getItem('activeConversationId');
         if (savedId) {
             this._conversationState.setConversationId(savedId);
-            // Don't auto-join here — the UI should decide when to join
+            // 不在这里自动加入 — UI 应决定何时加入
         }
     } catch {
-        // Ignore
+        // 忽略
     }
 }
 ```
 
-- [ ] **Step 2: Verify recovery flow**
+- [ ] **步骤 2：验证恢复流程**
 
-Test the full recovery flow:
-1. Open AI panel, send a message, wait for response
-2. Refresh the page
-3. Verify: the previous conversation ID is restored
-4. Verify: clicking the conversation loads history
-5. Verify: localStorage is cleared after `done` event
+测试完整恢复流程：
+1. 打开 AI 面板，发送消息，等待回复
+2. 刷新页面
+3. 验证：之前的对话 ID 已恢复
+4. 验证：点击对话加载历史
+5. 验证：`done` 事件后 localStorage 已清除
 
-- [ ] **Step 3: Commit**
+- [ ] **步骤 3：提交**
 
 ```bash
 git add apps/web/src/features/ai/harness/ai-harness.service.ts
@@ -2283,53 +2283,53 @@ History loads when user joins the restored conversation."
 
 ---
 
-## Self-Review
+## 自查
 
-### Spec Coverage Check
+### 规范覆盖检查
 
-| Spec Requirement | Task |
+| 规范要求 | 对应任务 |
 |-----------------|------|
-| Frontend checks WS connection, reuses or creates | Task 6 (ws-client), Task 7 (harness) |
-| Frontend sends create_and_send or send_message | Task 7 (harness sendMessage/sendCreateAndSend) |
-| Server validates conversationId | Task 8 (gateway handleSendMessage) |
-| Server builds context (history + system) | Task 9 (workflow-executor uses buildLLMHistory) |
-| Server stores user message, streams response | Task 9 (workflow-executor) |
-| Tool calls routed by danger level | Task 3 (ToolRouter) |
-| Backend+low tools auto-execute | Task 3 (ToolRouter.route) |
-| Backend+high tools require confirmation | Task 3 (ToolRouter.route) |
-| Frontend tools forwarded to client | Task 3 (ToolRouter.route) |
-| Different event names for different types | Task 1, Task 5 (types) |
-| Created event for new conversations | Task 8 (gateway) |
-| Done event with finishReason | Task 4 (StateMachine), Task 8 (gateway) |
-| Status events for UI feedback | Task 6 (ws-client), Task 7 (harness) |
-| Processing state disables send button | Task 7 (harness), Task 10 (UI) |
-| Conversation recovery via localStorage | Task 7 (harness), Task 11 (auto-restore) |
-| State machine drives tool loop | Task 4 (StateMachine), Task 9 (executor) |
-| Fix abortByClientId prefix bug | Deferred to separate cleanup (noted in spec §7.2) |
-| Merge ToolRegistry + Dispatcher | Deferred to separate cleanup (noted in spec §7.2) |
+| 前端检查 WS 连接，复用或创建 | 任务 6（ws-client）、任务 7（harness） |
+| 前端发送 create_and_send 或 send_message | 任务 7（harness sendMessage/sendCreateAndSend） |
+| 服务端验证 conversationId | 任务 8（gateway handleSendMessage） |
+| 服务端构建上下文（历史 + 系统） | 任务 9（workflow-executor 使用 buildLLMHistory） |
+| 服务端存储用户消息，流式响应 | 任务 9（workflow-executor） |
+| 工具调用按危险等级路由 | 任务 3（ToolRouter） |
+| 后端+低危险工具自动执行 | 任务 3（ToolRouter.route） |
+| 后端+高危险工具需确认 | 任务 3（ToolRouter.route） |
+| 前端工具转发到客户端 | 任务 3（ToolRouter.route） |
+| 不同类型使用不同事件名 | 任务 1、任务 5（类型） |
+| 新对话发出 created 事件 | 任务 8（gateway） |
+| done 事件包含 finishReason | 任务 4（StateMachine）、任务 8（gateway） |
+| 状态事件用于 UI 反馈 | 任务 6（ws-client）、任务 7（harness） |
+| 处理中状态禁用发送按钮 | 任务 7（harness）、任务 10（UI） |
+| 通过 localStorage 实现对话恢复 | 任务 7（harness）、任务 11（自动恢复） |
+| 状态机驱动工具循环 | 任务 4（StateMachine）、任务 9（executor） |
+| 修复 abortByClientId 前缀 bug | 延后到单独清理（见规范 §7.2） |
+| 合并 ToolRegistry + Dispatcher | 延后到单独清理（见规范 §7.2） |
 
-### Placeholder Scan
-- No TBD/TODO in steps
-- All code steps contain actual code
-- No "similar to Task N" references
-- Tests have real assertions
-- No "add appropriate error handling" without specifics
+### 占位符扫描
+- 步骤中无 TBD/TODO
+- 所有代码步骤均包含实际代码
+- 无"类似于任务 N"的引用
+- 测试包含真实断言
+- 无"添加适当的错误处理"等模糊描述
 
-### Type Consistency Check
-- `ClientMessage` and `ServerMessage` types defined in Task 1 (server) and Task 5 (frontend) are consistent
-- `conversationId: string` is present in all events
-- `FinishReason` enum values match between server types and frontend types
-- `ErrorCode` values match between server and frontend
-- `ToolRouteMode` values are consistent with the spec's routing matrix
+### 类型一致性检查
+- `ClientMessage` 和 `ServerMessage` 类型在任务 1（服务端）和任务 5（前端）中定义一致
+- 所有事件均包含 `conversationId: string`
+- `FinishReason` 枚举值在服务端和前端类型间匹配
+- `ErrorCode` 值在服务端和前端间匹配
+- `ToolRouteMode` 值与规范的决策矩阵一致
 
 ---
 
-## Execution Handoff
+## 执行交接
 
-Plan complete. Two execution options:
+计划已完成。两种执行方式：
 
-**1. Subagent-Driven (recommended)** — I dispatch a fresh subagent per task, review between tasks, fast iteration
+**1. 子代理驱动（推荐）** — 每个任务调度一个子代理逐步执行，任务间审查，快速迭代
 
-**2. Inline Execution** — Execute tasks in this session using executing-plans, batch execution with checkpoints
+**2. 内联执行** — 在当前会话中使用 executing-plans 执行，批量执行并设置检查点
 
-Which approach?
+选择哪种方式？
