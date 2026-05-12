@@ -84,7 +84,7 @@ export class WorkflowExecutor {
 
         // 初始状态
         const initialState: Partial<WorkflowState> = {
-            messages: [{ role: 'user', content: ctx.content }],
+            messages: [{ role: 'user' as const, content: ctx.content }],
             conversationId: ctx.conversationId,
             lastAssistantMessage: '',
             hasToolCalls: false,
@@ -190,29 +190,33 @@ export class WorkflowExecutor {
                 }
 
                 // 将助手消息和工具结果追加到状态消息中，用于下一轮
-                initialState.messages = [
-                    { role: 'user', content: ctx.content } as WorkflowMessage,
-                    ...(lastState.lastAssistantMessage
-                        ? [
-                              {
-                                  role: 'assistant',
-                                  content: lastState.lastAssistantMessage,
-                              } as WorkflowMessage,
-                          ]
-                        : []),
-                    ...Object.entries(results).map(([toolId, r]) => {
+                const toolResultMessages: WorkflowMessage[] = Object.entries(results).map(
+                    ([toolId, r]) => {
                         const resultStr = typeof r === 'string' ? r : JSON.stringify(r);
                         return {
-                            role: 'tool',
+                            role: 'tool' as const,
                             content: [
                                 {
-                                    type: 'tool_result',
+                                    type: 'tool_result' as const,
                                     tool_use_id: toolId,
                                     content: resultStr,
                                 },
                             ],
-                        } as WorkflowMessage;
-                    }),
+                        };
+                    },
+                );
+
+                initialState.messages = [
+                    { role: 'user' as const, content: ctx.content },
+                    ...(lastState.lastAssistantMessage
+                        ? [
+                              {
+                                  role: 'assistant' as const,
+                                  content: lastState.lastAssistantMessage,
+                              },
+                          ]
+                        : []),
+                    ...toolResultMessages,
                 ];
                 initialState.pendingToolCalls = [];
                 initialState.hasToolCalls = false;

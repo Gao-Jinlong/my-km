@@ -6,6 +6,7 @@
  */
 
 import { describe, expect, it } from '@jest/globals';
+import type { WorkflowMessage } from '@my-km/langgraph-workflows';
 
 describe('WorkflowExecutor message format', () => {
     it('should build WorkflowMessage[] for second round', () => {
@@ -18,7 +19,7 @@ describe('WorkflowExecutor message format', () => {
         };
 
         // The FIX: use WorkflowMessage[] instead of flat strings
-        const messages = [
+        const messages: WorkflowMessage[] = [
             { role: 'user' as const, content: ctxContent },
             ...(lastAssistantMessage
                 ? [{ role: 'assistant' as const, content: lastAssistantMessage }]
@@ -75,7 +76,7 @@ describe('WorkflowExecutor message format', () => {
         const results = { 'call-abc': 'success' };
         const ctxContent = 'test';
 
-        const messages = [
+        const messages: WorkflowMessage[] = [
             { role: 'user' as const, content: ctxContent },
             ...Object.entries(results).map(([toolId, r]) => {
                 const resultStr = typeof r === 'string' ? r : JSON.stringify(r);
@@ -92,7 +93,12 @@ describe('WorkflowExecutor message format', () => {
             }),
         ];
 
-        expect(messages[1].content[0].tool_use_id).toBe('call-abc');
-        expect(messages[1].content[0].content).toBe('success');
+        expect(
+            (messages[1].content as Array<{ tool_use_id?: string; content?: string }>)[0]
+                .tool_use_id,
+        ).toBe('call-abc');
+        expect(
+            (messages[1].content as Array<{ tool_use_id?: string; content?: string }>)[0].content,
+        ).toBe('success');
     });
 });

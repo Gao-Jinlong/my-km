@@ -148,7 +148,28 @@ export const WorkflowStateAnnotation = Annotation.Root({
     isDone: Annotation<boolean>,
 });
 
-export type WorkflowState = typeof WorkflowStateAnnotation.State;
+export interface WorkflowState {
+    /** 用户输入消息 */
+    messages: WorkflowMessage[];
+    /** 当前对话 ID */
+    conversationId: string;
+    /** 最后一条助手回复 */
+    lastAssistantMessage: string;
+    /** 是否包含工具调用 */
+    hasToolCalls: boolean;
+    /** 待执行的工具调用列表 */
+    pendingToolCalls: Array<{
+        id: string;
+        name: string;
+        arguments: Record<string, unknown>;
+    }>;
+    /** 工具调用执行结果 */
+    toolResults: Record<string, unknown>;
+    /** 错误信息 */
+    error: string | undefined;
+    /** 工作流是否完成 */
+    isDone: boolean;
+}
 
 /**
  * LLM 调用结果

@@ -5,7 +5,7 @@
  * 并处理流式输出和工具调用。
  */
 
-import type { GraphConfig, WorkflowState } from '../types/workflow.types';
+import type { GraphConfig, WorkflowMessage, WorkflowState } from '../types/workflow.types';
 
 export function createLLMNode() {
     return async (
@@ -21,11 +21,11 @@ export function createLLMNode() {
         }
 
         // 构建消息列表（状态中已存 WorkflowMessage，直接使用）
-        const messages = state.messages as Array<{ role: string; content: unknown }>;
+        const messages: WorkflowMessage[] = state.messages;
 
         // 如果有工具结果，追加 tool_result 消息
         if (state.pendingToolCalls && state.pendingToolCalls.length > 0) {
-            // 工具结果已在上一步被添加到 messages 中
+            // 工具结果已在上一步被添加到 messages 中docs/ai-conversation-flow.md。
         }
 
         let assistantText = '';
