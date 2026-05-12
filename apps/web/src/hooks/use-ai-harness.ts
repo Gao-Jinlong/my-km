@@ -13,6 +13,7 @@ import { getContainer } from '@/platform/bootstrap';
 interface AIHarnessSnapshot {
     messages: ReadonlyArray<import('@/features/ai/types/ai.types').MessageWire>;
     isGenerating: boolean;
+    isProcessing: boolean;
     selectedText: string | null;
     documentTitle: string;
     isConnected: boolean;
@@ -31,6 +32,7 @@ function createSubscriber(
     let snap: AIHarnessSnapshot = {
         messages: harness.messages,
         isGenerating: harness.isGenerating,
+        isProcessing: harness.isProcessing,
         selectedText: harness.selectedText,
         documentTitle: '',
         isConnected: false,
@@ -43,8 +45,8 @@ function createSubscriber(
 
     // 对话状态变更（消息列表、生成中）
     disposables.push(
-        harness.onStateChange(({ messages, isGenerating }) => {
-            snap = { ...snap, messages, isGenerating };
+        harness.onStateChange(({ messages, isGenerating, isProcessing }) => {
+            snap = { ...snap, messages, isGenerating, isProcessing };
             update();
         }),
     );
@@ -102,6 +104,7 @@ export function useAIHarness() {
     const snapshotRef = useRef<AIHarnessSnapshot>({
         messages: harness.messages,
         isGenerating: harness.isGenerating,
+        isProcessing: harness.isProcessing,
         selectedText: harness.selectedText,
         documentTitle: '',
         isConnected: false,
@@ -190,6 +193,7 @@ export function useAIHarness() {
             // 状态
             messages: snapshot.messages,
             isGenerating: snapshot.isGenerating,
+            isProcessing: snapshot.isProcessing,
             isConnected: snapshot.isConnected,
             selectedText: snapshot.selectedText,
             documentTitle: snapshot.documentTitle,
@@ -209,6 +213,7 @@ export function useAIHarness() {
         [
             snapshot.messages,
             snapshot.isGenerating,
+            snapshot.isProcessing,
             snapshot.isConnected,
             snapshot.selectedText,
             snapshot.documentTitle,

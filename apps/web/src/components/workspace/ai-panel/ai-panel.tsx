@@ -26,6 +26,7 @@ export function AIPanel() {
     const {
         messages,
         isGenerating,
+        isProcessing,
         isConnected,
         selectedText,
         documentTitle,
@@ -77,11 +78,11 @@ export function AIPanel() {
 
     const handleSend = useCallback(async () => {
         const trimmed = inputValue.trim();
-        if (!trimmed || isGenerating) return;
+        if (!trimmed || isGenerating || isProcessing) return;
 
         await sendMessage(trimmed);
         setInputValue('');
-    }, [inputValue, isGenerating, sendMessage]);
+    }, [inputValue, isGenerating, isProcessing, sendMessage]);
 
     const handleKeyDown = useCallback(
         (e: React.KeyboardEvent) => {
@@ -207,7 +208,7 @@ export function AIPanel() {
                                 onChange={e => setInputValue(e.target.value)}
                                 onKeyDown={handleKeyDown}
                                 placeholder="Ask AI anything..."
-                                disabled={isGenerating}
+                                disabled={isGenerating || isProcessing}
                                 rows={1}
                                 className="flex-1 resize-none rounded-md border-0 bg-ws-bg-secondary px-3 py-2 text-[13px] text-ws-fg-primary placeholder:text-ws-fg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ws-accent disabled:cursor-not-allowed disabled:opacity-50"
                             />
