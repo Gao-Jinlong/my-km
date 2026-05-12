@@ -20,6 +20,7 @@ import { ProviderRegistry } from './provider/provider-registry';
 import { ZhipuProvider } from './provider/zhipu.provider';
 import { AISessionManager } from './session/ai-session-manager';
 import { ToolDispatcher } from './tools/tool.dispatcher';
+import { ToolRouter } from './tools/tool-router';
 import { ConversationOrchestrator } from './workflow-runtime/conversation-orchestrator';
 import { GraphRegistry } from './workflow-runtime/graph-registry';
 import { LLMResolver } from './workflow-runtime/llm-resolver';
@@ -42,6 +43,7 @@ import { WorkflowExecutor } from './workflow-runtime/workflow-executor';
         AISessionManager,
         ConnectionManager,
         ToolDispatcher,
+        ToolRouter,
         RequestDispatcher,
         AiRateLimiter,
         // New architecture

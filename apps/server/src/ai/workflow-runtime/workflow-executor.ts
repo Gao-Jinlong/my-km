@@ -28,12 +28,13 @@
 
 import type { GraphConfig, WorkflowMessage, WorkflowState } from '@my-km/langgraph-workflows';
 import { Injectable, Logger } from '@nestjs/common';
-import type { LLMMessage, ToolDefinition } from '../ai.types';
-import { ConnectionManager } from '../connection/connection-manager';
+import type { LLMMessage } from '../ai.types';
+import { ConversationStateMachine } from '../gateway/conversation-statemachine';
 import { MessageService } from '../message/message.service';
 import { LLMFactory } from '../provider/llm-factory';
 import type { LLMConfig, NodeLLMConfigMap } from '../provider/provider.types';
 import { ToolDispatcher } from '../tools/tool.dispatcher';
+import { ToolRouter } from '../tools/tool-router';
 import { GraphRegistry } from './graph-registry';
 import { LLMResolver } from './llm-resolver';
 import type { WorkflowExecutionContext } from './workflow.types';
@@ -49,9 +50,10 @@ export class WorkflowExecutor {
         private graphRegistry: GraphRegistry,
         private llmResolver: LLMResolver,
         _llmFactory: LLMFactory,
-        private connectionManager: ConnectionManager,
         private messageService: MessageService,
         private toolDispatcher: ToolDispatcher,
+        private stateMachine: ConversationStateMachine,
+        private toolRouter: ToolRouter,
     ) {}
 
     /**
@@ -75,10 +77,7 @@ export class WorkflowExecutor {
             llmCaller,
             tools,
             onChunk: (content: string) => {
-                this.connectionManager.emitToConversation(ctx.conversationId, 'stream_chunk', {
-                    type: 'stream_chunk',
-                    content,
-                });
+                this.stateMachine.textChunk(ctx.conversationId, content);
             },
         };
 
@@ -110,11 +109,7 @@ export class WorkflowExecutor {
 
                     // 检查中止信号
                     if (ctx.abortSignal?.aborted) {
-                        this.connectionManager.emitToConversation(
-                            ctx.conversationId,
-                            'stream_done',
-                            { type: 'stream_done' },
-                        );
+                        this.stateMachine.stop(ctx.conversationId);
                         return;
                     }
                 }
@@ -139,12 +134,13 @@ export class WorkflowExecutor {
                 });
 
                 // 发送工具调用事件给前端
-                for (const tool of lastState.pendingToolCalls) {
-                    this.connectionManager.emitToConversation(ctx.conversationId, 'tool_call', {
-                        type: 'tool_call',
-                        id: tool.id,
-                        name: tool.name,
-                        arguments: tool.arguments,
+                for (const tc of lastState.pendingToolCalls) {
+                    this.toolRouter.route(tc.name, tc.arguments, ctx.conversationId, tc.id);
+                    this.stateMachine.toolCall(ctx.conversationId, {
+                        toolCallId: tc.id,
+                        toolName: tc.name,
+                        input: tc.arguments,
+                        requiresConfirmation: this.toolRouter.needsConfirmation(tc.name),
                     });
                 }
 
@@ -228,16 +224,14 @@ export class WorkflowExecutor {
             }
 
             // 执行完成
-            this.connectionManager.emitToConversation(ctx.conversationId, 'stream_done', {
-                type: 'stream_done',
-            });
+            this.stateMachine.llmDone(ctx.conversationId);
         } catch (error) {
             this.logger.error(`Workflow execution failed: ${error}`);
-            this.connectionManager.emitToConversation(ctx.conversationId, 'error', {
-                type: 'error',
-                message: error instanceof Error ? error.message : 'Workflow execution failed',
-                code: 'WORKFLOW_ERROR',
-            });
+            this.stateMachine.error(
+                ctx.conversationId,
+                'WORKFLOW_ERROR',
+                error instanceof Error ? error.message : 'Workflow execution failed',
+            );
         }
     }
 

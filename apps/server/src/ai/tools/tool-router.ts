@@ -85,6 +85,16 @@ export class ToolRouter {
         });
     }
 
+    /**
+     * Determine whether a tool requires user confirmation.
+     * Returns true for backend tools with high danger level.
+     */
+    needsConfirmation(toolName: string): boolean {
+        const tool = this._tools.get(toolName);
+        if (!tool) return false;
+        return tool.execution === 'backend' && tool.danger === 'high';
+    }
+
     get onDecision(): Event<ToolRouteDecision> {
         return this._onDecision.event;
     }
