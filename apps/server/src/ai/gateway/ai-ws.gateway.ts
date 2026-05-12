@@ -1,13 +1,15 @@
 /**
- * AI WebSocket 网关（重构版）
+ * AI WebSocket 网关（新协议版）
  *
- * 职责精简为：
- * - 连接生命周期管理
- * - 消息收发
- * - 委托业务逻辑给下层的 ConnectionManager 和 RequestDispatcher
+ * 事件协议：
+ * - create_and_send: 创建对话并发送首条消息
+ * - send_message: 已有对话发送消息
+ * - join: 加入对话，加载历史
+ * - stop: 中止生成
+ * - tool_result: 工具执行结果
  */
 
-import { Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
     ConnectedSocket,
     MessageBody,
@@ -16,34 +18,14 @@ import {
     WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { AiService } from '../ai.service';
 import { ConnectionManager } from '../connection/connection-manager';
 import { ConversationService } from '../conversation/conversation.service';
 import { RequestDispatcher } from '../dispatch/request-dispatcher';
+import { MessageService } from '../message/message.service';
 import { AISessionManager } from '../session/ai-session-manager';
 import { ToolDispatcher } from '../tools/tool.dispatcher';
-
-interface ClientMsg {
-    type: string;
-    conversationId?: string;
-    content?: string;
-    context?: Record<string, unknown>;
-    toolCallId?: string;
-    result?: unknown;
-    error?: string;
-    /** 运行时 LLM 配置映射（节点 ID -> LLM 配置） */
-    llmConfigMap?: Record<
-        string,
-        {
-            provider: string;
-            model: string;
-            temperature?: number;
-            maxTokens?: number;
-        }
-    >;
-    /** 使用的工作流图名称 */
-    graphName?: string;
-}
+import type { ClientMessage, ServerMessage } from './ai-ws-events.types';
+import { ConversationStateMachine } from './conversation-statemachine';
 
 @WebSocketGateway({
     cors: {
@@ -52,161 +34,215 @@ interface ClientMsg {
     },
     namespace: 'ai',
 })
+@Injectable()
 export class AiGateway {
     private readonly logger = new Logger(AiGateway.name);
 
     constructor(
-        private aiService: AiService,
         private connectionManager: ConnectionManager,
         private conversationService: ConversationService,
         private requestDispatcher: RequestDispatcher,
         private sessionManager: AISessionManager,
         private toolDispatcher: ToolDispatcher,
-    ) {}
+        private stateMachine: ConversationStateMachine,
+        private messageService: MessageService,
+    ) {
+        this.setupStateMachineHandler();
+    }
 
     @WebSocketServer()
     server!: Server;
 
-    /**
-     * 连接
-     */
-    async handleConnection(client: Socket) {
-        this.logger.log(
-            `Client connected: ${client.id}, transport: ${client.conn.transport?.name ?? 'unknown'}`,
-        );
-        this.logger.log(`Handshake query: ${JSON.stringify(client.handshake.query)}`);
-        this.logger.log(`Handshake auth: ${JSON.stringify(client.handshake.auth)}`);
+    private setupStateMachineHandler(): void {
+        this.stateMachine.onEvent(event => {
+            if (event.type === 'emit') {
+                this.server
+                    .to(event.message.conversationId)
+                    .emit(event.message.type, event.message);
+            }
+        });
+    }
 
-        // 注册到 ConnectionManager
+    async handleConnection(client: Socket) {
+        this.logger.log(`Client connected: ${client.id}`);
         this.connectionManager.registerClient(client.id, {
             emit: (event: string, data: unknown) => client.emit(event, data),
         });
     }
 
-    /**
-     * 断开连接
-     */
     handleDisconnect(client: Socket) {
         this.logger.log(`Client disconnected: ${client.id}`);
-
-        // 中断该客户端的活跃会话
         this.sessionManager.abortByClientId(client.id);
-
-        // 从 ConnectionManager 注销
         this.connectionManager.unregisterClient(client.id);
     }
 
-    /**
-     * 加入对话
-     *
-     * 如果对话不存在，自动创建（决策 D3/D11）。
-     * TODO(P1): 从 JWT 提取 userId，传入 createConversation
-     */
-    @SubscribeMessage('join')
-    async handleJoin(@MessageBody() data: ClientMsg, @ConnectedSocket() client: Socket) {
-        this.logger.log(`[${client.id}] join event received: ${JSON.stringify(data)}`);
+    @SubscribeMessage('create_and_send')
+    async handleCreateAndSend(
+        @MessageBody() data: ClientMessage & { type: 'create_and_send' },
+        @ConnectedSocket() client: Socket,
+    ): Promise<void> {
+        try {
+            const conversation = await this.conversationService.create({
+                title: data.content.substring(0, 50),
+            });
 
-        if (!data.conversationId) {
-            this.logger.warn(`[${client.id}] join rejected: no conversationId`);
+            client.join(conversation.id);
+            this.connectionManager.joinConversation(client.id, conversation.id);
+
+            // Emit created
+            client.emit('created', { type: 'created', conversationId: conversation.id });
+
+            // Create session
+            const session = this.sessionManager.create({
+                conversationId: conversation.id,
+                clientId: client.id,
+            });
+
+            // Create state machine session
+            this.stateMachine.create({
+                conversationId: conversation.id,
+                clientId: client.id,
+            });
+
+            // Dispatch the message
+            await this.requestDispatcher.dispatch({
+                conversationId: conversation.id,
+                clientId: client.id,
+                content: data.content,
+                context: data.context,
+                sessionId: session.id,
+            });
+        } catch (error) {
             client.emit('error', {
-                message: 'conversationId is required',
-                code: 'MISSING_CONVERSATION_ID',
-            });
-            return;
-        }
-
-        // 确保对话存在：不存在则自动创建
-        let conversation = await this.conversationService.findById(data.conversationId);
-        if (!conversation) {
-            this.logger.log(
-                `[${client.id}] conversation not found, creating: ${data.conversationId}`,
-            );
-            // TODO(P1): 从 JWT 提取 userId 传入
-            conversation = await this.conversationService.create({
-                id: data.conversationId,
-                userId: undefined,
+                type: 'error',
+                conversationId: '',
+                code: 'LLM_UNAVAILABLE',
+                message: (error as Error).message,
             });
         }
-
-        client.join(data.conversationId);
-        this.logger.log(`[${client.id}] joined room: ${data.conversationId}`);
-
-        this.connectionManager.joinConversation(client.id, data.conversationId);
-
-        client.emit('joined', { conversationId: data.conversationId });
-
-        // 加载历史
-        const history = await this.aiService.getConversationHistory(data.conversationId);
-        this.logger.log(`[${client.id}] sending ${history.length} history messages`);
-        client.emit('history', { messages: history });
     }
 
-    /**
-     * 发送消息
-     */
-    @SubscribeMessage('message')
-    async handleMessage(@MessageBody() data: ClientMsg, @ConnectedSocket() client: Socket) {
-        this.logger.log(
-            `[${client.id}] message received: conversationId=${data.conversationId}, contentLength=${data.content?.length ?? 0}`,
-        );
-
-        if (!data.conversationId || !data.content) {
-            this.logger.warn(`[${client.id}] message rejected: missing conversationId or content`);
-            client.emit('error', {
-                message: 'conversationId and content are required',
-                code: 'MISSING_PARAMS',
-            });
-            return;
-        }
-
+    @SubscribeMessage('send_message')
+    async handleSendMessage(
+        @MessageBody() data: ClientMessage & { type: 'send_message' },
+        @ConnectedSocket() client: Socket,
+    ): Promise<void> {
         try {
+            const conversation = await this.conversationService.findById(data.conversationId);
+            if (!conversation) {
+                client.emit('error', {
+                    type: 'error',
+                    conversationId: data.conversationId,
+                    code: 'CONVERSATION_NOT_FOUND',
+                    message: 'Conversation not found',
+                });
+                return;
+            }
+
+            client.join(data.conversationId);
+            this.connectionManager.joinConversation(client.id, data.conversationId);
+
+            const session = this.sessionManager.create({
+                conversationId: data.conversationId,
+                clientId: client.id,
+            });
+
+            this.stateMachine.create({
+                conversationId: data.conversationId,
+                clientId: client.id,
+            });
+
             await this.requestDispatcher.dispatch({
                 conversationId: data.conversationId,
                 clientId: client.id,
                 content: data.content,
                 context: data.context,
-                llmConfigMap: data.llmConfigMap,
-                graphName: data.graphName,
+                sessionId: session.id,
             });
         } catch (error) {
-            if ((error as Error).name === 'AbortError') {
-                this.logger.log(`Generation stopped for ${client.id}:${data.conversationId}`);
-                client.emit('stream_done');
+            const msg = (error as Error).message;
+            if (msg.includes('already active') || msg.includes('already has an active')) {
+                client.emit('error', {
+                    type: 'error',
+                    conversationId: data.conversationId,
+                    code: 'CONVERSATION_BUSY',
+                    message: 'Conversation is currently processing',
+                });
             } else {
-                this.logger.error(`AI message failed:`, error);
-                client.emit('error', { message: 'Internal error', code: 'AI_ERROR' });
+                client.emit('error', {
+                    type: 'error',
+                    conversationId: data.conversationId,
+                    code: 'LLM_UNAVAILABLE',
+                    message: msg,
+                });
             }
         }
     }
 
-    /**
-     * 停止生成
-     */
-    @SubscribeMessage('stop')
-    handleStop(@MessageBody() data: ClientMsg, @ConnectedSocket() _client: Socket) {
-        if (!data.conversationId) return;
+    @SubscribeMessage('join')
+    async handleJoin(
+        @MessageBody() data: { type: 'join'; conversationId: string },
+        @ConnectedSocket() client: Socket,
+    ): Promise<void> {
+        try {
+            const conversation = await this.conversationService.findById(data.conversationId);
+            if (!conversation) {
+                client.emit('error', {
+                    type: 'error',
+                    conversationId: data.conversationId,
+                    code: 'CONVERSATION_NOT_FOUND',
+                    message: 'Conversation not found',
+                });
+                return;
+            }
 
-        const session = this.sessionManager.findByConversationId(data.conversationId);
-        if (session) {
-            this.sessionManager.abort(session.id);
+            client.join(data.conversationId);
+            this.connectionManager.joinConversation(client.id, data.conversationId);
+
+            // Load and emit history
+            const messages = await this.messageService.findByConversationId(data.conversationId);
+            client.emit('history', {
+                type: 'history',
+                conversationId: data.conversationId,
+                messages: messages.map((m: any) => ({
+                    id: m.id,
+                    role: m.role,
+                    content: m.content,
+                    toolCalls: m.toolCalls,
+                    createdAt: m.createdAt.toISOString(),
+                })),
+            });
+        } catch (error) {
+            client.emit('error', {
+                type: 'error',
+                conversationId: data.conversationId,
+                code: 'CONVERSATION_NOT_FOUND',
+                message: (error as Error).message,
+            });
         }
     }
 
-    /**
-     * 工具执行结果
-     */
-    @SubscribeMessage('tool_result')
-    handleToolResult(@MessageBody() data: ClientMsg, @ConnectedSocket() _client: Socket) {
-        if (!data.conversationId || !data.toolCallId) return;
-
-        // 通过 ToolDispatcher 分发（统一路径，消除全局 EventEmitter）
+    @SubscribeMessage('stop')
+    async handleStop(
+        @MessageBody() data: { type: 'stop'; conversationId: string },
+        @ConnectedSocket() _client: Socket,
+    ): Promise<void> {
         const session = this.sessionManager.findByConversationId(data.conversationId);
-        this.toolDispatcher.deliverResult(
-            data.conversationId,
-            data.toolCallId,
-            data.error ? { error: data.error } : data.result,
-            data.error,
-            session?.id,
-        );
+        if (session) {
+            this.stateMachine.stop(session.conversationId);
+        }
+    }
+
+    @SubscribeMessage('tool_result')
+    async handleToolResult(
+        @MessageBody() data: {
+            type: 'tool_result';
+            conversationId: string;
+            toolCallId: string;
+            result: unknown;
+        },
+        @ConnectedSocket() _client: Socket,
+    ): Promise<void> {
+        this.toolDispatcher.deliverResult(data.conversationId, data.toolCallId, data.result);
     }
 }
