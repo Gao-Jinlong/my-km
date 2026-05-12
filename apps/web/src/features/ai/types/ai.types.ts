@@ -1,13 +1,16 @@
 /**
  * AI 模块共享类型定义
+ *
+ * Updated 2026-05-12: New event protocol with discriminated unions.
+ * All events include conversationId. Events are single-responsibility.
  */
 
 import type { FormatState, Position } from '@/features/editor/types';
 
 /**
- * AI 上下文线格式（前端 → 后端）
+ * Editor context (collected by frontend, sent with messages)
  */
-export interface AIContextWire {
+export interface EditorContext {
     documentId: string;
     documentTitle: string;
     documentPath: string;
@@ -17,45 +20,70 @@ export interface AIContextWire {
     formatState: FormatState | null;
 }
 
+/** @deprecated Use EditorContext instead */
+export type AIContextWire = EditorContext;
+
 /**
- * 消息线格式（历史加载用）
+ * Message wire format for history
  */
 export interface MessageWire {
     id: string;
     role: 'user' | 'assistant' | 'tool' | 'system';
     content: string | null;
-    toolCalls?: Array<{ name: string }>;
+    toolCalls?: Array<{ id: string; name: string }>;
     toolCallId?: string;
     createdAt: string;
 }
 
-/**
- * 客户端 → 服务端消息
- */
+// === Client → Server ===
+
 export type ClientMessage =
-    | { type: 'join'; conversationId: string }
-    | { type: 'create_conversation'; conversationId: string; title?: string }
-    | { type: 'message'; conversationId: string; content: string; context: AIContextWire | null }
+    | { type: 'create_and_send'; content: string; context?: EditorContext }
+    | { type: 'send_message'; conversationId: string; content: string; context?: EditorContext }
+    | { type: 'tool_result'; conversationId: string; toolCallId: string; result: unknown }
+    | { type: 'stop'; conversationId: string }
+    | { type: 'join'; conversationId: string };
+
+// === Server → Client ===
+
+export type StatusType = 'thinking' | 'tool_executing' | 'generating';
+export type FinishReason = 'complete' | 'max_turns' | 'stopped' | 'error' | 'interrupted';
+export type ErrorCode =
+    | 'CONVERSATION_NOT_FOUND'
+    | 'LLM_UNAVAILABLE'
+    | 'LLM_TIMEOUT'
+    | 'TOOL_TIMEOUT'
+    | 'TOOL_EXECUTION_ERROR'
+    | 'CONVERSATION_BUSY';
+
+export type ServerMessage =
+    | { type: 'created'; conversationId: string }
+    | { type: 'history'; conversationId: string; messages: MessageWire[] }
+    | { type: 'text_chunk'; conversationId: string; content: string }
     | {
-          type: 'tool_result';
+          type: 'tool_call';
           conversationId: string;
           toolCallId: string;
-          result: unknown;
-          error?: string;
+          toolName: string;
+          input: unknown;
+          requiresConfirmation: boolean;
       }
-    | { type: 'stop'; conversationId: string };
+    | { type: 'status'; conversationId: string; status: StatusType; message?: string }
+    | { type: 'done'; conversationId: string; finishReason: FinishReason; error?: string }
+    | { type: 'error'; conversationId: string; code: ErrorCode; message: string };
 
-/**
- * 服务端 → 客户端消息
- */
-export type ServerMessage =
-    | { type: 'joined'; conversationId: string }
-    | { type: 'history'; messages: MessageWire[] }
-    | { type: 'stream_chunk'; content: string }
-    | { type: 'stream_done' }
-    | { type: 'tool_call'; id: string; name: string; arguments: object }
-    | { type: 'tool_timeout'; toolCallId: string; message: string }
-    | { type: 'error'; message: string; code: string };
+// === Legacy type kept for backward compatibility during migration ===
+/** @deprecated Use ServerMessage instead */
+export type LegacyServerMessage = {
+    type:
+        | 'joined'
+        | 'history'
+        | 'stream_chunk'
+        | 'stream_done'
+        | 'tool_call'
+        | 'tool_timeout'
+        | 'error';
+} & Record<string, unknown>;
 
 /**
  * 工具处理器接口
