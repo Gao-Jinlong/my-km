@@ -29,7 +29,9 @@ export interface AIHarnessService {
     connect(wsUrl: string): Promise<void>;
     disconnect(): void;
     joinConversation(conversationId: string): void;
-    sendMessage(content: string): Promise<void>;
+    sendMessage(content: string, conversationId?: string): Promise<string | null>; // Returns conversationId
+    sendCreateAndSend(content: string): Promise<string | null>; // For new conversations
+    restoreConversation(conversationId: string): void; // Conversation recovery
     stopGenerating(): void;
 
     // 工具相关
@@ -39,6 +41,7 @@ export interface AIHarnessService {
     // 状态访问
     get messages(): ReadonlyArray<MessageWire>;
     get isGenerating(): boolean;
+    get isProcessing(): boolean;
     get conversationId(): string | null;
     get selectedText(): string | null;
     get wsClient(): WSClientService;
@@ -49,9 +52,16 @@ export interface AIHarnessService {
     get onStreamDone(): Event<void>;
     get onError(): Event<{ message: string; code: string }>;
     get onHistory(): Event<{ messages: MessageWire[] }>;
-    get onStateChange(): Event<{ messages: MessageWire[]; isGenerating: boolean }>;
+    get onStateChange(): Event<{
+        messages: MessageWire[];
+        isGenerating: boolean;
+        isProcessing: boolean;
+    }>;
     get onSelectionChange(): Event<{ selectedText: string | null; documentTitle: string }>;
     get onConnectionChange(): Event<{ connected: boolean }>;
+    get onStatus(): Event<{ conversationId: string; status: string; message?: string }>;
+    get onCreated(): Event<{ conversationId: string }>;
+    get onDone(): Event<{ conversationId: string; finishReason: string; error?: string }>;
 
     dispose(): void;
 }
@@ -68,12 +78,23 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
     private _onStreamDone = new Emitter<void>();
     private _onError = new Emitter<{ message: string; code: string }>();
     private _onHistory = new Emitter<{ messages: MessageWire[] }>();
-    private _onStateChange = new Emitter<{ messages: MessageWire[]; isGenerating: boolean }>();
+    private _onStateChange = new Emitter<{
+        messages: MessageWire[];
+        isGenerating: boolean;
+        isProcessing: boolean;
+    }>();
     private _onSelectionChange = new Emitter<{
         selectedText: string | null;
         documentTitle: string;
     }>();
     private _onConnectionChange = new Emitter<{ connected: boolean }>();
+    private _onStatus = new Emitter<{ conversationId: string; status: string; message?: string }>();
+    private _onCreated = new Emitter<{ conversationId: string }>();
+    private _onDone = new Emitter<{
+        conversationId: string;
+        finishReason: string;
+        error?: string;
+    }>();
 
     // 当前选中文本
     private _selectedText: string | null = null;
@@ -141,6 +162,29 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
 
         // 监听连接状态变化
         this._store.add(this._wsClient.onConnectionChange(e => this._onConnectionChange.fire(e)));
+
+        // NEW: Handle created event
+        this._store.add(
+            this._wsClient.onCreated(e => {
+                this._conversationState.setConversationId(e.conversationId);
+                this._saveActiveConversationId(e.conversationId);
+                this._onCreated.fire(e);
+            }),
+        );
+        // NEW: Handle status event
+        this._store.add(
+            this._wsClient.onStatus(e => {
+                this._onStatus.fire(e);
+            }),
+        );
+        // NEW: Handle done event
+        this._store.add(
+            this._wsClient.onDone(e => {
+                this._conversationState.stopGenerating();
+                this._clearActiveConversationId();
+                this._onDone.fire(e);
+            }),
+        );
     }
 
     /**
@@ -206,23 +250,26 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
         this._wsClient.joinConversation(conversationId);
     }
 
-    async sendMessage(content: string): Promise<void> {
-        const conversationId = this._conversationState.conversationId;
-        if (!conversationId) {
-            console.warn('[AI Harness] Cannot send message: no active conversation');
-            return;
+    async sendMessage(content: string, conversationId?: string): Promise<string | null> {
+        const targetConv = conversationId ?? this._conversationState.conversationId;
+        if (targetConv) {
+            return this._sendExistingConversation(targetConv, content);
+        }
+        return this.sendCreateAndSend(content);
+    }
+
+    private async _sendExistingConversation(
+        conversationId: string,
+        content: string,
+    ): Promise<string | null> {
+        if (this._conversationState.isProcessing) {
+            console.warn('[AI Harness] Cannot send: conversation is processing');
+            return null;
         }
 
-        // Ensure connected before sending (connection managed by WSClientService refCount)
         await this._wsClient.ensureConnected();
-
-        // Join conversation (idempotent via socket.io rooms)
-        this._wsClient.joinConversation(conversationId);
-
-        // Cancel any pending idle disconnect
         this._wsClient.stopIdleTimer();
 
-        // 乐观更新：先添加用户消息和生成状态，给用户即时反馈
         const userMsgId = `user-${Date.now()}`;
         this._conversationState.addMessage({
             id: userMsgId,
@@ -232,17 +279,59 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
         });
         this._conversationState.startGenerating();
 
-        // 异步获取上下文并发送
-        this._contextCollector
-            .getContext(conversationId.replace('doc-', ''))
-            .then(ctx => {
-                this._wsClient.sendMessage(content, ctx, conversationId);
-            })
-            .catch(() => {
-                // context 获取失败：回滚乐观状态
-                this._conversationState.removeMessage(userMsgId);
-                this._conversationState.stopGenerating();
-            });
+        this._saveActiveConversationId(conversationId);
+
+        const ctx = await this._contextCollector.getContext(conversationId.replace('doc-', ''));
+        this._wsClient.sendMessage(content, ctx, conversationId);
+
+        return conversationId;
+    }
+
+    async sendCreateAndSend(content: string): Promise<string | null> {
+        if (this._conversationState.isProcessing) {
+            console.warn('[AI Harness] Cannot send: conversation is processing');
+            return null;
+        }
+
+        await this._wsClient.ensureConnected();
+        this._wsClient.stopIdleTimer();
+
+        const userMsgId = `user-${Date.now()}`;
+        this._conversationState.addMessage({
+            id: userMsgId,
+            role: 'user',
+            content,
+            createdAt: new Date().toISOString(),
+        });
+        this._conversationState.startGenerating();
+
+        const ctx = await this._contextCollector.getContext('');
+        this._wsClient.sendCreateAndSend(content, ctx);
+
+        // conversationId will be set when 'created' event arrives
+        return null;
+    }
+
+    restoreConversation(conversationId: string): void {
+        this._conversationState.setConversationId(conversationId);
+        this._wsClient.sendJoin(conversationId);
+        // History will arrive via 'history' event and be loaded by _setupEventProxy
+    }
+
+    private _saveActiveConversationId(id: string): void {
+        try {
+            localStorage.setItem('activeConversationId', id);
+        } catch {
+            // localStorage may be unavailable
+        }
+    }
+
+    private _clearActiveConversationId(): void {
+        try {
+            localStorage.removeItem('activeConversationId');
+        } catch {
+            // localStorage may be unavailable
+        }
     }
 
     stopGenerating(): void {
@@ -271,6 +360,10 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
 
     get isGenerating(): boolean {
         return this._conversationState.isGenerating;
+    }
+
+    get isProcessing(): boolean {
+        return this._conversationState.isProcessing;
     }
 
     get conversationId(): string | null {
@@ -307,7 +400,11 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
         return this._onHistory.event;
     }
 
-    get onStateChange(): Event<{ messages: MessageWire[]; isGenerating: boolean }> {
+    get onStateChange(): Event<{
+        messages: MessageWire[];
+        isGenerating: boolean;
+        isProcessing: boolean;
+    }> {
         return this._onStateChange.event;
     }
 
@@ -317,6 +414,18 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
 
     get onConnectionChange(): Event<{ connected: boolean }> {
         return this._onConnectionChange.event;
+    }
+
+    get onStatus(): Event<{ conversationId: string; status: string; message?: string }> {
+        return this._onStatus.event;
+    }
+
+    get onCreated(): Event<{ conversationId: string }> {
+        return this._onCreated.event;
+    }
+
+    get onDone(): Event<{ conversationId: string; finishReason: string; error?: string }> {
+        return this._onDone.event;
     }
 
     override dispose(): void {
@@ -332,6 +441,9 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
         this._onStateChange.dispose();
         this._onSelectionChange.dispose();
         this._onConnectionChange.dispose();
+        this._onStatus.dispose();
+        this._onCreated.dispose();
+        this._onDone.dispose();
         super.dispose();
     }
 }

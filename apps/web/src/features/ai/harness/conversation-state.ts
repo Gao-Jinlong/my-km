@@ -15,6 +15,7 @@ import type { MessageWire } from '../types/ai.types';
 export interface ConversationState {
     get messages(): ReadonlyArray<MessageWire>;
     get isGenerating(): boolean;
+    get isProcessing(): boolean;
     get conversationId(): string | null;
     setConversationId(id: string | null): void;
     addMessage(message: MessageWire): void;
@@ -24,7 +25,11 @@ export interface ConversationState {
     stopGenerating(): void;
     setHistory(messages: MessageWire[]): void;
     clear(): void;
-    get onStateChange(): Event<{ messages: MessageWire[]; isGenerating: boolean }>;
+    get onStateChange(): Event<{
+        messages: MessageWire[];
+        isGenerating: boolean;
+        isProcessing: boolean;
+    }>;
     get onStreamChunk(): Event<{ content: string }>;
     dispose(): void;
 }
@@ -32,11 +37,16 @@ export interface ConversationState {
 class ConversationStateImpl extends Disposable implements ConversationState {
     private _messages: MessageWire[] = [];
     private _isGenerating = false;
+    private _isProcessing = false;
     private _conversationId: string | null = null;
     private _currentAssistantMessage: MessageWire | null = null;
 
     // 事件
-    private _onStateChange = new Emitter<{ messages: MessageWire[]; isGenerating: boolean }>();
+    private _onStateChange = new Emitter<{
+        messages: MessageWire[];
+        isGenerating: boolean;
+        isProcessing: boolean;
+    }>();
     private _onStreamChunk = new Emitter<{ content: string }>();
 
     get messages(): ReadonlyArray<MessageWire> {
@@ -45,6 +55,10 @@ class ConversationStateImpl extends Disposable implements ConversationState {
 
     get isGenerating(): boolean {
         return this._isGenerating;
+    }
+
+    get isProcessing(): boolean {
+        return this._isProcessing;
     }
 
     get conversationId(): string | null {
@@ -63,6 +77,7 @@ class ConversationStateImpl extends Disposable implements ConversationState {
         this._onStateChange.fire({
             messages: [...this._messages],
             isGenerating: this._isGenerating,
+            isProcessing: this._isProcessing,
         });
     }
 
@@ -76,6 +91,7 @@ class ConversationStateImpl extends Disposable implements ConversationState {
             this._onStateChange.fire({
                 messages: [...this._messages],
                 isGenerating: this._isGenerating,
+                isProcessing: this._isProcessing,
             });
         }
     }
@@ -88,6 +104,7 @@ class ConversationStateImpl extends Disposable implements ConversationState {
             return;
         }
         this._isGenerating = true;
+        this._isProcessing = true;
         this._currentAssistantMessage = {
             id: `stream-${Date.now()}`,
             role: 'assistant',
@@ -95,7 +112,11 @@ class ConversationStateImpl extends Disposable implements ConversationState {
             createdAt: new Date().toISOString(),
         };
         this._messages.push(this._currentAssistantMessage);
-        this._onStateChange.fire({ messages: [...this._messages], isGenerating: true });
+        this._onStateChange.fire({
+            messages: [...this._messages],
+            isGenerating: true,
+            isProcessing: true,
+        });
     }
 
     /**
@@ -119,9 +140,14 @@ class ConversationStateImpl extends Disposable implements ConversationState {
             const idx = this._messages.indexOf(this._currentAssistantMessage);
             if (idx >= 0) this._messages.splice(idx, 1);
         }
+        this._isProcessing = false;
         this._isGenerating = false;
         this._currentAssistantMessage = null;
-        this._onStateChange.fire({ messages: [...this._messages], isGenerating: false });
+        this._onStateChange.fire({
+            messages: [...this._messages],
+            isGenerating: false,
+            isProcessing: false,
+        });
     }
 
     /**
@@ -130,8 +156,13 @@ class ConversationStateImpl extends Disposable implements ConversationState {
     setHistory(messages: MessageWire[]): void {
         this._messages = [...messages];
         this._isGenerating = false;
+        this._isProcessing = false;
         this._currentAssistantMessage = null;
-        this._onStateChange.fire({ messages: [...this._messages], isGenerating: false });
+        this._onStateChange.fire({
+            messages: [...this._messages],
+            isGenerating: false,
+            isProcessing: false,
+        });
     }
 
     /**
@@ -140,14 +171,19 @@ class ConversationStateImpl extends Disposable implements ConversationState {
     clear(): void {
         this._messages = [];
         this._isGenerating = false;
+        this._isProcessing = false;
         this._currentAssistantMessage = null;
-        this._onStateChange.fire({ messages: [], isGenerating: false });
+        this._onStateChange.fire({ messages: [], isGenerating: false, isProcessing: false });
     }
 
     /**
      * 状态变化事件
      */
-    get onStateChange(): Event<{ messages: MessageWire[]; isGenerating: boolean }> {
+    get onStateChange(): Event<{
+        messages: MessageWire[];
+        isGenerating: boolean;
+        isProcessing: boolean;
+    }> {
         return this._onStateChange.event;
     }
 
