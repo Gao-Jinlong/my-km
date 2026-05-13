@@ -92,12 +92,6 @@ export class AiGateway {
             // Emit created
             client.emit('created', { type: 'created', conversationId: conversation.id });
 
-            // Create session
-            const session = this.sessionManager.create({
-                conversationId: conversation.id,
-                clientId: client.id,
-            });
-
             // Create state machine session
             this.stateMachine.create({
                 conversationId: conversation.id,
@@ -109,8 +103,7 @@ export class AiGateway {
                 conversationId: conversation.id,
                 clientId: client.id,
                 content: data.content,
-                context: data.context,
-                sessionId: session.id,
+                context: data.context as Record<string, unknown> | undefined,
             });
         } catch (error) {
             client.emit('error', {
@@ -142,11 +135,6 @@ export class AiGateway {
             client.join(data.conversationId);
             this.connectionManager.joinConversation(client.id, data.conversationId);
 
-            const session = this.sessionManager.create({
-                conversationId: data.conversationId,
-                clientId: client.id,
-            });
-
             this.stateMachine.create({
                 conversationId: data.conversationId,
                 clientId: client.id,
@@ -156,8 +144,7 @@ export class AiGateway {
                 conversationId: data.conversationId,
                 clientId: client.id,
                 content: data.content,
-                context: data.context,
-                sessionId: session.id,
+                context: data.context as Record<string, unknown> | undefined,
             });
         } catch (error) {
             const msg = (error as Error).message;
