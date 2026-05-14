@@ -18,6 +18,7 @@ describe('WsGateway', () => {
             sendMessage: jest.fn(),
             joinRoom: jest.fn(),
             stop: jest.fn(),
+            onClientDisconnect: jest.fn(),
         } as any;
 
         toolDispatcher = {

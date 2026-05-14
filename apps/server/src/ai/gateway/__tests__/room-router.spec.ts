@@ -34,6 +34,7 @@ describe('RoomRouter', () => {
             create: jest.fn(),
             get: jest.fn(),
             destroy: jest.fn(),
+            destroyByClientId: jest.fn(),
         } as any;
 
         const module = await Test.createTestingModule({
@@ -149,6 +150,22 @@ describe('RoomRouter', () => {
         it('no-ops if no state machine exists', () => {
             stateMachineFactory.get.mockReturnValue(null);
             expect(() => roomRouter.stop('conv-1')).not.toThrow();
+        });
+    });
+
+    describe('onClientDisconnect', () => {
+        it('calls destroyByClientId on the state machine factory', () => {
+            roomRouter.onClientDisconnect('client-1');
+
+            expect(stateMachineFactory.destroyByClientId).toHaveBeenCalledWith('client-1');
+        });
+
+        it('does not throw when no FSMs exist for client', () => {
+            stateMachineFactory.destroyByClientId.mockImplementation(() => {});
+
+            expect(() => {
+                roomRouter.onClientDisconnect('unknown-client');
+            }).not.toThrow();
         });
     });
 });

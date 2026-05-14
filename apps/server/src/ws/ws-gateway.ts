@@ -46,6 +46,7 @@ export class WsGateway {
 
     handleDisconnect(client: Socket): void {
         this.logger.log(`Client disconnected: ${client.id}`);
+        this.roomRouter.onClientDisconnect(client.id);
         this.registry.unregister(client.id);
     }
 

@@ -116,4 +116,8 @@ export class RoomRouter {
             sm.stop();
         }
     }
+
+    onClientDisconnect(clientId: string): void {
+        this.stateMachineFactory.destroyByClientId(clientId);
+    }
 }
