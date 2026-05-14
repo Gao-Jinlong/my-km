@@ -152,8 +152,7 @@ export class ConversationStateMachine {
     }
 
     stop(conversationId: string): void {
-        const session = this._sessions.get(this._byConversation.get(conversationId) ?? '');
-        if (!session) return;
+        const session = this._getByConvOrThrow(conversationId);
         session.abortController.abort();
         this._transition(session, ConversationState.Done);
         this._emit({
@@ -167,8 +166,7 @@ export class ConversationStateMachine {
     }
 
     error(conversationId: string, code: string, message: string): void {
-        const session = this._sessions.get(this._byConversation.get(conversationId) ?? '');
-        if (!session) return;
+        const session = this._getByConvOrThrow(conversationId);
         session.abortController.abort();
         this._transition(session, ConversationState.Done);
         this._emit({

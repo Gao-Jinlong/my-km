@@ -138,4 +138,20 @@ describe('ConversationStateMachine', () => {
             expect(sm.findByConversationId(session.conversationId)).toBeNull();
         });
     });
+
+    describe('stop', () => {
+        it('throws when conversation not found', () => {
+            expect(() => {
+                sm.stop('nonexistent-conv');
+            }).toThrow(/session not found/i);
+        });
+    });
+
+    describe('error', () => {
+        it('throws when conversation not found', () => {
+            expect(() => {
+                sm.error('nonexistent-conv', 'ERR', 'something went wrong');
+            }).toThrow(/session not found/i);
+        });
+    });
 });
