@@ -5,7 +5,6 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { SocketRegistry } from '../ws/socket-registry';
 import { WsModule } from '../ws/ws.module';
 import { AiController } from './ai.controller';
-import { AiService } from './ai.service';
 import { ConnectionManager } from './connection/connection-manager';
 import { ConversationService } from './conversation/conversation.service';
 import { AiRateLimiter } from './dispatch/rate-limiter.guard';
@@ -38,7 +37,6 @@ import { WorkflowExecutor } from './workflow-runtime/workflow-executor';
     controllers: [AiController],
     providers: [
         AiGateway,
-        AiService,
         ConversationService,
         MessageService,
         AISessionManager,
@@ -58,7 +56,6 @@ import { WorkflowExecutor } from './workflow-runtime/workflow-executor';
         ConversationStateMachine,
     ],
     exports: [
-        AiService,
         ConversationService,
         MessageService,
         // New architecture exports

@@ -1,7 +1,7 @@
 /**
  * AI REST Controller
  *
- * - POST /ai/chat — 发送 AI 消息（同步，遗留）
+ * - POST /ai/chat — 发送 AI 消息（通过 RequestDispatcher 分发）
  * - GET  /ai/conversations — 获取对话列表
  * - POST /ai/conversations — 创建新对话
  * - GET  /ai/conversations/:id/messages — 获取对话消息历史
@@ -11,8 +11,8 @@
 
 import { Body, Controller, Delete, Get, Logger, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { AiService } from './ai.service';
 import { ConversationService } from './conversation/conversation.service';
+import { RequestDispatcher } from './dispatch/request-dispatcher';
 import { SendMessageDto } from './dto/send-message.dto';
 import { MessageService } from './message/message.service';
 
@@ -37,20 +37,35 @@ export class AiController {
     private readonly logger = new Logger(AiController.name);
 
     constructor(
-        private aiService: AiService,
+        private requestDispatcher: RequestDispatcher,
         private conversationService: ConversationService,
         private messageService: MessageService,
     ) {}
 
     @Post('chat')
-    @ApiOperation({ summary: '发送 AI 消息（同步）' })
+    @ApiOperation({ summary: '发送 AI 消息（通过 RequestDispatcher）' })
     @ApiResponse({ status: 200, description: '消息处理完成' })
     async sendMessage(@Body() dto: SendMessageDto) {
         this.logger.log(`Received AI chat request: ${dto.content.slice(0, 50)}...`);
 
         try {
-            await this.aiService.handleUserMessage(dto.conversationId, dto.content, dto.context);
-            return { success: true };
+            // Create conversation if no conversationId provided
+            let conversationId = dto.conversationId;
+            if (!conversationId) {
+                const conversation = await this.conversationService.create();
+                conversationId = conversation.id;
+                this.logger.log(`Auto-created conversation: ${conversationId}`);
+            }
+
+            // Dispatch to RequestDispatcher (REST mode: no streaming, just kick off processing)
+            await this.requestDispatcher.dispatch({
+                conversationId,
+                clientId: `rest:${Date.now()}`,
+                content: dto.content,
+                context: dto.context,
+            });
+
+            return { success: true, conversationId };
         } catch (error) {
             this.logger.error('AI chat failed:', error);
             throw error;

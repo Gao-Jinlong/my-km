@@ -2,10 +2,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNotEmpty, IsObject, IsOptional, IsString } from 'class-validator';
 
 export class SendMessageDto {
-    @ApiProperty({ description: '对话 ID' })
+    @ApiPropertyOptional({ description: '对话 ID（可选，不传则自动创建）' })
+    @IsOptional()
     @IsString()
-    @IsNotEmpty()
-    conversationId!: string;
+    conversationId?: string;
 
     @ApiProperty({ description: '用户消息内容' })
     @IsString()
