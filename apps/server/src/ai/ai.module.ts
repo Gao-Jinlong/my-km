@@ -9,7 +9,6 @@ import { ConnectionManager } from './connection/connection-manager';
 import { ConversationService } from './conversation/conversation.service';
 import { AiRateLimiter } from './dispatch/rate-limiter.guard';
 import { RequestDispatcher } from './dispatch/request-dispatcher';
-import { AiGateway } from './gateway/ai-ws.gateway';
 import { ConversationStateMachine } from './gateway/conversation-statemachine';
 import { MessageService } from './message/message.service';
 import { AnthropicProvider } from './provider/anthropic.provider';
@@ -36,7 +35,6 @@ import { WorkflowExecutor } from './workflow-runtime/workflow-executor';
     imports: [PrismaModule, ConfigModule, WsModule],
     controllers: [AiController],
     providers: [
-        AiGateway,
         ConversationService,
         MessageService,
         AISessionManager,
