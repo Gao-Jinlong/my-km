@@ -2,6 +2,7 @@ import { ChatGraph } from '@my-km/langgraph-workflows';
 import { Module, OnModuleInit } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PrismaModule } from '../prisma/prisma.module';
+import { WsModule } from '../ws/ws.module';
 import { AiController } from './ai.controller';
 import { AiService } from './ai.service';
 import { ConnectionManager } from './connection/connection-manager';
@@ -33,7 +34,7 @@ import { WorkflowExecutor } from './workflow-runtime/workflow-executor';
  * 支持多 provider: Anthropic, OpenAI, Zhipu, DashScope
  */
 @Module({
-    imports: [PrismaModule, ConfigModule],
+    imports: [PrismaModule, ConfigModule, WsModule],
     controllers: [AiController],
     providers: [
         AiGateway,
