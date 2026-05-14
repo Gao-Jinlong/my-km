@@ -16,11 +16,12 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { ConnectionManager } from '../connection/connection-manager';
+import { ConversationStateMachine } from '../gateway/conversation-statemachine';
 import { MessageService } from '../message/message.service';
 import type { LLMConfig, NodeLLMConfigMap } from '../provider/provider.types';
 import type { AISession } from '../session/ai-session.types';
 import { AISessionManager } from '../session/ai-session-manager';
-import type { WorkflowExecutionContext } from './workflow.types';
+import type { WorkflowCallbacks, WorkflowExecutionContext } from './workflow.types';
 import { WorkflowExecutor } from './workflow-executor';
 
 @Injectable()
@@ -31,6 +32,7 @@ export class ConversationOrchestrator {
         private messageService: MessageService,
         private sessionManager: AISessionManager,
         private workflowExecutor: WorkflowExecutor,
+        private stateMachine: ConversationStateMachine,
         _connectionManager: ConnectionManager,
     ) {}
 
@@ -58,7 +60,28 @@ export class ConversationOrchestrator {
 
         // 2. 构建上下文（历史消息由 workflowExecutor 负责构建）
 
-        // 3. 构建工作流执行上下文
+        // 3. Build callback bridge from transport layer (ConversationStateMachine)
+        //    to business layer (WorkflowExecutor). This decouples WorkflowExecutor
+        //    from knowing about the state machine directly.
+        const callbacks: WorkflowCallbacks = {
+            onTextChunk: (convId, chunk) => {
+                this.stateMachine.textChunk(convId, chunk);
+            },
+            onToolCall: (convId, info) => {
+                this.stateMachine.toolCall(convId, info);
+            },
+            onLlmDone: convId => {
+                this.stateMachine.llmDone(convId);
+            },
+            onError: (convId, code, message) => {
+                this.stateMachine.error(convId, code, message);
+            },
+            onStop: convId => {
+                this.stateMachine.stop(convId);
+            },
+        };
+
+        // 4. 构建工作流执行上下文 with injected callbacks
         const workflowCtx: WorkflowExecutionContext = {
             conversationId,
             sessionId: session.id,
@@ -66,9 +89,10 @@ export class ConversationOrchestrator {
             llmConfigMap: opts.llmConfigMap,
             tokenLimit: opts.tokenLimit,
             abortSignal: session.abortController.signal,
+            callbacks,
         };
 
-        // 4. 执行工作流
+        // 5. 执行工作流
         try {
             this.sessionManager.updateStatus(session.id, 'streaming');
 

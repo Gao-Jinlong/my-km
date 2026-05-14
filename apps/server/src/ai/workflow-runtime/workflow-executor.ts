@@ -27,9 +27,9 @@
  */
 
 import type { GraphConfig, WorkflowMessage, WorkflowState } from '@my-km/langgraph-workflows';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import type { LLMMessage } from '../ai.types';
-import { ConversationStateMachine } from '../gateway/conversation-statemachine';
+import type { ConversationStateMachine } from '../gateway/conversation-statemachine';
 import { MessageService } from '../message/message.service';
 import { LLMFactory } from '../provider/llm-factory';
 import type { LLMConfig, NodeLLMConfigMap } from '../provider/provider.types';
@@ -37,7 +37,7 @@ import { ToolDispatcher } from '../tools/tool.dispatcher';
 import { ToolRouter } from '../tools/tool-router';
 import { GraphRegistry } from './graph-registry';
 import { LLMResolver } from './llm-resolver';
-import type { WorkflowExecutionContext } from './workflow.types';
+import type { WorkflowCallbacks, WorkflowExecutionContext } from './workflow.types';
 
 @Injectable()
 export class WorkflowExecutor {
@@ -52,14 +52,18 @@ export class WorkflowExecutor {
         _llmFactory: LLMFactory,
         private messageService: MessageService,
         private toolDispatcher: ToolDispatcher,
-        private stateMachine: ConversationStateMachine,
+        @Optional() private stateMachine: ConversationStateMachine | null,
         private toolRouter: ToolRouter,
     ) {}
 
     /**
-     * 执行工作流
+     * Execute the workflow, using injected callbacks to signal lifecycle events.
+     * Callbacks take priority over the (optional) stateMachine for decoupling
+     * the business layer from the transport layer.
      */
     async execute(ctx: WorkflowExecutionContext, graphName = 'chat'): Promise<void> {
+        const callbacks = ctx.callbacks;
+
         const graphDef = this.graphRegistry.get(graphName);
         const graph = this.getOrCreateGraph(graphDef);
 
@@ -72,12 +76,12 @@ export class WorkflowExecutor {
         // 创建工具定义列表
         const tools = this.toolDispatcher.getDefinitions() as GraphConfig['tools'];
 
-        // 创建 configurable 上下文
+        // 创建 configurable 上下文 — use callbacks for text chunks
         const configurable: Partial<GraphConfig> = {
             llmCaller,
             tools,
             onChunk: (content: string) => {
-                this.stateMachine.textChunk(ctx.conversationId, content);
+                this._emitTextChunk(callbacks, ctx.conversationId, content);
             },
         };
 
@@ -109,7 +113,7 @@ export class WorkflowExecutor {
 
                     // 检查中止信号
                     if (ctx.abortSignal?.aborted) {
-                        this.stateMachine.stop(ctx.conversationId);
+                        this._emitStop(callbacks, ctx.conversationId);
                         return;
                     }
                 }
@@ -136,7 +140,7 @@ export class WorkflowExecutor {
                 // 发送工具调用事件给前端
                 for (const tc of lastState.pendingToolCalls) {
                     this.toolRouter.route(tc.name, tc.arguments, ctx.conversationId, tc.id);
-                    this.stateMachine.toolCall(ctx.conversationId, {
+                    this._emitToolCall(callbacks, ctx.conversationId, {
                         toolCallId: tc.id,
                         toolName: tc.name,
                         input: tc.arguments,
@@ -224,14 +228,88 @@ export class WorkflowExecutor {
             }
 
             // 执行完成
-            this.stateMachine.llmDone(ctx.conversationId);
+            this._emitLlmDone(callbacks, ctx.conversationId);
         } catch (error) {
             this.logger.error(`Workflow execution failed: ${error}`);
-            this.stateMachine.error(
+            this._emitError(
+                callbacks,
                 ctx.conversationId,
                 'WORKFLOW_ERROR',
                 error instanceof Error ? error.message : 'Workflow execution failed',
             );
+        }
+    }
+
+    /**
+     * Emit a text chunk event. Uses callbacks if available, falls back to stateMachine.
+     */
+    private _emitTextChunk(
+        callbacks: WorkflowCallbacks | undefined,
+        conversationId: string,
+        content: string,
+    ): void {
+        if (callbacks?.onTextChunk) {
+            callbacks.onTextChunk(conversationId, content);
+        } else if (this.stateMachine) {
+            this.stateMachine.textChunk(conversationId, content);
+        }
+    }
+
+    /**
+     * Emit a tool call event. Uses callbacks if available, falls back to stateMachine.
+     */
+    private _emitToolCall(
+        callbacks: WorkflowCallbacks | undefined,
+        conversationId: string,
+        info: {
+            toolCallId: string;
+            toolName: string;
+            input: unknown;
+            requiresConfirmation: boolean;
+        },
+    ): void {
+        if (callbacks?.onToolCall) {
+            callbacks.onToolCall(conversationId, info);
+        } else if (this.stateMachine) {
+            this.stateMachine.toolCall(conversationId, info);
+        }
+    }
+
+    /**
+     * Emit LLM done event. Uses callbacks if available, falls back to stateMachine.
+     */
+    private _emitLlmDone(callbacks: WorkflowCallbacks | undefined, conversationId: string): void {
+        if (callbacks?.onLlmDone) {
+            callbacks.onLlmDone(conversationId);
+        } else if (this.stateMachine) {
+            this.stateMachine.llmDone(conversationId);
+        }
+    }
+
+    /**
+     * Emit stop event. Uses callbacks if available, falls back to stateMachine.
+     */
+    private _emitStop(callbacks: WorkflowCallbacks | undefined, conversationId: string): void {
+        if (callbacks?.onStop) {
+            callbacks.onStop(conversationId);
+        } else if (this.stateMachine) {
+            this.stateMachine.stop(conversationId);
+        }
+    }
+
+    /**
+     * Emit error event. Uses callbacks if available, falls back to stateMachine.
+     */
+    private _emitError(
+        callbacks: WorkflowCallbacks | undefined,
+        conversationId: string,
+        code: string,
+        message: string,
+    ): void {
+        if (callbacks?.onError) {
+            callbacks.onError(conversationId, code, message);
+        } else if (this.stateMachine) {
+            this.stateMachine.error(conversationId, code, message);
         }
     }
 
