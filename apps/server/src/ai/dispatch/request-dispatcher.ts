@@ -14,7 +14,7 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { ConnectionManager } from '../connection/connection-manager';
+import { SocketRegistry } from '../../ws/socket-registry';
 import { ConversationService } from '../conversation/conversation.service';
 import { AISessionManager } from '../session/ai-session-manager';
 import { ConversationOrchestrator } from '../workflow-runtime/conversation-orchestrator';
@@ -44,7 +44,7 @@ export class RequestDispatcher {
     constructor(
         private sessionManager: AISessionManager,
         private orchestrator: ConversationOrchestrator,
-        private connectionManager: ConnectionManager,
+        private socketRegistry: SocketRegistry,
         private conversationService: ConversationService,
         private rateLimiter: AiRateLimiter,
     ) {}
@@ -69,7 +69,7 @@ export class RequestDispatcher {
 
         const userId = conversation.userId ?? null;
         if (!this.rateLimiter.check(userId, clientId)) {
-            this.connectionManager.emitToConversation(conversationId, 'error', {
+            this.socketRegistry.emitToClient(clientId, 'error', {
                 type: 'error',
                 message: 'Rate limit exceeded. Please try again later.',
                 code: 'RATE_LIMITED',
@@ -91,7 +91,7 @@ export class RequestDispatcher {
             });
         } catch (error) {
             this.logger.error(`Dispatch failed for session ${session.id}:`, error);
-            this.connectionManager.emitToConversation(conversationId, 'error', {
+            this.socketRegistry.emitToClient(clientId, 'error', {
                 type: 'error',
                 message: error instanceof Error ? error.message : 'Unknown error',
                 code: 'DISPATCH_ERROR',

@@ -2,6 +2,7 @@ import { ChatGraph } from '@my-km/langgraph-workflows';
 import { Module, OnModuleInit } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PrismaModule } from '../prisma/prisma.module';
+import { SocketRegistry } from '../ws/socket-registry';
 import { WsModule } from '../ws/ws.module';
 import { AiController } from './ai.controller';
 import { AiService } from './ai.service';
@@ -26,7 +27,6 @@ import { ConversationOrchestrator } from './workflow-runtime/conversation-orches
 import { GraphRegistry } from './workflow-runtime/graph-registry';
 import { LLMResolver } from './workflow-runtime/llm-resolver';
 import { WorkflowExecutor } from './workflow-runtime/workflow-executor';
-
 /**
  * AI 模块
  *
@@ -43,6 +43,7 @@ import { WorkflowExecutor } from './workflow-runtime/workflow-executor';
         MessageService,
         AISessionManager,
         ConnectionManager,
+        SocketRegistry,
         ToolDispatcher,
         ToolRouter,
         RequestDispatcher,
