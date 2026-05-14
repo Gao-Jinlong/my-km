@@ -7,8 +7,8 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { RoomStateMachine, EmitFn } from './room-statemachine';
 import { ConversationState } from './conversation-statemachine.types';
+import { EmitFn, RoomStateMachine } from './room-statemachine';
 
 export interface CreateOptions {
     conversationId: string;

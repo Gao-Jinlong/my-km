@@ -1,10 +1,10 @@
-import { Emitter } from '@/base/common/event';
+import { Emitter } from '../../../base/common/event';
 import { ConversationContext, ConversationStateMachine } from '../conversation-statemachine';
-import { ConversationState } from '../conversation-statemachine.types';
+import { ConversationState, StateTransition } from '../conversation-statemachine.types';
 
 describe('ConversationStateMachine', () => {
     let sm: ConversationStateMachine;
-    let transitions: Array<{ from: ConversationState; to: ConversationState }> = [];
+    let transitions: StateTransition[] = [];
 
     const mockCtx: ConversationContext = {
         conversationId: 'conv-1',

@@ -7,8 +7,8 @@
  * decoupling business logic from WebSocket protocol.
  */
 
+import type { ErrorCode, ServerMessage } from './ai-ws-events.types';
 import { ConversationState, isValidTransition } from './conversation-statemachine.types';
-import type { ServerMessage, ErrorCode } from './ai-ws-events.types';
 
 export type EmitFn = (msg: ServerMessage) => void;
 

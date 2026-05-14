@@ -12,7 +12,7 @@ import { Injectable } from '@nestjs/common';
 import { ConversationService } from '../conversation/conversation.service';
 import { RequestDispatcher } from '../dispatch/request-dispatcher';
 import { MessageService } from '../message/message.service';
-import type { ServerMessage } from './ai-ws-events.types';
+import type { MessageWire, ServerMessage } from './ai-ws-events.types';
 import { RoomStateMachineFactory } from './room-statemachine-factory';
 
 type EmitFn = (msg: ServerMessage) => void;
@@ -102,9 +102,10 @@ export class RoomRouter {
             conversationId,
             messages: messages.map(m => ({
                 id: m.id,
-                role: m.role,
+                role: m.role as MessageWire['role'],
                 content: m.content,
-                toolCalls: m.toolCalls,
+                toolCalls:
+                    (m.toolCalls as Array<{ id: string; name: string }> | undefined) ?? undefined,
                 createdAt: m.createdAt.toISOString(),
             })),
         });

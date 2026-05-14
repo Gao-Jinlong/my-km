@@ -56,6 +56,10 @@ describe('RoomRouter', () => {
                 id: 'conv-1',
                 title: 'test',
                 userId: null,
+                status: 'active',
+                model: null,
+                provider: null,
+                messageCount: 0,
                 createdAt: new Date(),
                 updatedAt: new Date(),
             };
@@ -95,7 +99,17 @@ describe('RoomRouter', () => {
         });
 
         it('creates state machine and dispatches for existing conversation', async () => {
-            const conv = { id: 'conv-1', title: 'test', userId: null };
+            const conv = {
+                id: 'conv-1',
+                title: 'test',
+                userId: null,
+                status: 'active',
+                model: null,
+                provider: null,
+                messageCount: 0,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            };
             conversationService.findById.mockResolvedValue(conv);
 
             await roomRouter.sendMessage('client-1', 'conv-1', 'hello', undefined, emitCallback);
@@ -119,13 +133,26 @@ describe('RoomRouter', () => {
         });
 
         it('loads and emits history for existing conversation', async () => {
-            const conv = { id: 'conv-1', title: 'test', userId: null };
+            const conv = {
+                id: 'conv-1',
+                title: 'test',
+                userId: null,
+                status: 'active',
+                model: null,
+                provider: null,
+                messageCount: 0,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            };
             conversationService.findById.mockResolvedValue(conv);
             messageService.findByConversationId.mockResolvedValue([
                 {
                     id: 'msg-1',
                     role: 'user',
                     content: 'hi',
+                    toolCalls: null,
+                    toolResultId: null,
+                    tokenCount: null,
                     createdAt: new Date(),
                 },
             ]);
