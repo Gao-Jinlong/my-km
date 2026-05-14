@@ -2,155 +2,190 @@
  * WSClientService — AI WebSocket 连接管理 Service
  *
  * 使用 socket.io-client 与服务端通信。
- * 通过 acquire()/release() 引用计数自动管理连接生命周期。
- * 当引用计数归零时，启动 idle timer 后自动断开连接。
+ * WSClient 只负责通信层面，不关心任何业务消息类型。
+ * 消费者通过 subscribe(messageType, cb) 声明自己关注哪些消息。
+ *
+ * 连接生命周期自动管理：
+ * - 首次订阅时自动建立连接
+ * - 最后一个订阅 dispose 后启动 30s idle timer 断开连接
  */
 
 import { io, type Socket } from 'socket.io-client';
 import { Emitter, type Event } from '@/base/common/event';
-import type { ServerMessage } from '@/features/ai/types/ai.types';
+import { DisposableStore, type IDisposable, toDisposable } from '@/base/common/lifecycle';
 import { ServiceBase } from '@/platform/base/service-base';
 import { Service } from '@/platform/di';
 
-/**
- * WSClientService — 全局单例 WebSocket 连接管理
- *
- * 引用计数机制：
- * - acquire(): refCount++，首次引用时自动连接
- * - release(): refCount--，归零时启动 30s idle timer 后断开
- */
 @Service({ singleton: true })
 export class WSClientService extends ServiceBase {
     private _socket: Socket | null = null;
     private _idleTimer: ReturnType<typeof setTimeout> | null = null;
     private readonly _IDLE_TIMEOUT_MS = 30_000;
     private readonly _url: string;
-    private _refCount = 0;
+    private _subscriptionCount = 0;
+    private readonly _subscriptions = new DisposableStore();
+    private readonly _msgSubscribers = new Map<string, Set<(data: unknown) => void>>();
 
-    // 事件发射器
-    private _onStreamChunk = new Emitter<{ content: string }>();
-    private _onToolCall = new Emitter<{ id: string; name: string; args: object }>();
-    private _onStreamDone = new Emitter<void>();
-    private _onError = new Emitter<{ message: string; code: string }>();
-    private _onHistory = new Emitter<{ messages: unknown[] }>();
-    private _onToolTimeout = new Emitter<{ toolCallId: string; message: string }>();
-    private _onConnectionChange = new Emitter<{ connected: boolean }>();
-    private _onCreated = new Emitter<{ conversationId: string }>();
-    private _onStatus = new Emitter<{ conversationId: string; status: string; message?: string }>();
-    private _onDone = new Emitter<{
-        conversationId: string;
-        finishReason: string;
-        error?: string;
-    }>();
+    // 连接级事件（不属于任何业务消息类型）
+    private readonly _onConnectionChange = new Emitter<{ connected: boolean }>();
 
     constructor(url: string) {
         super();
         this._url = url;
     }
 
-    get refCount(): number {
-        return this._refCount;
-    }
-
     get isConnected(): boolean {
         return this._socket?.connected ?? false;
     }
 
-    /**
-     * 增加引用计数。首次引用时自动建立连接。
-     */
-    acquire(): void {
-        this._refCount++;
-        if (this._refCount === 1) {
-            this._connect();
-        }
+    get onConnectionChange(): Event<{ connected: boolean }> {
+        return cb => this._registerSubscription(this._onConnectionChange.event(cb));
     }
 
     /**
-     * 减少引用计数。归零时启动 idle timer 后自动断开连接。
+     * 订阅指定 message type 的服务端消息。
+     * 首次调用时自动建立 WebSocket 连接。
      */
-    release(): void {
-        if (this._refCount <= 0) return;
-        this._refCount--;
-        if (this._refCount === 0) {
-            this.startIdleTimer(() => this._disconnect());
+    subscribe(messageType: string, callback: (data: unknown) => void): IDisposable {
+        const subs = this._msgSubscribers.get(messageType) ?? new Set<(data: unknown) => void>();
+        subs.add(callback);
+        if (!this._msgSubscribers.has(messageType)) {
+            this._msgSubscribers.set(messageType, subs);
         }
+
+        const wrapped: IDisposable = {
+            dispose: () => {
+                const s = this._msgSubscribers.get(messageType);
+                if (s) {
+                    s.delete(callback);
+                    if (s.size === 0) this._msgSubscribers.delete(messageType);
+                }
+            },
+        };
+        return this._registerSubscription(wrapped);
+    }
+
+    /**
+     * 注册订阅并自动管理连接生命周期。
+     */
+    private _registerSubscription(d: IDisposable): IDisposable {
+        this._subscriptionCount++;
+        if (this._subscriptionCount === 1) {
+            this._ensureConnected();
+        }
+        this._subscriptions.add(d);
+
+        return toDisposable(() => {
+            d.dispose();
+            this._subscriptionCount--;
+            this._stopIdleTimer();
+            if (this._subscriptionCount === 0) {
+                this._startIdleTimer();
+            }
+        });
     }
 
     /**
      * 确保已连接。如果已连接则清除 idle timer，否则建立连接。
      */
-    async ensureConnected(): Promise<void> {
+    private _ensureConnected(): void {
         if (this.isConnected) {
-            this.stopIdleTimer();
+            this._stopIdleTimer();
             return;
         }
-        await this._connect();
+        this._connect();
     }
 
     /**
      * 建立 WebSocket 连接
      */
-    private _connect(): Promise<void> {
-        if (this._socket?.connected) return Promise.resolve();
+    private _connect(): void {
+        if (this._socket?.connected) return;
 
-        return new Promise((resolve, reject) => {
-            try {
-                console.log(`[AI WS] Connecting to ${this._url}...`);
-                this._socket = io(this._url, {
-                    autoConnect: true,
-                    reconnection: true,
-                    reconnectionDelay: 3000,
-                    transports: ['websocket'],
-                });
-
-                this._socket.on('connect', () => {
-                    console.log(`[AI WS] Connected, socket id: ${this._socket?.id}`);
-                    this._onConnectionChange.fire({ connected: true });
-                    resolve();
-                });
-
-                this._socket.on('connect_error', err => {
-                    console.error(`[AI WS] Connect error: ${err.message}`);
-                    this._onError.fire({ message: 'WebSocket connection error', code: 'WS_ERROR' });
-                    reject(new Error('WebSocket connection error'));
-                });
-
-                this._socket.on('disconnect', reason => {
-                    console.log(`[AI WS] Disconnected, reason: ${reason}`);
-                    this._onConnectionChange.fire({ connected: false });
-                });
-
-                this._socket.on('reconnect', attempt => {
-                    console.log(`[AI WS] Reconnected after ${attempt} attempts`);
-                });
-
-                this._socket.on('reconnect_error', err => {
-                    console.error(`[AI WS] Reconnect error: ${err.message}`);
-                });
-
-                this._socket.on('error', err => {
-                    console.error(`[AI WS] Error: ${err}`);
-                });
-
-                this._socket.on('message', (data: unknown) => {
-                    this._handleMessage(data);
-                });
-            } catch (error) {
-                console.error(`[AI WS] Connect exception:`, error);
-                reject(error);
-            }
+        console.log(`[AI WS] Connecting to ${this._url}...`);
+        this._socket = io(this._url, {
+            autoConnect: true,
+            reconnection: true,
+            reconnectionDelay: 3000,
+            transports: ['websocket'],
         });
+
+        this._socket.on('connect', () => {
+            console.log(`[AI WS] Connected, socket id: ${this._socket?.id}`);
+            this._onConnectionChange.fire({ connected: true });
+        });
+
+        this._socket.on('connect_error', err => {
+            console.error(`[AI WS] Connect error: ${err.message}`);
+            this._onConnectionChange.fire({ connected: false });
+        });
+
+        this._socket.on('disconnect', reason => {
+            console.log(`[AI WS] Disconnected, reason: ${reason}`);
+            this._onConnectionChange.fire({ connected: false });
+        });
+
+        this._socket.on('reconnect', attempt => {
+            console.log(`[AI WS] Reconnected after ${attempt} attempts`);
+        });
+
+        this._socket.on('reconnect_error', err => {
+            console.error(`[AI WS] Reconnect error: ${err.message}`);
+        });
+
+        this._socket.on('error', err => {
+            console.error(`[AI WS] Error: ${err}`);
+        });
+
+        this._socket.on('message', (data: unknown) => {
+            this._dispatchMessage(data);
+        });
+    }
+
+    /**
+     * 按 message.type 动态派发消息到订阅者
+     */
+    private _dispatchMessage(data: unknown): void {
+        try {
+            const msg = data as { type: string };
+            const subs = this._msgSubscribers.get(msg.type);
+            if (!subs) return;
+            for (const cb of subs) {
+                cb(data);
+            }
+        } catch (error) {
+            console.error('Failed to dispatch WebSocket message:', error);
+        }
     }
 
     /**
      * 断开 WebSocket 连接
      */
     private _disconnect(): void {
-        this.stopIdleTimer();
+        this._stopIdleTimer();
         this._socket?.disconnect();
         this._socket = null;
     }
+
+    /**
+     * 启动 idle timer，超时后断开连接
+     */
+    private _startIdleTimer(): void {
+        this._stopIdleTimer();
+        this._idleTimer = setTimeout(() => this._disconnect(), this._IDLE_TIMEOUT_MS);
+    }
+
+    /**
+     * 停止 idle timer
+     */
+    private _stopIdleTimer(): void {
+        if (this._idleTimer) {
+            clearTimeout(this._idleTimer);
+            this._idleTimer = null;
+        }
+    }
+
+    // ===== 发送消息方法 =====
 
     /**
      * 发送原始消息
@@ -222,134 +257,13 @@ export class WSClientService extends ServiceBase {
         this._socket?.emit('stop', { type: 'stop', conversationId });
     }
 
-    /**
-     * 启动 idle timer，超时后执行回调
-     */
-    startIdleTimer(onIdle: () => void): void {
-        this.stopIdleTimer();
-        this._idleTimer = setTimeout(onIdle, this._IDLE_TIMEOUT_MS);
-    }
-
-    /**
-     * 停止 idle timer
-     */
-    stopIdleTimer(): void {
-        if (this._idleTimer) {
-            clearTimeout(this._idleTimer);
-            this._idleTimer = null;
-        }
-    }
-
-    // ===== 事件访问器 =====
-
-    get onConnectionChange(): Event<{ connected: boolean }> {
-        return this._onConnectionChange.event;
-    }
-    get onStreamChunk(): Event<{ content: string }> {
-        return this._onStreamChunk.event;
-    }
-    get onToolCall(): Event<{ id: string; name: string; args: object }> {
-        return this._onToolCall.event;
-    }
-    get onStreamDone(): Event<void> {
-        return this._onStreamDone.event;
-    }
-    get onError(): Event<{ message: string; code: string }> {
-        return this._onError.event;
-    }
-    get onHistory(): Event<{ messages: unknown[] }> {
-        return this._onHistory.event;
-    }
-    get onToolTimeout(): Event<{ toolCallId: string; message: string }> {
-        return this._onToolTimeout.event;
-    }
-    get onCreated(): Event<{ conversationId: string }> {
-        return this._onCreated.event;
-    }
-    get onStatus(): Event<{ conversationId: string; status: string; message?: string }> {
-        return this._onStatus.event;
-    }
-    get onDone(): Event<{ conversationId: string; finishReason: string; error?: string }> {
-        return this._onDone.event;
-    }
-
-    // ===== 内部方法 =====
-
-    private _handleMessage(data: unknown): void {
-        try {
-            const msg = data as ServerMessage;
-            switch (msg.type) {
-                case 'created':
-                    this._onCreated.fire({ conversationId: msg.conversationId });
-                    break;
-                case 'history':
-                    this._onHistory.fire({ messages: msg.messages });
-                    break;
-                case 'text_chunk':
-                    this._onStreamChunk.fire({ content: msg.content });
-                    break;
-                case 'tool_call':
-                    this._onToolCall.fire({
-                        id: msg.toolCallId,
-                        name: msg.toolName,
-                        args: msg.input as object,
-                    });
-                    break;
-                case 'status':
-                    this._onStatus.fire({
-                        conversationId: msg.conversationId,
-                        status: msg.status,
-                        message: msg.message,
-                    });
-                    break;
-                case 'done':
-                    this._onDone.fire({
-                        conversationId: msg.conversationId,
-                        finishReason: msg.finishReason,
-                        error: msg.error,
-                    });
-                    this._onStreamDone.fire();
-                    break;
-                case 'error':
-                    this._onError.fire({ message: msg.message, code: msg.code });
-                    break;
-                // Legacy events
-                case 'joined':
-                    break;
-                case 'tool_timeout':
-                    this._onToolTimeout.fire({
-                        toolCallId: (msg as any).toolCallId,
-                        message: (msg as any).message,
-                    });
-                    break;
-                case 'stream_chunk':
-                    this._onStreamChunk.fire({ content: (msg as any).content });
-                    break;
-                case 'stream_done':
-                    this._onStreamDone.fire();
-                    break;
-            }
-        } catch (error) {
-            console.error('Failed to parse WebSocket message:', error);
-        }
-    }
-
     override dispose(): void {
-        // 释放所有引用，触发 idle disconnect
-        while (this._refCount > 0) {
-            this.release();
-        }
-        this.stopIdleTimer();
-        this._onStreamChunk.dispose();
-        this._onToolCall.dispose();
-        this._onStreamDone.dispose();
-        this._onError.dispose();
-        this._onHistory.dispose();
-        this._onToolTimeout.dispose();
+        this._stopIdleTimer();
+        this._subscriptions.dispose();
+        this._msgSubscribers.clear();
+        this._socket?.disconnect();
+        this._socket = null;
         this._onConnectionChange.dispose();
-        this._onCreated.dispose();
-        this._onStatus.dispose();
-        this._onDone.dispose();
         super.dispose();
     }
 }

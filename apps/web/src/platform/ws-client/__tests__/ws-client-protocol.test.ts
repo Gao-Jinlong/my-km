@@ -1,17 +1,17 @@
 /**
- * WSClientService new protocol tests
+ * WSClientService subscribe() and message routing tests
  *
- * Tests for onCreated, onStatus, onDone event emitters
- * and sendCreateAndSend, sendJoin methods.
- *
- * These tests verify the message routing and emit behavior
- * matching the WSClientService implementation.
+ * Tests for subscribe(messageType, cb), dynamic dispatch,
+ * and connection lifecycle management.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Must import reflect-metadata before any decorators are evaluated
 import 'reflect-metadata';
+
+import type { IDisposable } from '@/base/common/lifecycle';
+import { WSClientService } from '@/platform/ws-client';
 
 // Mock socket.io-client
 const mockSocket = {
@@ -26,229 +26,222 @@ vi.mock('socket.io-client', () => ({
     io: vi.fn(() => mockSocket),
 }));
 
-describe('WSClientService new protocol', () => {
+interface TestableWSClient {
+    subscribe(messageType: string, callback: (data: unknown) => void): IDisposable;
+    sendCreateAndSend(content: string, context: unknown): void;
+    sendJoin(conversationId: string): void;
+    sendMessage(content: string, context: unknown, conversationId: string): void;
+    dispose(): void;
+    _dispatchMessage(data: unknown): void;
+}
+
+describe('WSClientService subscribe and routing', () => {
+    let client: TestableWSClient;
+
     beforeEach(() => {
+        vi.useFakeTimers();
         vi.clearAllMocks();
         mockSocket.connected = true;
+        client = new WSClientService('http://localhost:3001/ai') as unknown as TestableWSClient;
     });
 
     afterEach(() => {
-        vi.restoreAllMocks();
+        vi.useRealTimers();
+        client.dispose();
     });
 
-    it('emits created event', () => {
-        const received = createClientAndFire<{ conversationId: string }>(
-            {
-                type: 'created',
-                conversationId: 'conv-1',
-            },
-            'created',
-        );
+    describe('subscribe routing', () => {
+        it('routes created message to subscribers', () => {
+            const received: unknown[] = [];
+            client.subscribe('created', data => received.push(data));
 
-        expect(received?.conversationId).toBe('conv-1');
-    });
+            client._dispatchMessage({ type: 'created', conversationId: 'conv-1' });
 
-    it('emits status event', () => {
-        const received = createClientAndFire<{
-            conversationId: string;
-            status: string;
-            message?: string;
-        }>(
-            {
+            expect(received).toHaveLength(1);
+            expect((received[0] as { conversationId: string }).conversationId).toBe('conv-1');
+        });
+
+        it('routes status message to subscribers', () => {
+            const received: unknown[] = [];
+            client.subscribe('status', data => received.push(data));
+
+            client._dispatchMessage({
                 type: 'status',
                 conversationId: 'conv-1',
                 status: 'thinking',
-            },
-            'status',
-        );
+            });
 
-        expect(received?.status).toBe('thinking');
-        expect(received?.conversationId).toBe('conv-1');
-    });
-
-    it('emits done event with finishReason', () => {
-        let received: { conversationId: string; finishReason: string; error?: string } | undefined;
-        let streamDone = false;
-
-        const client = createClient();
-        client.onDone(e => {
-            received = e;
-        });
-        client.onStreamDone(() => {
-            streamDone = true;
+            expect(received).toHaveLength(1);
+            expect((received[0] as { status: string }).status).toBe('thinking');
         });
 
-        (client as any)._handleMessage({
-            type: 'done',
-            conversationId: 'conv-1',
-            finishReason: 'complete',
+        it('routes done message to subscribers', () => {
+            const received: unknown[] = [];
+            client.subscribe('done', data => received.push(data));
+
+            client._dispatchMessage({
+                type: 'done',
+                conversationId: 'conv-1',
+                finishReason: 'complete',
+            });
+
+            expect(received).toHaveLength(1);
+            expect((received[0] as { finishReason: string }).finishReason).toBe('complete');
         });
 
-        expect(received?.finishReason).toBe('complete');
-        expect(received?.conversationId).toBe('conv-1');
-        expect(streamDone).toBe(true);
-    });
+        it('routes error message to subscribers', () => {
+            const received: unknown[] = [];
+            client.subscribe('error', data => received.push(data));
 
-    it('emits error event with code', () => {
-        const received = createClientAndFire<{ message: string; code: string }>(
-            {
+            client._dispatchMessage({
                 type: 'error',
                 conversationId: 'conv-1',
                 code: 'CONVERSATION_NOT_FOUND',
                 message: 'Not found',
-            },
-            'error',
-        );
+            });
 
-        expect(received?.code).toBe('CONVERSATION_NOT_FOUND');
-        expect(received?.message).toBe('Not found');
-    });
+            expect(received).toHaveLength(1);
+            expect((received[0] as { code: string }).code).toBe('CONVERSATION_NOT_FOUND');
+        });
 
-    it('sendCreateAndSend emits create_and_send event', () => {
-        const client = createClient();
+        it('routes text_chunk to subscribers', () => {
+            const received: unknown[] = [];
+            client.subscribe('text_chunk', data => received.push(data));
 
-        client.sendCreateAndSend('Hello world', { docId: 'doc-1' });
+            client._dispatchMessage({
+                type: 'text_chunk',
+                conversationId: 'conv-1',
+                content: 'Hello world',
+            });
 
-        expect(mockSocket.emit).toHaveBeenCalledWith('create_and_send', {
-            type: 'create_and_send',
-            content: 'Hello world',
-            context: { docId: 'doc-1' },
+            expect(received).toHaveLength(1);
+            expect((received[0] as { content: string }).content).toBe('Hello world');
+        });
+
+        it('supports multiple subscribers for same message type', () => {
+            const received1: unknown[] = [];
+            const received2: unknown[] = [];
+            client.subscribe('done', data => received1.push(data));
+            client.subscribe('done', data => received2.push(data));
+
+            client._dispatchMessage({
+                type: 'done',
+                conversationId: 'conv-1',
+                finishReason: 'stop',
+            });
+
+            expect(received1).toHaveLength(1);
+            expect(received2).toHaveLength(1);
+        });
+
+        it('unsubscribe removes callback', () => {
+            const received: unknown[] = [];
+            const unsub = client.subscribe('done', data => received.push(data));
+
+            client._dispatchMessage({ type: 'done', conversationId: '1', finishReason: 'a' });
+            expect(received).toHaveLength(1);
+
+            unsub.dispose();
+
+            client._dispatchMessage({ type: 'done', conversationId: '2', finishReason: 'b' });
+            expect(received).toHaveLength(1); // still 1
+        });
+
+        it('ignores messages with no subscribers', () => {
+            // Should not throw even with no subscribers
+            expect(() => {
+                client._dispatchMessage({ type: 'unknown_type', foo: 'bar' });
+            }).not.toThrow();
         });
     });
 
-    it('sendCreateAndSend throws when not connected', () => {
-        const client = createClient();
-        mockSocket.connected = false;
+    describe('send methods', () => {
+        it('sendCreateAndSend emits create_and_send event', () => {
+            // Need to subscribe first to establish connection
+            const unsub = client.subscribe('done', () => {});
+            client.sendCreateAndSend('Hello world', { docId: 'doc-1' });
 
-        expect(() => client.sendCreateAndSend('Hello', {})).toThrow('WebSocket is not connected');
-    });
+            expect(mockSocket.emit).toHaveBeenCalledWith('create_and_send', {
+                type: 'create_and_send',
+                content: 'Hello world',
+                context: { docId: 'doc-1' },
+            });
+            unsub.dispose();
+        });
 
-    it('sendJoin emits join event', () => {
-        const client = createClient();
+        it('sendCreateAndSend throws when not connected', () => {
+            mockSocket.connected = false;
 
-        client.sendJoin('conv-1');
+            expect(() => client.sendCreateAndSend('Hello', {})).toThrow(
+                'WebSocket is not connected',
+            );
+        });
 
-        expect(mockSocket.emit).toHaveBeenCalledWith('join', {
-            type: 'join',
-            conversationId: 'conv-1',
+        it('sendJoin emits join event', () => {
+            // Need to subscribe first to establish connection
+            const unsub = client.subscribe('done', () => {});
+            client.sendJoin('conv-1');
+
+            expect(mockSocket.emit).toHaveBeenCalledWith('join', {
+                type: 'join',
+                conversationId: 'conv-1',
+            });
+            unsub.dispose();
+        });
+
+        it('sendMessage uses send_message type', () => {
+            // Need to subscribe first to establish connection
+            const unsub = client.subscribe('done', () => {});
+            client.sendMessage('test content', { docId: 'doc-1' }, 'conv-1');
+
+            expect(mockSocket.emit).toHaveBeenCalledWith('message', {
+                type: 'send_message',
+                conversationId: 'conv-1',
+                content: 'test content',
+                context: { docId: 'doc-1' },
+            });
+            unsub.dispose();
         });
     });
 
-    it('sendMessage uses send_message type', () => {
-        const client = createClient();
+    describe('connection lifecycle', () => {
+        it('connects on first subscribe', () => {
+            mockSocket.connected = false;
 
-        client.sendMessage('test content', { docId: 'doc-1' }, 'conv-1');
+            client.subscribe('done', () => {});
 
-        expect(mockSocket.emit).toHaveBeenCalledWith('message', {
-            type: 'send_message',
-            conversationId: 'conv-1',
-            content: 'test content',
-            context: { docId: 'doc-1' },
+            expect(mockSocket.on).toHaveBeenCalledWith('connect', expect.any(Function));
+        });
+
+        it('starts idle timer when last subscription is disposed', () => {
+            const unsub1 = client.subscribe('done', () => {});
+            const unsub2 = client.subscribe('text_chunk', () => {});
+
+            unsub1.dispose();
+            vi.advanceTimersByTime(30000);
+            expect(mockSocket.disconnect).not.toHaveBeenCalled();
+
+            unsub2.dispose();
+            vi.advanceTimersByTime(29999);
+            expect(mockSocket.disconnect).not.toHaveBeenCalled();
+
+            vi.advanceTimersByTime(1);
+            expect(mockSocket.disconnect).toHaveBeenCalled();
+        });
+
+        it('cancels idle timer on new subscription', () => {
+            const unsub = client.subscribe('done', () => {});
+            unsub.dispose();
+
+            vi.advanceTimersByTime(15000);
+
+            // New subscription before timeout
+            const unsub2 = client.subscribe('text_chunk', () => {});
+
+            vi.advanceTimersByTime(30000);
+            expect(mockSocket.disconnect).not.toHaveBeenCalled();
+
+            unsub2.dispose();
         });
     });
 });
-
-// ---- helpers ----
-
-interface EmitterLike<T> {
-    event: (cb: (e: T) => void) => { dispose: () => void };
-    fire: (data: T) => void;
-}
-
-function makeEmitter<T>(): EmitterLike<T> {
-    const cbs: Array<(e: T) => void> = [];
-    return {
-        event: cb => {
-            cbs.push(cb);
-            return {
-                dispose: () => {
-                    const i = cbs.indexOf(cb);
-                    if (i >= 0) cbs.splice(i, 1);
-                },
-            };
-        },
-        fire: data => {
-            for (const cb of [...cbs]) {
-                cb(data);
-            }
-        },
-    };
-}
-
-interface WireClient {
-    onCreated: EmitterLike<{ conversationId: string }>['event'];
-    onStatus: EmitterLike<{ conversationId: string; status: string; message?: string }>['event'];
-    onDone: EmitterLike<{ conversationId: string; finishReason: string; error?: string }>['event'];
-    onError: EmitterLike<{ message: string; code: string }>['event'];
-    onStreamDone: EmitterLike<void>['event'];
-    sendCreateAndSend: (content: string, context: unknown) => void;
-    sendJoin: (conversationId: string) => void;
-    sendMessage: (content: string, context: unknown, conversationId: string) => void;
-    _handleMessage: (data: unknown) => void;
-}
-
-function createClient(): WireClient {
-    const onCreated = makeEmitter<{ conversationId: string }>();
-    const onStatus = makeEmitter<{ conversationId: string; status: string; message?: string }>();
-    const onDone = makeEmitter<{ conversationId: string; finishReason: string; error?: string }>();
-    const onError = makeEmitter<{ message: string; code: string }>();
-    const onStreamDone = makeEmitter<void>();
-
-    const _handleMessage = (data: unknown) => {
-        const msg = data as { type: string; [key: string]: unknown };
-        switch (msg.type) {
-            case 'created':
-                onCreated.fire({ conversationId: msg.conversationId as string });
-                break;
-            case 'status':
-                onStatus.fire({
-                    conversationId: msg.conversationId as string,
-                    status: msg.status as string,
-                    message: msg.message as string | undefined,
-                });
-                break;
-            case 'done':
-                onDone.fire({
-                    conversationId: msg.conversationId as string,
-                    finishReason: msg.finishReason as string,
-                    error: msg.error as string | undefined,
-                });
-                onStreamDone.fire();
-                break;
-            case 'error':
-                onError.fire({ message: msg.message as string, code: msg.code as string });
-                break;
-        }
-    };
-
-    return {
-        onCreated: onCreated.event,
-        onStatus: onStatus.event,
-        onDone: onDone.event,
-        onError: onError.event,
-        onStreamDone: onStreamDone.event,
-        sendCreateAndSend: (content, context) => {
-            if (!mockSocket.connected) throw new Error('WebSocket is not connected');
-            mockSocket.emit('create_and_send', { type: 'create_and_send', content, context });
-        },
-        sendJoin: conversationId => {
-            mockSocket.emit('join', { type: 'join', conversationId });
-        },
-        sendMessage: (content, context, conversationId) => {
-            mockSocket.emit('message', { type: 'send_message', conversationId, content, context });
-        },
-        _handleMessage,
-    };
-}
-
-function createClientAndFire<T>(message: unknown, eventName: string): T | undefined {
-    const client = createClient();
-    let received: T | undefined;
-    const accessor =
-        `on${eventName.charAt(0).toUpperCase()}${eventName.slice(1)}` as keyof WireClient;
-    (client[accessor] as EmitterLike<T>['event'])(e => {
-        received = e;
-    });
-    client._handleMessage(message);
-    return received;
-}

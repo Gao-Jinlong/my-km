@@ -114,41 +114,98 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
     }
 
     /**
-     * 将子模块事件代理到 Harness
+     * 将 WSClient 消息代理到 Harness 事件
      */
     private _setupEventProxy(): void {
+        // text_chunk → onStreamChunk
         this._store.add(
-            this._wsClient.onStreamChunk(e => {
-                this._conversationState.appendStreamChunk(e.content);
-                this._onStreamChunk.fire(e);
+            this._wsClient.subscribe('text_chunk', (raw: unknown) => {
+                const msg = raw as { content: string };
+                this._conversationState.appendStreamChunk(msg.content);
+                this._onStreamChunk.fire({ content: msg.content });
             }),
         );
-        this._store.add(this._wsClient.onToolCall(e => this._onToolCall.fire(e)));
+
+        // tool_call → onToolCall（执行逻辑在 _setupToolCallHandler）
         this._store.add(
-            this._wsClient.onStreamDone(() => {
+            this._wsClient.subscribe('tool_call', (raw: unknown) => {
+                const msg = raw as { id: string; name: string; args: object };
+                this._onToolCall.fire({ id: msg.id, name: msg.name, args: msg.args });
+            }),
+        );
+
+        // done → onDone + onStreamDone（AI 生成完成）
+        this._store.add(
+            this._wsClient.subscribe('done', (raw: unknown) => {
+                const msg = raw as {
+                    conversationId: string;
+                    finishReason: string;
+                    error?: string;
+                };
                 this._conversationState.stopGenerating();
+                this._clearActiveConversationId();
+                this._onDone.fire(msg);
                 this._onStreamDone.fire();
             }),
         );
-        this._store.add(this._wsClient.onError(e => this._onError.fire(e)));
+
+        // stream_done → onStreamDone（legacy fallback）
         this._store.add(
-            this._wsClient.onHistory(e => {
-                this._onHistory.fire(e as { messages: MessageWire[] });
-                // 自动加载到对话状态
-                this._conversationState.setHistory((e as { messages: MessageWire[] }).messages);
+            this._wsClient.subscribe('stream_done', () => {
+                this._onStreamDone.fire();
             }),
         );
-        this._store.add(
-            this._wsClient.onToolTimeout(e =>
-                this._onError.fire({
-                    message: `Tool timeout: ${e.toolCallId}`,
-                    code: 'TOOL_TIMEOUT',
-                }),
-            ),
-        );
-        this._store.add(this._conversationState.onStateChange(e => this._onStateChange.fire(e)));
 
-        // 监听编辑器选中文本变化
+        // error → onError
+        this._store.add(
+            this._wsClient.subscribe('error', (raw: unknown) => {
+                const msg = raw as { message: string; code: string };
+                this._onError.fire({ message: msg.message, code: msg.code });
+            }),
+        );
+
+        // history → onHistory
+        this._store.add(
+            this._wsClient.subscribe('history', (raw: unknown) => {
+                const msg = raw as { messages: MessageWire[] };
+                this._onHistory.fire(msg);
+                this._conversationState.setHistory(msg.messages);
+            }),
+        );
+
+        // tool_timeout → onError
+        this._store.add(
+            this._wsClient.subscribe('tool_timeout', (raw: unknown) => {
+                const msg = raw as { toolCallId: string; message: string };
+                this._onError.fire({
+                    message: `Tool timeout: ${msg.toolCallId}`,
+                    code: 'TOOL_TIMEOUT',
+                });
+            }),
+        );
+
+        // 连接状态变化（connection-level event，不经过 message 路由）
+        this._store.add(this._wsClient.onConnectionChange(e => this._onConnectionChange.fire(e)));
+
+        // created → onCreated
+        this._store.add(
+            this._wsClient.subscribe('created', (raw: unknown) => {
+                const msg = raw as { conversationId: string };
+                this._conversationState.setConversationId(msg.conversationId);
+                this._saveActiveConversationId(msg.conversationId);
+                this._onCreated.fire(msg);
+            }),
+        );
+
+        // status → onStatus
+        this._store.add(
+            this._wsClient.subscribe('status', (raw: unknown) => {
+                const msg = raw as { conversationId: string; status: string; message?: string };
+                this._onStatus.fire(msg);
+            }),
+        );
+
+        // 编辑器选中文本变化
         this._store.add(
             this._contextCollector.onContextChange(e => {
                 this._selectedText = e.context.selectedText;
@@ -160,31 +217,8 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
             }),
         );
 
-        // 监听连接状态变化
-        this._store.add(this._wsClient.onConnectionChange(e => this._onConnectionChange.fire(e)));
-
-        // NEW: Handle created event
-        this._store.add(
-            this._wsClient.onCreated(e => {
-                this._conversationState.setConversationId(e.conversationId);
-                this._saveActiveConversationId(e.conversationId);
-                this._onCreated.fire(e);
-            }),
-        );
-        // NEW: Handle status event
-        this._store.add(
-            this._wsClient.onStatus(e => {
-                this._onStatus.fire(e);
-            }),
-        );
-        // NEW: Handle done event
-        this._store.add(
-            this._wsClient.onDone(e => {
-                this._conversationState.stopGenerating();
-                this._clearActiveConversationId();
-                this._onDone.fire(e);
-            }),
-        );
+        // 对话状态变化
+        this._store.add(this._conversationState.onStateChange(e => this._onStateChange.fire(e)));
     }
 
     /**
@@ -192,21 +226,20 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
      */
     private _setupToolCallHandler(): void {
         this._store.add(
-            this._wsClient.onToolCall(async ({ id, name, args }) => {
+            this._wsClient.subscribe('tool_call', async (raw: unknown) => {
+                const msg = raw as { id: string; name: string };
                 try {
-                    const result = await this._toolRegistry.execute(name, args as object);
+                    const result = await this._toolRegistry.execute(msg.name, {});
                     const conversationId = this._conversationState.conversationId;
                     if (conversationId) {
-                        this._wsClient.stopIdleTimer();
-                        this._wsClient.sendToolResult(conversationId, id, result);
+                        this._wsClient.sendToolResult(conversationId, msg.id, result);
                     }
                 } catch (error) {
                     const conversationId = this._conversationState.conversationId;
                     if (conversationId) {
-                        this._wsClient.stopIdleTimer();
                         this._wsClient.sendToolResult(
                             conversationId,
-                            id,
+                            msg.id,
                             null,
                             (error as Error).message,
                         );
@@ -237,12 +270,11 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
     // ========== 对话相关 ==========
 
     async connect(_wsUrl: string): Promise<void> {
-        // URL 已由 WSClientService 内部管理，此处确保连接即可
-        await this._wsClient.ensureConnected();
+        // WS 连接由订阅自动管理，无需显式连接
     }
 
     disconnect(): void {
-        this._wsClient.release();
+        // WS 连接由订阅自动管理
     }
 
     joinConversation(conversationId: string): void {
@@ -267,9 +299,6 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
             return null;
         }
 
-        await this._wsClient.ensureConnected();
-        this._wsClient.stopIdleTimer();
-
         const userMsgId = `user-${Date.now()}`;
         this._conversationState.addMessage({
             id: userMsgId,
@@ -292,9 +321,6 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
             console.warn('[AI Harness] Cannot send: conversation is processing');
             return null;
         }
-
-        await this._wsClient.ensureConnected();
-        this._wsClient.stopIdleTimer();
 
         const userMsgId = `user-${Date.now()}`;
         this._conversationState.addMessage({

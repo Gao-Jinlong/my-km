@@ -1,14 +1,13 @@
 /**
- * AIHarnessService sendMessage 按需连接测试
+ * AIHarnessService subscription-based connection tests
  *
- * 验证 sendMessage 流程：
- * - 未连接时调用 ensureConnected
- * - 发送前取消 idle timer
+ * Verify that sendMessage and tool call handler work correctly
+ * with the new Disposable pattern — no explicit ensureConnected/stopIdleTimer needed.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-describe('AIHarnessService on-demand connection', () => {
+describe('AIHarnessService subscription-based connection', () => {
     beforeEach(() => {
         vi.useFakeTimers();
     });
@@ -17,78 +16,57 @@ describe('AIHarnessService on-demand connection', () => {
         vi.useRealTimers();
     });
 
-    it('sendMessage should call ensureConnected when not connected', async () => {
-        // This test verifies the behavioral contract:
-        // ai-harness.service.ts sendMessage() calls wsClient.ensureConnected(wsUrl)
-        const ensureConnectedMock = vi.fn().mockResolvedValue(undefined);
-        const stopIdleTimerMock = vi.fn();
-        const sendMessageMock = vi.fn();
+    it('sendMessage should not require explicit connection management', () => {
+        // With the Disposable pattern, connections are auto-managed by subscriptions.
+        // sendMessage just fires the socket emit — the connection exists because
+        // the harness holds event subscriptions.
+        const emitMock = vi.fn();
 
-        // Simulate the sendMessage flow
-        async function simulatedSendMessage(
-            wsClient: {
-                ensureConnected: (url: string) => Promise<void>;
-                stopIdleTimer: () => void;
-                sendMessage: (content: string, ctx: unknown, convId: string) => void;
-                joinConversation: (id: string) => void;
-            },
+        function simulatedSendMessage(
+            socket: { emit: (event: string, data: unknown) => void },
             content: string,
         ) {
-            await wsClient.ensureConnected('http://localhost:3001/ai');
-            wsClient.joinConversation('conv-test');
-            wsClient.stopIdleTimer();
-            wsClient.sendMessage(content, null, 'conv-test');
+            socket.emit('message', {
+                type: 'send_message',
+                conversationId: 'conv-test',
+                content,
+                context: null,
+            });
         }
 
-        const mockWsClient = {
-            ensureConnected: ensureConnectedMock,
-            stopIdleTimer: stopIdleTimerMock,
-            sendMessage: sendMessageMock,
-            joinConversation: vi.fn(),
-        };
+        simulatedSendMessage({ emit: emitMock }, 'hello');
 
-        await simulatedSendMessage(mockWsClient, 'hello');
-
-        expect(ensureConnectedMock).toHaveBeenCalledWith('http://localhost:3001/ai');
-        expect(stopIdleTimerMock).toHaveBeenCalled();
+        expect(emitMock).toHaveBeenCalledWith('message', {
+            type: 'send_message',
+            conversationId: 'conv-test',
+            content: 'hello',
+            context: null,
+        });
     });
 
-    it('tool call handler should stop idle timer before sending result', async () => {
-        // Verifies: _setupToolCallHandler calls stopIdleTimer before sendToolResult
-        const stopIdleTimerMock = vi.fn();
-        const sendToolResultMock = vi.fn();
+    it('tool call handler should send result without explicit timer management', () => {
+        // With subscriptions auto-managing idle timer, no need to stop it manually.
+        const emitMock = vi.fn();
 
-        // Simulate the tool call handler flow
-        async function simulatedToolCallHandler(
-            wsClient: {
-                stopIdleTimer: () => void;
-                sendToolResult: (
-                    convId: string,
-                    toolId: string,
-                    result: unknown,
-                    error?: string,
-                ) => void;
-            },
+        function simulatedToolCallHandler(
+            socket: { emit: (event: string, data: unknown) => void },
             conversationId: string,
         ) {
-            try {
-                const result = 'mock result';
-                wsClient.stopIdleTimer();
-                wsClient.sendToolResult(conversationId, 'tool-1', result);
-            } catch {
-                wsClient.stopIdleTimer();
-                wsClient.sendToolResult(conversationId, 'tool-1', null, 'error');
-            }
+            socket.emit('tool_result', {
+                type: 'tool_result',
+                conversationId,
+                toolCallId: 'tool-1',
+                result: 'mock result',
+            });
         }
 
-        const mockWsClient = {
-            stopIdleTimer: stopIdleTimerMock,
-            sendToolResult: sendToolResultMock,
-        };
+        simulatedToolCallHandler({ emit: emitMock }, 'conv-test');
 
-        await simulatedToolCallHandler(mockWsClient, 'conv-test');
-
-        expect(stopIdleTimerMock).toHaveBeenCalled();
-        expect(sendToolResultMock).toHaveBeenCalledWith('conv-test', 'tool-1', 'mock result');
+        expect(emitMock).toHaveBeenCalledWith('tool_result', {
+            type: 'tool_result',
+            conversationId: 'conv-test',
+            toolCallId: 'tool-1',
+            result: 'mock result',
+        });
     });
 });

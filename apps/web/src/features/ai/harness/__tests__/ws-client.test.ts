@@ -1,172 +1,110 @@
 /**
- * WSClient idle timer 测试
+ * WSClient subscription-based connection lifecycle tests
  *
- * 测试按需连接模式下的连接生命周期：
- * - idle timer 超时断开
- * - disconnect/ dispose 时清除 timer
- * - ensureConnected 复用/新建连接
+ * Tests for the Disposable pattern:
+ * - First subscription triggers auto-connect
+ * - Last subscription dispose starts idle timer
+ * - Idle timeout disconnects
+ * - New subscription reconnects
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock the entire ws-client module to avoid alias resolution issues
-const createMockClient = () => {
-    let idleTimer: ReturnType<typeof setTimeout> | null = null;
-    const IDLE_TIMEOUT_MS = 30_000;
-    let connected = false;
-
-    return {
-        ensureConnected: async (_url: string) => {
-            if (connected) {
-                if (idleTimer) {
-                    clearTimeout(idleTimer);
-                    idleTimer = null;
-                }
-                return;
-            }
-            connected = true;
-        },
-        startIdleTimer: (onIdle: () => void) => {
-            if (idleTimer) clearTimeout(idleTimer);
-            idleTimer = setTimeout(onIdle, IDLE_TIMEOUT_MS);
-        },
-        stopIdleTimer: () => {
-            if (idleTimer) {
-                clearTimeout(idleTimer);
-                idleTimer = null;
-            }
-        },
-        disconnect: () => {
-            if (idleTimer) {
-                clearTimeout(idleTimer);
-                idleTimer = null;
-            }
-            connected = false;
-        },
-        dispose: () => {
-            if (idleTimer) {
-                clearTimeout(idleTimer);
-                idleTimer = null;
-            }
-        },
-        get isConnected() {
-            return connected;
-        },
-        _setConnected: (v: boolean) => {
-            connected = v;
-        },
-        // Expose timer for test assertions
-        _getTimer: () => idleTimer,
-    };
+// Mock socket.io-client
+const mockSocket = {
+    connected: true,
+    id: 'mock-socket-id',
+    on: vi.fn(),
+    emit: vi.fn(),
+    disconnect: vi.fn(),
 };
 
-describe('WSClient idle timer', () => {
+vi.mock('socket.io-client', () => ({
+    io: vi.fn(() => mockSocket),
+}));
+
+// Must import reflect-metadata before any decorators
+import 'reflect-metadata';
+
+// Import after mocks
+import { WSClientService } from '@/platform/ws-client';
+
+describe('WSClient subscription lifecycle', () => {
+    let client: WSClientService;
+
     beforeEach(() => {
         vi.useFakeTimers();
+        vi.clearAllMocks();
+        mockSocket.connected = true;
+        client = new WSClientService('http://localhost:3001/ai');
     });
 
     afterEach(() => {
         vi.useRealTimers();
+        client.dispose();
+    });
+
+    describe('auto-connect on first subscription', () => {
+        it('connects when first subscription is added', () => {
+            // Initially not connected (mock socket.io-client returns unconnected)
+            mockSocket.connected = false;
+
+            const unsub = client.subscribe('text_chunk', () => {});
+
+            // Connection should be established
+            expect(mockSocket.on).toHaveBeenCalledWith('connect', expect.any(Function));
+            unsub.dispose();
+        });
     });
 
     describe('idle timer', () => {
-        it('should fire callback after 30 seconds', () => {
-            const client = createMockClient();
-            const onIdle = vi.fn();
-            client.startIdleTimer(onIdle);
+        it('starts idle timer when last subscription is disposed', () => {
+            const unsub1 = client.subscribe('text_chunk', () => {});
+            const unsub2 = client.subscribe('done', () => {});
 
+            unsub1.dispose();
+            // Still one subscription, no idle timer
+            vi.advanceTimersByTime(30000);
+            expect(mockSocket.disconnect).not.toHaveBeenCalled();
+
+            unsub2.dispose();
+            // Now zero subscriptions, idle timer starts
             vi.advanceTimersByTime(29999);
-            expect(onIdle).not.toHaveBeenCalled();
+            expect(mockSocket.disconnect).not.toHaveBeenCalled();
 
             vi.advanceTimersByTime(1);
-            expect(onIdle).toHaveBeenCalledTimes(1);
+            expect(mockSocket.disconnect).toHaveBeenCalled();
         });
 
-        it('should cancel pending timer on stopIdleTimer', () => {
-            const client = createMockClient();
-            const onIdle = vi.fn();
-            client.startIdleTimer(onIdle);
-            client.stopIdleTimer();
+        it('cancels idle timer when new subscription arrives', () => {
+            const unsub = client.subscribe('text_chunk', () => {});
+            unsub.dispose();
 
+            // Start advancing idle timer
+            vi.advanceTimersByTime(15000);
+
+            // New subscription arrives before timeout
+            const unsub2 = client.subscribe('done', () => {});
+
+            // Complete the idle timer period
             vi.advanceTimersByTime(30000);
-            expect(onIdle).not.toHaveBeenCalled();
-        });
+            expect(mockSocket.disconnect).not.toHaveBeenCalled();
 
-        it('should replace existing timer when startIdleTimer is called again', () => {
-            const client = createMockClient();
-            const onIdle1 = vi.fn();
-            const onIdle2 = vi.fn();
-
-            client.startIdleTimer(onIdle1);
-            vi.advanceTimersByTime(15000);
-
-            // Start new timer — should cancel the first
-            client.startIdleTimer(onIdle2);
-            vi.advanceTimersByTime(15000);
-
-            expect(onIdle1).not.toHaveBeenCalled();
-            expect(onIdle2).not.toHaveBeenCalled();
-
-            vi.advanceTimersByTime(15000);
-            expect(onIdle1).not.toHaveBeenCalled();
-            expect(onIdle2).toHaveBeenCalledTimes(1);
+            unsub2.dispose();
         });
     });
 
-    describe('disconnect', () => {
-        it('should stop idle timer before disconnecting', () => {
-            const client = createMockClient();
-            const onIdle = vi.fn();
-            client.startIdleTimer(onIdle);
-
-            client.disconnect();
-
-            vi.advanceTimersByTime(30000);
-            expect(onIdle).not.toHaveBeenCalled();
-        });
-    });
-
-    describe('dispose', () => {
-        it('should clean up idle timer', () => {
-            const client = createMockClient();
-            const onIdle = vi.fn();
-            client.startIdleTimer(onIdle);
+    describe('dispose cleanup', () => {
+        it('cleans up all subscriptions and disconnects', () => {
+            const unsub = client.subscribe('text_chunk', () => {});
 
             client.dispose();
 
-            vi.advanceTimersByTime(30000);
-            expect(onIdle).not.toHaveBeenCalled();
-        });
-    });
+            expect(mockSocket.disconnect).toHaveBeenCalled();
+            // Double dispose should not throw
+            expect(() => client.dispose()).not.toThrow();
 
-    describe('ensureConnected', () => {
-        it('should stop idle timer when reusing existing connection', async () => {
-            const client = createMockClient();
-            client._setConnected(true);
-
-            const onIdle = vi.fn();
-            client.startIdleTimer(onIdle);
-
-            await client.ensureConnected('http://test');
-
-            vi.advanceTimersByTime(30000);
-            expect(onIdle).not.toHaveBeenCalled();
-        });
-
-        it('should not clear timer when establishing new connection', async () => {
-            const client = createMockClient();
-            // Already not connected (default)
-
-            // Timer should be unaffected by new connection
-            const onIdle = vi.fn();
-            client.startIdleTimer(onIdle);
-
-            // This will set connected=true but won't clear timer since it wasn't connected
-            await client.ensureConnected('http://test');
-
-            // Timer was NOT cleared (because we were not connected before)
-            vi.advanceTimersByTime(30000);
-            expect(onIdle).toHaveBeenCalledTimes(1);
+            unsub.dispose();
         });
     });
 });
