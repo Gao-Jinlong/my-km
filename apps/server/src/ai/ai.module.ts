@@ -5,11 +5,12 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { SocketRegistry } from '../ws/socket-registry';
 import { WsModule } from '../ws/ws.module';
 import { AiController } from './ai.controller';
-import { ConnectionManager } from './connection/connection-manager';
-import { ConversationService } from './conversation/conversation.service';
+import { RoomService } from './conversation/room.service';
 import { AiRateLimiter } from './dispatch/rate-limiter.guard';
 import { RequestDispatcher } from './dispatch/request-dispatcher';
-import { ConversationStateMachine } from './gateway/conversation-statemachine';
+import { AiMessageRouter } from './gateway/ai-message-router';
+import { RoomRouter } from './gateway/room-router';
+import { RoomStateMachineFactory } from './gateway/room-statemachine-factory';
 import { MessageService } from './message/message.service';
 import { AnthropicProvider } from './provider/anthropic.provider';
 import { DashscopeProvider } from './provider/dashscope.provider';
@@ -21,9 +22,9 @@ import { ZhipuProvider } from './provider/zhipu.provider';
 import { AISessionManager } from './session/ai-session-manager';
 import { ToolDispatcher } from './tools/tool.dispatcher';
 import { ToolRouter } from './tools/tool-router';
-import { ConversationOrchestrator } from './workflow-runtime/conversation-orchestrator';
 import { GraphRegistry } from './workflow-runtime/graph-registry';
 import { LLMResolver } from './workflow-runtime/llm-resolver';
+import { RoomOrchestrator } from './workflow-runtime/room-orchestrator';
 import { WorkflowExecutor } from './workflow-runtime/workflow-executor';
 /**
  * AI 模块
@@ -35,26 +36,27 @@ import { WorkflowExecutor } from './workflow-runtime/workflow-executor';
     imports: [PrismaModule, ConfigModule, WsModule],
     controllers: [AiController],
     providers: [
-        ConversationService,
+        RoomService,
         MessageService,
         AISessionManager,
-        ConnectionManager,
         SocketRegistry,
+        RoomRouter,
         ToolDispatcher,
         ToolRouter,
         RequestDispatcher,
         AiRateLimiter,
+        RoomStateMachineFactory,
+        // Message routing (self-subscribing)
+        AiMessageRouter,
         // New architecture
         ProviderRegistry,
         LLMFactory,
         LLMResolver,
         GraphRegistry,
         WorkflowExecutor,
-        ConversationOrchestrator,
-        ConversationStateMachine,
+        RoomOrchestrator,
     ],
     exports: [
-        ConversationService,
         MessageService,
         // New architecture exports
         ProviderRegistry,
@@ -62,7 +64,8 @@ import { WorkflowExecutor } from './workflow-runtime/workflow-executor';
         LLMResolver,
         GraphRegistry,
         WorkflowExecutor,
-        ConversationOrchestrator,
+        RoomOrchestrator,
+        RoomRouter,
     ],
 })
 export class AiModule implements OnModuleInit {
@@ -73,13 +76,13 @@ export class AiModule implements OnModuleInit {
     ) {}
 
     async onModuleInit() {
-        // 注册所有已配置的 provider 到 ProviderRegistry
+        // Register all configured providers to ProviderRegistry
         this.registerProvider('anthropic', AnthropicProvider);
         this.registerProvider('openai', OpenAIProvider);
         this.registerProvider('zhipu', ZhipuProvider);
         this.registerProvider('dashscope', DashscopeProvider);
 
-        // 注册内置图定义
+        // Register built-in graph definitions
         this.graphRegistry.register(new ChatGraph());
     }
 

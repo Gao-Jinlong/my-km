@@ -92,7 +92,7 @@ model PasswordReset {
 
 model Message {
   id             String   @id @default(cuid())
-  conversationId String
+  roomId        String
   role           String // 'user' | 'assistant' | 'tool' | 'system'
   content        String?  @db.Text
 
@@ -109,14 +109,14 @@ model Message {
 
   createdAt      DateTime @default(now())
 
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  room   Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
-  @@index([conversationId])
+  @@index([roomId])
   @@index([createdAt])
   @@index([role])
 }
 
-model Conversation {
+model Room {
   id        String   @id @default(cuid())
   userId    String?  // 关联用户（可选，匿名用户也可为 null）
   title     String?  // 对话标题（首次交互后由 AI 生成）

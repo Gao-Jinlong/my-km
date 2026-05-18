@@ -1,52 +1,47 @@
 /**
- * ConversationService — 对话生命周期管理
+ * RoomService — 对话生命周期管理
  *
  * 负责：
- * - Conversation CRUD
+ * - Room CRUD
  * - 元数据管理（标题、模型、provider）
  * - 统计和列表查询
  */
 
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import type {
-    ConversationStats,
-    CreateConversationOpts,
-    ListOpts,
-    UpdateConversationOpts,
-} from './conversation.types';
-import { CONVERSATION_STATUS } from './conversation-state';
+import type { CreateRoomOpts, ListOpts, RoomStats, UpdateRoomOpts } from './room.types';
+import { ROOM_STATUS } from './room-state';
 
 @Injectable()
-export class ConversationService {
-    private readonly logger = new Logger(ConversationService.name);
+export class RoomService {
+    private readonly logger = new Logger(RoomService.name);
 
     constructor(private prisma: PrismaService) {}
 
     /**
      * 创建新对话
      */
-    async create(opts: CreateConversationOpts = {}) {
-        const conversation = await this.prisma.conversation.create({
+    async create(opts: CreateRoomOpts = {}) {
+        const room = await this.prisma.room.create({
             data: {
                 id: opts.id || undefined,
                 userId: opts.userId || null,
                 title: opts.title || null,
                 model: opts.model || null,
                 provider: opts.provider || null,
-                status: CONVERSATION_STATUS.ACTIVE,
+                status: ROOM_STATUS.ACTIVE,
             },
         });
 
-        this.logger.log(`Conversation created: ${conversation.id}`);
-        return conversation;
+        this.logger.log(`Room created: ${room.id}`);
+        return room;
     }
 
     /**
      * 根据 ID 查找对话
      */
     async findById(id: string) {
-        return this.prisma.conversation.findUnique({
+        return this.prisma.room.findUnique({
             where: { id },
         });
     }
@@ -56,9 +51,9 @@ export class ConversationService {
      * TODO: 接入 auth 后改为 findByUserId
      */
     async findAll(opts: ListOpts = {}) {
-        const { limit = 50, offset = 0, status = CONVERSATION_STATUS.ACTIVE } = opts;
+        const { limit = 50, offset = 0, status = ROOM_STATUS.ACTIVE } = opts;
 
-        return this.prisma.conversation.findMany({
+        return this.prisma.room.findMany({
             where: { status },
             orderBy: { updatedAt: 'desc' },
             take: limit,
@@ -80,9 +75,9 @@ export class ConversationService {
      * 根据用户 ID 列出对话
      */
     async findByUserId(userId: string, opts: ListOpts = {}) {
-        const { limit = 50, offset = 0, status = CONVERSATION_STATUS.ACTIVE } = opts;
+        const { limit = 50, offset = 0, status = ROOM_STATUS.ACTIVE } = opts;
 
-        return this.prisma.conversation.findMany({
+        return this.prisma.room.findMany({
             where: { userId, status },
             orderBy: { updatedAt: 'desc' },
             take: limit,
@@ -103,8 +98,8 @@ export class ConversationService {
     /**
      * 更新对话元数据
      */
-    async updateMetadata(id: string, updates: UpdateConversationOpts) {
-        const conversation = await this.prisma.conversation.update({
+    async updateMetadata(id: string, updates: UpdateRoomOpts) {
+        const room = await this.prisma.room.update({
             where: { id },
             data: {
                 ...(updates.title !== undefined && { title: updates.title }),
@@ -114,42 +109,42 @@ export class ConversationService {
             },
         });
 
-        this.logger.log(`Conversation updated: ${id}`);
-        return conversation;
+        this.logger.log(`Room updated: ${id}`);
+        return room;
     }
 
     /**
      * 归档对话
      */
     async archive(id: string) {
-        await this.prisma.conversation.update({
+        await this.prisma.room.update({
             where: { id },
-            data: { status: CONVERSATION_STATUS.ARCHIVED },
+            data: { status: ROOM_STATUS.ARCHIVED },
         });
 
-        this.logger.log(`Conversation archived: ${id}`);
+        this.logger.log(`Room archived: ${id}`);
     }
 
     /**
      * 软删除对话
      */
     async delete(id: string) {
-        await this.prisma.conversation.update({
+        await this.prisma.room.update({
             where: { id },
-            data: { status: CONVERSATION_STATUS.DELETED },
+            data: { status: ROOM_STATUS.DELETED },
         });
 
-        this.logger.log(`Conversation deleted: ${id}`);
+        this.logger.log(`Room deleted: ${id}`);
     }
 
     /**
      * 获取用户统计
      */
-    async getStats(userId: string): Promise<ConversationStats> {
+    async getStats(userId: string): Promise<RoomStats> {
         const [total, active] = await Promise.all([
-            this.prisma.conversation.count({ where: { userId } }),
-            this.prisma.conversation.count({
-                where: { userId, status: CONVERSATION_STATUS.ACTIVE },
+            this.prisma.room.count({ where: { userId } }),
+            this.prisma.room.count({
+                where: { userId, status: ROOM_STATUS.ACTIVE },
             }),
         ]);
 
@@ -163,7 +158,7 @@ export class ConversationService {
      * 增加消息计数（原子操作）
      */
     async incrementMessageCount(id: string) {
-        await this.prisma.conversation.update({
+        await this.prisma.room.update({
             where: { id },
             data: { messageCount: { increment: 1 } },
         });

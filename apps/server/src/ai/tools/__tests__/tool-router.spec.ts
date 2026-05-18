@@ -35,7 +35,7 @@ describe('ToolRouter', () => {
                 decisions.push(d);
                 resolve(d);
             });
-            router.route(toolName, input, 'conv-1', 'tc-1');
+            router.route(toolName, input, 'room-1', 'tc-1');
         });
     }
 
@@ -62,9 +62,9 @@ describe('ToolRouter', () => {
         expect(decision.mode).toBe('error');
     });
 
-    it('emits event with conversationId and toolCallId', async () => {
+    it('emits event with roomId and toolCallId', async () => {
         const decision = await captureDecision('delete_file', { path: '/tmp/x' });
-        expect(decision.conversationId).toBe('conv-1');
+        expect(decision.roomId).toBe('room-1');
         expect(decision.toolCallId).toBe('tc-1');
     });
 });

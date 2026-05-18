@@ -1,5 +1,5 @@
 /**
- * ConversationState — AI 本地对话状态管理子模块
+ * RoomState — AI 本地对话状态管理子模块
  *
  * 负责维护本地消息列表、生成中状态等。
  * 仅通过 Emitter 向 Harness 发事件，不直接调用其他子模块。
@@ -10,14 +10,14 @@ import { Disposable } from '@/base/common/lifecycle';
 import type { MessageWire } from '../types/ai.types';
 
 /**
- * ConversationState 接口
+ * RoomState 接口
  */
-export interface ConversationState {
+export interface RoomState {
     get messages(): ReadonlyArray<MessageWire>;
     get isGenerating(): boolean;
     get isProcessing(): boolean;
-    get conversationId(): string | null;
-    setConversationId(id: string | null): void;
+    get roomId(): string | null;
+    setRoomId(id: string | null): void;
     addMessage(message: MessageWire): void;
     removeMessage(id: string): void;
     appendStreamChunk(content: string): void;
@@ -34,11 +34,11 @@ export interface ConversationState {
     dispose(): void;
 }
 
-class ConversationStateImpl extends Disposable implements ConversationState {
+class RoomStateImpl extends Disposable implements RoomState {
     private _messages: MessageWire[] = [];
     private _isGenerating = false;
     private _isProcessing = false;
-    private _conversationId: string | null = null;
+    private _roomId: string | null = null;
     private _currentAssistantMessage: MessageWire | null = null;
 
     // 事件
@@ -61,12 +61,12 @@ class ConversationStateImpl extends Disposable implements ConversationState {
         return this._isProcessing;
     }
 
-    get conversationId(): string | null {
-        return this._conversationId;
+    get roomId(): string | null {
+        return this._roomId;
     }
 
-    setConversationId(id: string | null): void {
-        this._conversationId = id;
+    setRoomId(id: string | null): void {
+        this._roomId = id;
     }
 
     /**
@@ -202,6 +202,6 @@ class ConversationStateImpl extends Disposable implements ConversationState {
     }
 }
 
-export function createConversationState(): ConversationState {
-    return new ConversationStateImpl();
+export function createRoomState(): RoomState {
+    return new RoomStateImpl();
 }

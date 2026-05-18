@@ -7,9 +7,9 @@
 
 import { Test } from '@nestjs/testing';
 import { SocketRegistry } from '../../../ws/socket-registry';
-import { ConversationService } from '../../conversation/conversation.service';
+import { RoomService } from '../../conversation/room.service';
 import { AISessionManager } from '../../session/ai-session-manager';
-import { ConversationOrchestrator } from '../../workflow-runtime/conversation-orchestrator';
+import { RoomOrchestrator } from '../../workflow-runtime/room-orchestrator';
 import { AiRateLimiter } from '../rate-limiter.guard';
 import { RequestDispatcher } from '../request-dispatcher';
 
@@ -17,7 +17,7 @@ describe('RequestDispatcher', () => {
     let dispatcher: RequestDispatcher;
     let socketRegistry: SocketRegistry;
     let rateLimiter: AiRateLimiter;
-    let orchestrator: ConversationOrchestrator;
+    let orchestrator: RoomOrchestrator;
 
     beforeEach(async () => {
         const module = await Test.createTestingModule({
@@ -28,7 +28,7 @@ describe('RequestDispatcher', () => {
                     useValue: {
                         create: jest.fn().mockReturnValue({
                             id: 'session-1',
-                            conversationId: 'conv-1',
+                            roomId: 'room-1',
                             clientId: 'client-1',
                             status: 'active',
                         }),
@@ -36,7 +36,7 @@ describe('RequestDispatcher', () => {
                     },
                 },
                 {
-                    provide: ConversationOrchestrator,
+                    provide: RoomOrchestrator,
                     useValue: { dispatch: jest.fn().mockResolvedValue(undefined) },
                 },
                 {
@@ -44,9 +44,9 @@ describe('RequestDispatcher', () => {
                     useValue: { emitToClient: jest.fn() },
                 },
                 {
-                    provide: ConversationService,
+                    provide: RoomService,
                     useValue: {
-                        findById: jest.fn().mockResolvedValue({ id: 'conv-1', userId: 'user-1' }),
+                        findById: jest.fn().mockResolvedValue({ id: 'room-1', userId: 'user-1' }),
                     },
                 },
                 {
@@ -59,12 +59,12 @@ describe('RequestDispatcher', () => {
         dispatcher = module.get(RequestDispatcher);
         socketRegistry = module.get(SocketRegistry);
         rateLimiter = module.get(AiRateLimiter);
-        orchestrator = module.get(ConversationOrchestrator);
+        orchestrator = module.get(RoomOrchestrator);
     });
 
     it('should dispatch successfully', async () => {
         await dispatcher.dispatch({
-            conversationId: 'conv-1',
+            roomId: 'room-1',
             clientId: 'client-1',
             content: 'Hello',
         });
@@ -77,7 +77,7 @@ describe('RequestDispatcher', () => {
         (rateLimiter.check as jest.Mock).mockReturnValue(false);
 
         await dispatcher.dispatch({
-            conversationId: 'conv-1',
+            roomId: 'room-1',
             clientId: 'client-1',
             content: 'Hello',
         });
@@ -95,7 +95,7 @@ describe('RequestDispatcher', () => {
         (orchestrator.dispatch as jest.Mock).mockRejectedValue(new Error(errorMsg));
 
         await dispatcher.dispatch({
-            conversationId: 'conv-1',
+            roomId: 'room-1',
             clientId: 'client-1',
             content: 'Hello',
         });

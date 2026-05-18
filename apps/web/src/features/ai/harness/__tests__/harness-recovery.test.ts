@@ -1,5 +1,5 @@
 /**
- * ConversationState — AI 本地对话状态管理测试
+ * RoomState — AI 本地对话状态管理测试
  *
  * 验证：
  * - isProcessing 状态生命周期
@@ -8,29 +8,29 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createConversationState } from '../conversation-state';
+import { createRoomState } from '../conversation-state';
 
-describe('ConversationState isProcessing', () => {
+describe('RoomState isProcessing', () => {
     it('isProcessing is false by default', () => {
-        const state = createConversationState();
+        const state = createRoomState();
         expect(state.isProcessing).toBe(false);
     });
 
     it('isProcessing is true when startGenerating is called', () => {
-        const state = createConversationState();
+        const state = createRoomState();
         state.startGenerating();
         expect(state.isProcessing).toBe(true);
     });
 
     it('isProcessing is false after stopGenerating', () => {
-        const state = createConversationState();
+        const state = createRoomState();
         state.startGenerating();
         state.stopGenerating();
         expect(state.isProcessing).toBe(false);
     });
 
     it('isProcessing is false after setHistory', () => {
-        const state = createConversationState();
+        const state = createRoomState();
         state.startGenerating();
         state.setHistory([]);
         expect(state.isProcessing).toBe(false);
@@ -38,7 +38,7 @@ describe('ConversationState isProcessing', () => {
 
     it('onStateChange includes isProcessing', () =>
         new Promise<void>(resolve => {
-            const state = createConversationState();
+            const state = createRoomState();
             state.onStateChange(e => {
                 expect(e).toHaveProperty('isProcessing');
                 resolve();
@@ -47,7 +47,7 @@ describe('ConversationState isProcessing', () => {
         }));
 });
 
-describe('Conversation recovery localStorage helpers', () => {
+describe('Room recovery localStorage helpers', () => {
     beforeEach(() => {
         localStorage.clear();
     });
@@ -56,15 +56,14 @@ describe('Conversation recovery localStorage helpers', () => {
         localStorage.clear();
     });
 
-    it('_saveActiveConversationId writes to localStorage', () => {
-        // The implementation uses localStorage.setItem('activeConversationId', id)
-        localStorage.setItem('activeConversationId', 'conv-test');
-        expect(localStorage.getItem('activeConversationId')).toBe('conv-test');
+    it('_saveActiveRoomId writes to localStorage', () => {
+        localStorage.setItem('activeRoomId', 'room-test');
+        expect(localStorage.getItem('activeRoomId')).toBe('room-test');
     });
 
-    it('_clearActiveConversationId removes from localStorage', () => {
-        localStorage.setItem('activeConversationId', 'conv-test');
-        localStorage.removeItem('activeConversationId');
-        expect(localStorage.getItem('activeConversationId')).toBeNull();
+    it('_clearActiveRoomId removes from localStorage', () => {
+        localStorage.setItem('activeRoomId', 'room-test');
+        localStorage.removeItem('activeRoomId');
+        expect(localStorage.getItem('activeRoomId')).toBeNull();
     });
 });

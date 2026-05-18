@@ -1,13 +1,13 @@
 /**
- * Conversation API Service
+ * Room API Service
  *
- * REST API client for conversation management.
+ * REST API client for room management.
  * Uses native fetch with the server at http://localhost:3001.
  */
 
 const API_BASE = process.env.NEXT_PUBLIC_AI_API_URL ?? 'http://localhost:3001';
 
-export interface ConversationRecord {
+export interface RoomRecord {
     id: string;
     title: string | null;
     status: 'active' | 'archived' | 'deleted';
@@ -26,71 +26,65 @@ export interface MessageRecord {
     createdAt: string;
 }
 
-export async function listConversations(opts?: {
+export async function listRooms(opts?: {
     limit?: number;
     offset?: number;
     status?: string;
-}): Promise<ConversationRecord[]> {
+}): Promise<RoomRecord[]> {
     const params = new URLSearchParams();
     if (opts?.limit) params.set('limit', String(opts.limit));
     if (opts?.offset) params.set('offset', String(opts.offset));
     if (opts?.status) params.set('status', opts.status);
 
-    const res = await fetch(`${API_BASE}/ai/conversations?${params}`);
-    if (!res.ok) throw new Error(`Failed to list conversations: ${res.status}`);
+    const res = await fetch(`${API_BASE}/ai/rooms?${params}`);
+    if (!res.ok) throw new Error(`Failed to list rooms: ${res.status}`);
 
-    const data = (await res.json()) as { conversations: ConversationRecord[] };
-    return data.conversations;
+    const data = (await res.json()) as { rooms: RoomRecord[] };
+    return data.rooms;
 }
 
-export async function createConversation(opts?: {
-    id?: string;
-    title?: string;
-}): Promise<ConversationRecord> {
-    const res = await fetch(`${API_BASE}/ai/conversations`, {
+export async function createRoom(opts?: { id?: string; title?: string }): Promise<RoomRecord> {
+    const res = await fetch(`${API_BASE}/ai/rooms`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(opts ?? {}),
     });
-    if (!res.ok) throw new Error(`Failed to create conversation: ${res.status}`);
+    if (!res.ok) throw new Error(`Failed to create room: ${res.status}`);
 
-    const data = (await res.json()) as { conversation: ConversationRecord };
-    return data.conversation;
+    const data = (await res.json()) as { room: RoomRecord };
+    return data.room;
 }
 
-export async function getConversationMessages(
-    conversationId: string,
+export async function getRoomMessages(
+    roomId: string,
     opts?: { limit?: number; offset?: number },
 ): Promise<MessageRecord[]> {
     const params = new URLSearchParams();
     if (opts?.limit) params.set('limit', String(opts.limit));
     if (opts?.offset) params.set('offset', String(opts.offset));
 
-    const res = await fetch(`${API_BASE}/ai/conversations/${conversationId}/messages?${params}`);
+    const res = await fetch(`${API_BASE}/ai/rooms/${roomId}/messages?${params}`);
     if (!res.ok) throw new Error(`Failed to get messages: ${res.status}`);
 
     const data = (await res.json()) as { messages: MessageRecord[] };
     return data.messages;
 }
 
-export async function updateConversationTitle(
-    conversationId: string,
-    title: string,
-): Promise<ConversationRecord> {
-    const res = await fetch(`${API_BASE}/ai/conversations/${conversationId}`, {
+export async function updateRoomTitle(roomId: string, title: string): Promise<RoomRecord> {
+    const res = await fetch(`${API_BASE}/ai/rooms/${roomId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title }),
     });
-    if (!res.ok) throw new Error(`Failed to update conversation: ${res.status}`);
+    if (!res.ok) throw new Error(`Failed to update room: ${res.status}`);
 
-    const data = (await res.json()) as { conversation: ConversationRecord };
-    return data.conversation;
+    const data = (await res.json()) as { room: RoomRecord };
+    return data.room;
 }
 
-export async function deleteConversation(conversationId: string): Promise<void> {
-    const res = await fetch(`${API_BASE}/ai/conversations/${conversationId}`, {
+export async function deleteRoom(roomId: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/ai/rooms/${roomId}`, {
         method: 'DELETE',
     });
-    if (!res.ok) throw new Error(`Failed to delete conversation: ${res.status}`);
+    if (!res.ok) throw new Error(`Failed to delete room: ${res.status}`);
 }

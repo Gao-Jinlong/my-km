@@ -2,30 +2,30 @@
  * AI REST Controller
  *
  * - POST /ai/chat — 发送 AI 消息（通过 RequestDispatcher 分发）
- * - GET  /ai/conversations — 获取对话列表
- * - POST /ai/conversations — 创建新对话
- * - GET  /ai/conversations/:id/messages — 获取对话消息历史
- * - PATCH /ai/conversations/:id — 更新对话元数据（标题）
- * - DELETE /ai/conversations/:id — 软删除对话
+ * - GET  /ai/rooms — 获取对话列表
+ * - POST /ai/rooms — 创建新对话
+ * - GET  /ai/rooms/:id/messages — 获取对话消息历史
+ * - PATCH /ai/rooms/:id — 更新对话元数据（标题）
+ * - DELETE /ai/rooms/:id — 软删除对话
  */
 
 import { Body, Controller, Delete, Get, Logger, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { ConversationService } from './conversation/conversation.service';
+import { RoomService } from './conversation/room.service';
 import { RequestDispatcher } from './dispatch/request-dispatcher';
 import { SendMessageDto } from './dto/send-message.dto';
 import { MessageService } from './message/message.service';
 
-interface CreateConversationBody {
+interface CreateRoomBody {
     id?: string;
     title?: string;
 }
 
-interface UpdateConversationBody {
+interface UpdateRoomBody {
     title?: string;
 }
 
-interface ListConversationsQuery {
+interface ListRoomsQuery {
     limit?: string;
     offset?: string;
     status?: string;
@@ -38,7 +38,7 @@ export class AiController {
 
     constructor(
         private requestDispatcher: RequestDispatcher,
-        private conversationService: ConversationService,
+        private roomService: RoomService,
         private messageService: MessageService,
     ) {}
 
@@ -49,59 +49,57 @@ export class AiController {
         this.logger.log(`Received AI chat request: ${dto.content.slice(0, 50)}...`);
 
         try {
-            // Create conversation if no conversationId provided
-            let conversationId = dto.conversationId;
-            if (!conversationId) {
-                const conversation = await this.conversationService.create();
-                conversationId = conversation.id;
-                this.logger.log(`Auto-created conversation: ${conversationId}`);
+            let roomId = dto.roomId;
+            if (!roomId) {
+                const room = await this.roomService.create();
+                roomId = room.id;
+                this.logger.log(`Auto-created room: ${roomId}`);
             }
 
-            // Dispatch to RequestDispatcher (REST mode: no streaming, just kick off processing)
             await this.requestDispatcher.dispatch({
-                conversationId,
+                roomId,
                 clientId: `rest:${Date.now()}`,
                 content: dto.content,
                 context: dto.context,
             });
 
-            return { success: true, conversationId };
+            return { success: true, roomId };
         } catch (error) {
             this.logger.error('AI chat failed:', error);
             throw error;
         }
     }
 
-    @Get('conversations')
+    @Get('rooms')
     @ApiOperation({ summary: '获取对话列表' })
     @ApiResponse({ status: 200, description: '返回对话列表' })
-    async listConversations(@Query() query: ListConversationsQuery) {
+    async listRooms(@Query() query: ListRoomsQuery) {
         const limit = query.limit ? parseInt(query.limit, 10) : 50;
         const offset = query.offset ? parseInt(query.offset, 10) : 0;
         const status = query.status || 'active';
 
-        const conversations = await this.conversationService.findAll({
+        const rooms = await this.roomService.findAll({
             limit,
             offset,
             status: status as 'active' | 'archived' | 'deleted',
         });
 
-        return { conversations, limit, offset };
+        return { rooms, limit, offset };
     }
 
-    @Post('conversations')
+    @Post('rooms')
     @ApiOperation({ summary: '创建新对话' })
     @ApiResponse({ status: 201, description: '对话已创建' })
-    async createConversation(@Body() body: CreateConversationBody) {
-        const conversation = await this.conversationService.create({
+    async createRoom(@Body() body: CreateRoomBody) {
+        const room = await this.roomService.create({
             id: body.id,
             title: body.title,
         });
 
-        return { conversation };
+        return { room };
     }
 
-    @Get('conversations/:id/messages')
+    @Get('rooms/:id/messages')
     @ApiOperation({ summary: '获取对话消息历史' })
     @ApiResponse({ status: 200, description: '返回消息列表' })
     async getMessages(
@@ -112,7 +110,7 @@ export class AiController {
         const limit = limitStr ? parseInt(limitStr, 10) : 100;
         const offset = offsetStr ? parseInt(offsetStr, 10) : 0;
 
-        const messages = await this.messageService.findByConversationId(id, {
+        const messages = await this.messageService.findByRoomId(id, {
             limit,
             offset,
         });
@@ -120,22 +118,22 @@ export class AiController {
         return { messages, limit, offset };
     }
 
-    @Patch('conversations/:id')
+    @Patch('rooms/:id')
     @ApiOperation({ summary: '更新对话元数据' })
     @ApiResponse({ status: 200, description: '对话已更新' })
-    async updateConversation(@Param('id') id: string, @Body() body: UpdateConversationBody) {
-        const conversation = await this.conversationService.updateMetadata(id, {
+    async updateRoom(@Param('id') id: string, @Body() body: UpdateRoomBody) {
+        const room = await this.roomService.updateMetadata(id, {
             title: body.title,
         });
 
-        return { conversation };
+        return { room };
     }
 
-    @Delete('conversations/:id')
+    @Delete('rooms/:id')
     @ApiOperation({ summary: '软删除对话' })
     @ApiResponse({ status: 200, description: '对话已删除' })
-    async deleteConversation(@Param('id') id: string) {
-        await this.conversationService.delete(id);
+    async deleteRoom(@Param('id') id: string) {
+        await this.roomService.delete(id);
         return { success: true };
     }
 }

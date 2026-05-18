@@ -34,37 +34,55 @@ export interface MessageWire {
 
 // === Client → Server ===
 
+export enum ClientMessageType {
+    CreateAndSend = 'create_and_send',
+    SendMessage = 'send_message',
+    Join = 'join',
+    Stop = 'stop',
+    ToolResult = 'tool_result',
+}
+
+/** Transport-level message types (not part of ClientMessage protocol). */
+export enum TransportMessageType {
+    Disconnect = 'disconnect',
+}
+
 export type ClientMessage =
-    | { type: 'create_and_send'; content: string; context?: EditorContext }
-    | { type: 'send_message'; conversationId: string; content: string; context?: EditorContext }
-    | { type: 'tool_result'; conversationId: string; toolCallId: string; result: unknown }
-    | { type: 'stop'; conversationId: string }
-    | { type: 'join'; conversationId: string };
+    | { type: ClientMessageType.CreateAndSend; content: string; context?: EditorContext }
+    | {
+          type: ClientMessageType.SendMessage;
+          roomId: string;
+          content: string;
+          context?: EditorContext;
+      }
+    | { type: ClientMessageType.ToolResult; roomId: string; toolCallId: string; result: unknown }
+    | { type: ClientMessageType.Stop; roomId: string }
+    | { type: ClientMessageType.Join; roomId: string };
 
 // === Server → Client ===
 
 export type StatusType = 'thinking' | 'tool_executing' | 'generating';
 export type FinishReason = 'complete' | 'max_turns' | 'stopped' | 'error' | 'interrupted';
 export type ErrorCode =
-    | 'CONVERSATION_NOT_FOUND'
+    | 'ROOM_NOT_FOUND'
     | 'LLM_UNAVAILABLE'
     | 'LLM_TIMEOUT'
     | 'TOOL_TIMEOUT'
     | 'TOOL_EXECUTION_ERROR'
-    | 'CONVERSATION_BUSY';
+    | 'ROOM_BUSY';
 
 export type ServerMessage =
-    | { type: 'created'; conversationId: string }
-    | { type: 'history'; conversationId: string; messages: MessageWire[] }
-    | { type: 'text_chunk'; conversationId: string; content: string }
+    | { type: 'created'; roomId: string }
+    | { type: 'history'; roomId: string; messages: MessageWire[] }
+    | { type: 'text_chunk'; roomId: string; content: string }
     | {
           type: 'tool_call';
-          conversationId: string;
+          roomId: string;
           toolCallId: string;
           toolName: string;
           input: unknown;
           requiresConfirmation: boolean;
       }
-    | { type: 'status'; conversationId: string; status: StatusType; message?: string }
-    | { type: 'done'; conversationId: string; finishReason: FinishReason; error?: string }
-    | { type: 'error'; conversationId: string; code: ErrorCode; message: string };
+    | { type: 'status'; roomId: string; status: StatusType; message?: string }
+    | { type: 'done'; roomId: string; finishReason: FinishReason; error?: string }
+    | { type: 'error'; roomId: string; code: ErrorCode; message: string };

@@ -29,7 +29,7 @@
 import type { GraphConfig, WorkflowMessage, WorkflowState } from '@my-km/langgraph-workflows';
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import type { LLMMessage } from '../ai.types';
-import type { ConversationStateMachine } from '../gateway/conversation-statemachine';
+import type { RoomStateMachine } from '../gateway/room-statemachine';
 import { MessageService } from '../message/message.service';
 import { LLMFactory } from '../provider/llm-factory';
 import type { LLMConfig, NodeLLMConfigMap } from '../provider/provider.types';
@@ -52,7 +52,7 @@ export class WorkflowExecutor {
         _llmFactory: LLMFactory,
         private messageService: MessageService,
         private toolDispatcher: ToolDispatcher,
-        @Optional() private stateMachine: ConversationStateMachine | null,
+        @Optional() private stateMachine: RoomStateMachine | null,
         private toolRouter: ToolRouter,
     ) {}
 
@@ -68,7 +68,7 @@ export class WorkflowExecutor {
         const graph = this.getOrCreateGraph(graphDef);
 
         // 构建 LLM 格式消息历史
-        const history = await this.messageService.buildLLMHistory(ctx.conversationId);
+        const history = await this.messageService.buildLLMHistory(ctx.roomId);
 
         // 创建 LLM 调用函数（桥接 LLMProvider 到 LLMCaller 接口）
         const llmCaller = this.createLLMCaller(ctx.llmConfigMap, ctx.defaultLlmConfig);
@@ -81,14 +81,14 @@ export class WorkflowExecutor {
             llmCaller,
             tools,
             onChunk: (content: string) => {
-                this._emitTextChunk(callbacks, ctx.conversationId, content);
+                this._emitTextChunk(callbacks, ctx.roomId, content);
             },
         };
 
         // 初始状态
         const initialState: Partial<WorkflowState> = {
             messages: [{ role: 'user' as const, content: ctx.content }],
-            conversationId: ctx.conversationId,
+            roomId: ctx.roomId,
             lastAssistantMessage: '',
             hasToolCalls: false,
             pendingToolCalls: [],
@@ -113,7 +113,7 @@ export class WorkflowExecutor {
 
                     // 检查中止信号
                     if (ctx.abortSignal?.aborted) {
-                        this._emitStop(callbacks, ctx.conversationId);
+                        this._emitStop(callbacks, ctx.roomId);
                         return;
                     }
                 }
@@ -126,7 +126,7 @@ export class WorkflowExecutor {
 
                 // 保存助手消息（包含工具调用）
                 await this.messageService.create({
-                    conversationId: ctx.conversationId,
+                    roomId: ctx.roomId,
                     role: 'assistant',
                     content: lastState.lastAssistantMessage || null,
                     toolCalls: lastState.pendingToolCalls.map(tc => ({
@@ -139,8 +139,8 @@ export class WorkflowExecutor {
 
                 // 发送工具调用事件给前端
                 for (const tc of lastState.pendingToolCalls) {
-                    this.toolRouter.route(tc.name, tc.arguments, ctx.conversationId, tc.id);
-                    this._emitToolCall(callbacks, ctx.conversationId, {
+                    this.toolRouter.route(tc.name, tc.arguments, ctx.roomId, tc.id);
+                    this._emitToolCall(callbacks, ctx.roomId, {
                         toolCallId: tc.id,
                         toolName: tc.name,
                         input: tc.arguments,
@@ -149,8 +149,8 @@ export class WorkflowExecutor {
                 }
 
                 // 等待前端返回工具结果
-                const results = await this.toolDispatcher.waitForResultsByConversation(
-                    ctx.conversationId,
+                const results = await this.toolDispatcher.waitForResultsByRoom(
+                    ctx.roomId,
                     lastState.pendingToolCalls.map(tc => ({
                         id: tc.id,
                         name: tc.name,
@@ -170,7 +170,7 @@ export class WorkflowExecutor {
                     const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
 
                     await this.messageService.create({
-                        conversationId: ctx.conversationId,
+                        roomId: ctx.roomId,
                         role: 'tool',
                         content: resultStr,
                         toolResultId: toolId,
@@ -228,12 +228,12 @@ export class WorkflowExecutor {
             }
 
             // 执行完成
-            this._emitLlmDone(callbacks, ctx.conversationId);
+            this._emitLlmDone(callbacks, ctx.roomId);
         } catch (error) {
             this.logger.error(`Workflow execution failed: ${error}`);
             this._emitError(
                 callbacks,
-                ctx.conversationId,
+                ctx.roomId,
                 'WORKFLOW_ERROR',
                 error instanceof Error ? error.message : 'Workflow execution failed',
             );
@@ -245,13 +245,13 @@ export class WorkflowExecutor {
      */
     private _emitTextChunk(
         callbacks: WorkflowCallbacks | undefined,
-        conversationId: string,
+        roomId: string,
         content: string,
     ): void {
         if (callbacks?.onTextChunk) {
-            callbacks.onTextChunk(conversationId, content);
+            callbacks.onTextChunk(roomId, content);
         } else if (this.stateMachine) {
-            this.stateMachine.textChunk(conversationId, content);
+            this.stateMachine.textChunk(content);
         }
     }
 
@@ -260,7 +260,7 @@ export class WorkflowExecutor {
      */
     private _emitToolCall(
         callbacks: WorkflowCallbacks | undefined,
-        conversationId: string,
+        roomId: string,
         info: {
             toolCallId: string;
             toolName: string;
@@ -269,31 +269,36 @@ export class WorkflowExecutor {
         },
     ): void {
         if (callbacks?.onToolCall) {
-            callbacks.onToolCall(conversationId, info);
+            callbacks.onToolCall(roomId, info);
         } else if (this.stateMachine) {
-            this.stateMachine.toolCall(conversationId, info);
+            this.stateMachine.toolCall(
+                info.toolCallId,
+                info.toolName,
+                info.input,
+                info.requiresConfirmation,
+            );
         }
     }
 
     /**
      * Emit LLM done event. Uses callbacks if available, falls back to stateMachine.
      */
-    private _emitLlmDone(callbacks: WorkflowCallbacks | undefined, conversationId: string): void {
+    private _emitLlmDone(callbacks: WorkflowCallbacks | undefined, roomId: string): void {
         if (callbacks?.onLlmDone) {
-            callbacks.onLlmDone(conversationId);
+            callbacks.onLlmDone(roomId);
         } else if (this.stateMachine) {
-            this.stateMachine.llmDone(conversationId);
+            this.stateMachine.llmDone();
         }
     }
 
     /**
      * Emit stop event. Uses callbacks if available, falls back to stateMachine.
      */
-    private _emitStop(callbacks: WorkflowCallbacks | undefined, conversationId: string): void {
+    private _emitStop(callbacks: WorkflowCallbacks | undefined, roomId: string): void {
         if (callbacks?.onStop) {
-            callbacks.onStop(conversationId);
+            callbacks.onStop(roomId);
         } else if (this.stateMachine) {
-            this.stateMachine.stop(conversationId);
+            this.stateMachine.stop();
         }
     }
 
@@ -302,14 +307,14 @@ export class WorkflowExecutor {
      */
     private _emitError(
         callbacks: WorkflowCallbacks | undefined,
-        conversationId: string,
+        roomId: string,
         code: string,
         message: string,
     ): void {
         if (callbacks?.onError) {
-            callbacks.onError(conversationId, code, message);
+            callbacks.onError(roomId, code, message);
         } else if (this.stateMachine) {
-            this.stateMachine.error(conversationId, code, message);
+            this.stateMachine.error(code, message);
         }
     }
 

@@ -28,17 +28,17 @@ describe('AIHarnessService sendMessage rollback', () => {
                 startGenerating: () => void;
                 stopGenerating: () => void;
             },
-            wsClient: { sendMessage: (c: string, ctx: unknown, convId: string) => void },
-            conversationId: string,
+            wsClient: { sendMessage: (c: string, ctx: unknown, roomId: string) => void },
+            roomId: string,
         ) {
             const userMsgId = `user-${Date.now()}`;
             state.addMessage({ id: userMsgId, role: 'user', content });
             state.startGenerating();
 
             await contextCollector
-                .getContext(conversationId)
+                .getContext(roomId)
                 .then(ctx => {
-                    wsClient.sendMessage(content, ctx, conversationId);
+                    wsClient.sendMessage(content, ctx, roomId);
                 })
                 .catch(() => {
                     state.removeMessage(userMsgId);
@@ -79,17 +79,17 @@ describe('AIHarnessService sendMessage rollback', () => {
                 startGenerating: () => void;
                 stopGenerating: () => void;
             },
-            wsClient: { sendMessage: (c: string, ctx: unknown, convId: string) => void },
-            conversationId: string,
+            wsClient: { sendMessage: (c: string, ctx: unknown, roomId: string) => void },
+            roomId: string,
         ) {
             const userMsgId = `user-${Date.now()}`;
             state.addMessage({ id: userMsgId, role: 'user', content });
             state.startGenerating();
 
             await contextCollector
-                .getContext(conversationId)
+                .getContext(roomId)
                 .then(ctx => {
-                    wsClient.sendMessage(content, ctx, conversationId);
+                    wsClient.sendMessage(content, ctx, roomId);
                 })
                 .catch(() => {
                     state.removeMessage(userMsgId);
@@ -117,10 +117,10 @@ describe('AIHarnessService sendMessage rollback', () => {
         const getContext = vi.fn().mockResolvedValue(null);
 
         // Simulate: getContext returns null → .then receives null → sendMessage with null ctx
-        await getContext('conv-test').then(ctx => {
-            sendMessage('hello', ctx, 'conv-test');
+        await getContext('room-test').then((ctx: unknown) => {
+            sendMessage('hello', ctx, 'room-test');
         });
 
-        expect(sendMessage).toHaveBeenCalledWith('hello', null, 'conv-test');
+        expect(sendMessage).toHaveBeenCalledWith('hello', null, 'room-test');
     });
 });

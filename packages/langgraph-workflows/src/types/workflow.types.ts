@@ -33,8 +33,8 @@ export type NodeId = string;
 export interface NodeContext {
     /** 当前节点 ID */
     nodeId: NodeId;
-    /** 对话 ID */
-    conversationId: string;
+    /** 房间 ID */
+    roomId: string;
     /** 会话 ID */
     sessionId?: string;
     /** 中止信号 */
@@ -120,8 +120,8 @@ export const WorkflowStateAnnotation = Annotation.Root({
         ],
         default: () => [],
     }),
-    /** 当前对话 ID */
-    conversationId: Annotation<string>,
+    /** 当前房间 ID */
+    roomId: Annotation<string>,
     /** 最后一条助手回复 */
     lastAssistantMessage: Annotation<string>,
     /** 是否包含工具调用 */
@@ -151,8 +151,8 @@ export const WorkflowStateAnnotation = Annotation.Root({
 export interface WorkflowState {
     /** 用户输入消息 */
     messages: WorkflowMessage[];
-    /** 当前对话 ID */
-    conversationId: string;
+    /** 当前房间 ID */
+    roomId: string;
     /** 最后一条助手回复 */
     lastAssistantMessage: string;
     /** 是否包含工具调用 */

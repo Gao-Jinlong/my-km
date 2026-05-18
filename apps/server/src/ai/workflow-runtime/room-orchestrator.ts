@@ -1,5 +1,5 @@
 /**
- * ConversationOrchestrator — 对话编排器
+ * RoomOrchestrator — 对话编排器
  *
  * 替代 AILoopOrchestrator。
  * 负责：
@@ -15,8 +15,8 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { ConnectionManager } from '../connection/connection-manager';
-import { ConversationStateMachine } from '../gateway/conversation-statemachine';
+import type { ServerMessage } from '../gateway/ai-ws-events.types';
+import { RoomStateMachineFactory } from '../gateway/room-statemachine-factory';
 import { MessageService } from '../message/message.service';
 import type { LLMConfig, NodeLLMConfigMap } from '../provider/provider.types';
 import type { AISession } from '../session/ai-session.types';
@@ -25,15 +25,14 @@ import type { WorkflowCallbacks, WorkflowExecutionContext } from './workflow.typ
 import { WorkflowExecutor } from './workflow-executor';
 
 @Injectable()
-export class ConversationOrchestrator {
-    private readonly logger = new Logger(ConversationOrchestrator.name);
+export class RoomOrchestrator {
+    private readonly logger = new Logger(RoomOrchestrator.name);
 
     constructor(
         private messageService: MessageService,
         private sessionManager: AISessionManager,
         private workflowExecutor: WorkflowExecutor,
-        private stateMachine: ConversationStateMachine,
-        _connectionManager: ConnectionManager,
+        private smFactory: RoomStateMachineFactory,
     ) {}
 
     /**
@@ -47,43 +46,55 @@ export class ConversationOrchestrator {
             defaultLlmConfig?: LLMConfig;
             graphName?: string;
             tokenLimit?: number;
+            emit?: (msg: ServerMessage) => void;
         } = {},
     ): Promise<void> {
-        const { conversationId } = session;
+        const { roomId } = session;
 
         // 1. 保存用户消息
         await this.messageService.create({
-            conversationId,
+            roomId,
             role: 'user',
             content,
         });
 
-        // 2. 构建上下文（历史消息由 workflowExecutor 负责构建）
+        // 2. 确保 FSM 存在
+        const emit = opts.emit ?? (() => {});
+        this.smFactory.create({
+            roomId,
+            clientId: session.clientId,
+            emit,
+        });
 
-        // 3. Build callback bridge from transport layer (ConversationStateMachine)
+        // 3. Build callback bridge from transport layer (RoomStateMachine)
         //    to business layer (WorkflowExecutor). This decouples WorkflowExecutor
         //    from knowing about the state machine directly.
         const callbacks: WorkflowCallbacks = {
-            onTextChunk: (convId, chunk) => {
-                this.stateMachine.textChunk(convId, chunk);
+            onTextChunk: (_convId, chunk) => {
+                const sm = this.smFactory.get(roomId);
+                sm?.textChunk(chunk);
             },
-            onToolCall: (convId, info) => {
-                this.stateMachine.toolCall(convId, info);
+            onToolCall: (_convId, info) => {
+                const sm = this.smFactory.get(roomId);
+                sm?.toolCall(info.toolCallId, info.toolName, info.input, info.requiresConfirmation);
             },
-            onLlmDone: convId => {
-                this.stateMachine.llmDone(convId);
+            onLlmDone: () => {
+                const sm = this.smFactory.get(roomId);
+                sm?.llmDone();
             },
-            onError: (convId, code, message) => {
-                this.stateMachine.error(convId, code, message);
+            onError: (_convId, code, message) => {
+                const sm = this.smFactory.get(roomId);
+                sm?.error(code, message);
             },
-            onStop: convId => {
-                this.stateMachine.stop(convId);
+            onStop: () => {
+                const sm = this.smFactory.get(roomId);
+                sm?.stop();
             },
         };
 
         // 4. 构建工作流执行上下文 with injected callbacks
         const workflowCtx: WorkflowExecutionContext = {
-            conversationId,
+            roomId,
             sessionId: session.id,
             content,
             llmConfigMap: opts.llmConfigMap,

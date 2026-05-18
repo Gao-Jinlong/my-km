@@ -6,10 +6,10 @@ describe('ClientMessage discriminated union', () => {
         expect(msg.type).toBe('create_and_send');
     });
 
-    it('accepts send_message with conversationId', () => {
+    it('accepts send_message with roomId', () => {
         const msg: ClientMessage = {
             type: 'send_message',
-            conversationId: 'conv-1',
+            roomId: 'room-1',
             content: 'Hello',
         };
         expect(msg.type).toBe('send_message');
@@ -18,7 +18,7 @@ describe('ClientMessage discriminated union', () => {
     it('accepts tool_result', () => {
         const msg: ClientMessage = {
             type: 'tool_result',
-            conversationId: 'conv-1',
+            roomId: 'room-1',
             toolCallId: 'tc-1',
             result: { text: 'done' },
         };
@@ -26,26 +26,26 @@ describe('ClientMessage discriminated union', () => {
     });
 
     it('accepts stop', () => {
-        const msg: ClientMessage = { type: 'stop', conversationId: 'conv-1' };
+        const msg: ClientMessage = { type: 'stop', roomId: 'room-1' };
         expect(msg.type).toBe('stop');
     });
 
     it('accepts join', () => {
-        const msg: ClientMessage = { type: 'join', conversationId: 'conv-1' };
+        const msg: ClientMessage = { type: 'join', roomId: 'room-1' };
         expect(msg.type).toBe('join');
     });
 });
 
 describe('ServerMessage discriminated union', () => {
-    it('accepts created with conversationId', () => {
-        const msg: ServerMessage = { type: 'created', conversationId: 'conv-1' };
+    it('accepts created with roomId', () => {
+        const msg: ServerMessage = { type: 'created', roomId: 'room-1' };
         expect(msg.type).toBe('created');
     });
 
-    it('accepts text_chunk with conversationId', () => {
+    it('accepts text_chunk with roomId', () => {
         const msg: ServerMessage = {
             type: 'text_chunk',
-            conversationId: 'conv-1',
+            roomId: 'room-1',
             content: 'Hello',
         };
         expect(msg.type).toBe('text_chunk');
@@ -54,7 +54,7 @@ describe('ServerMessage discriminated union', () => {
     it('accepts tool_call with all fields', () => {
         const msg: ServerMessage = {
             type: 'tool_call',
-            conversationId: 'conv-1',
+            roomId: 'room-1',
             toolCallId: 'tc-1',
             toolName: 'search',
             input: { query: 'test' },
@@ -67,14 +67,14 @@ describe('ServerMessage discriminated union', () => {
     });
 
     it('accepts status event', () => {
-        const msg: ServerMessage = { type: 'status', conversationId: 'conv-1', status: 'thinking' };
+        const msg: ServerMessage = { type: 'status', roomId: 'room-1', status: 'thinking' };
         expect(msg.type).toBe('status');
     });
 
     it('accepts done with finishReason', () => {
         const msg: ServerMessage = {
             type: 'done',
-            conversationId: 'conv-1',
+            roomId: 'room-1',
             finishReason: 'complete',
         };
         expect(msg.type).toBe('done');
@@ -83,8 +83,8 @@ describe('ServerMessage discriminated union', () => {
     it('accepts error with code', () => {
         const msg: ServerMessage = {
             type: 'error',
-            conversationId: 'conv-1',
-            code: 'CONVERSATION_NOT_FOUND',
+            roomId: 'room-1',
+            code: 'ROOM_NOT_FOUND',
             message: 'Not found',
         };
         expect(msg.type).toBe('error');

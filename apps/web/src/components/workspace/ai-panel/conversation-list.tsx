@@ -9,60 +9,57 @@
 
 import { Loader2, Plus, Search } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import {
-    type ConversationRecord,
-    createConversation,
-    listConversations,
-} from '@/features/ai/api/conversation-api';
+import { createRoom, listRooms, type RoomRecord } from '@/features/ai/api/conversation-api';
+import { ConversationItem } from './conversation-item';
 
-interface ConversationListProps {
-    onJoinConversation: (id: string) => void;
-    onCreateNewConversation: (id: string) => void;
-    activeConversationId?: string;
-    generatingConversationId?: string;
+interface RoomListProps {
+    onJoinRoom: (id: string) => void;
+    onCreateNewRoom: (id: string) => void;
+    activeRoomId?: string;
+    generatingRoomId?: string;
 }
 
 export function ConversationList({
-    onJoinConversation,
-    onCreateNewConversation,
-    activeConversationId,
-    generatingConversationId,
-}: ConversationListProps) {
-    const [conversations, setConversations] = useState<ConversationRecord[]>([]);
+    onJoinRoom,
+    onCreateNewRoom,
+    activeRoomId,
+    generatingRoomId,
+}: RoomListProps) {
+    const [rooms, setRooms] = useState<RoomRecord[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const fetchConversations = useCallback(async () => {
+    const fetchRooms = useCallback(async () => {
         try {
             setIsLoading(true);
             setError(null);
-            const list = await listConversations({ limit: 50 });
-            setConversations(list);
+            const list = await listRooms({ limit: 50 });
+            setRooms(list);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to load conversations');
+            setError(err instanceof Error ? err.message : 'Failed to load rooms');
         } finally {
             setIsLoading(false);
         }
     }, []);
 
     useEffect(() => {
-        fetchConversations();
-    }, [fetchConversations]);
+        fetchRooms();
+    }, [fetchRooms]);
 
-    const handleNewConversation = useCallback(async () => {
+    const handleNewRoom = useCallback(async () => {
         try {
-            const conv = await createConversation();
-            onCreateNewConversation(conv.id);
+            const room = await createRoom();
+            onCreateNewRoom(room.id);
         } catch (err) {
-            console.error('Failed to create conversation:', err);
+            console.error('Failed to create room:', err);
         }
-    }, [onCreateNewConversation]);
+    }, [onCreateNewRoom]);
 
     const handleClick = useCallback(
         (id: string) => {
-            onJoinConversation(id);
+            onJoinRoom(id);
         },
-        [onJoinConversation],
+        [onJoinRoom],
     );
 
     return (
@@ -76,7 +73,7 @@ export function ConversationList({
             <div className="flex items-center gap-2 border-ws-border border-b px-3 py-2">
                 <button
                     type="button"
-                    onClick={handleNewConversation}
+                    onClick={handleNewRoom}
                     className="flex flex-1 items-center gap-1.5 rounded-md bg-ws-bg-secondary px-3 py-1.5 font-medium text-[13px] text-ws-accent hover:bg-ws-bg-tertiary"
                 >
                     <Plus className="h-3.5 w-3.5" />
@@ -104,7 +101,7 @@ export function ConversationList({
                         <p className="text-red-400 text-xs">{error}</p>
                         <button
                             type="button"
-                            onClick={fetchConversations}
+                            onClick={fetchRooms}
                             className="mt-2 text-ws-accent text-xs underline"
                         >
                             Retry
@@ -112,12 +109,12 @@ export function ConversationList({
                     </div>
                 )}
 
-                {!isLoading && !error && conversations.length === 0 && (
+                {!isLoading && !error && rooms.length === 0 && (
                     <div className="flex h-full flex-col items-center justify-center p-4 text-center">
                         <p className="text-sm text-ws-fg-muted">No conversations yet</p>
                         <button
                             type="button"
-                            onClick={handleNewConversation}
+                            onClick={handleNewRoom}
                             className="mt-2 text-ws-accent text-xs underline"
                         >
                             Start a new conversation
@@ -125,14 +122,14 @@ export function ConversationList({
                     </div>
                 )}
 
-                {!isLoading && !error && conversations.length > 0 && (
+                {!isLoading && !error && rooms.length > 0 && (
                     <div className="py-1">
-                        {conversations.map(conv => (
+                        {rooms.map(room => (
                             <ConversationItem
-                                key={conv.id}
-                                conversation={conv}
-                                isActive={conv.id === activeConversationId}
-                                isGenerating={conv.id === generatingConversationId}
+                                key={room.id}
+                                room={room}
+                                isActive={room.id === activeRoomId}
+                                isGenerating={room.id === generatingRoomId}
                                 onClick={handleClick}
                             />
                         ))}
@@ -142,6 +139,3 @@ export function ConversationList({
         </div>
     );
 }
-
-// 内联导入以避免循环依赖
-import { ConversationItem } from './conversation-item';

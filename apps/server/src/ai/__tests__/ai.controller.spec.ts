@@ -2,12 +2,12 @@
  * AiController tests
  *
  * Verifies that POST /ai/chat delegates to RequestDispatcher (not AiService)
- * and creates a conversation when none is provided.
+ * and creates a room when none is provided.
  */
 
 import { Test, type TestingModule } from '@nestjs/testing';
 import { AiController } from '../ai.controller';
-import { ConversationService } from '../conversation/conversation.service';
+import { RoomService } from '../conversation/room.service';
 import type { DispatchContext } from '../dispatch/request-dispatcher';
 import { RequestDispatcher } from '../dispatch/request-dispatcher';
 import { MessageService } from '../message/message.service';
@@ -15,10 +15,10 @@ import { MessageService } from '../message/message.service';
 describe('AiController', () => {
     let controller: AiController;
     let requestDispatcher: RequestDispatcher;
-    let conversationService: ConversationService;
+    let roomService: RoomService;
 
-    const mockConversation = {
-        id: 'conv-1',
+    const mockRoom = {
+        id: 'room-1',
         userId: null,
         title: null,
         model: null,
@@ -38,10 +38,10 @@ describe('AiController', () => {
                     useValue: { dispatch: jest.fn().mockResolvedValue(undefined) },
                 },
                 {
-                    provide: ConversationService,
+                    provide: RoomService,
                     useValue: {
-                        create: jest.fn().mockResolvedValue(mockConversation),
-                        findById: jest.fn().mockResolvedValue(mockConversation),
+                        create: jest.fn().mockResolvedValue(mockRoom),
+                        findById: jest.fn().mockResolvedValue(mockRoom),
                     },
                 },
                 {
@@ -53,45 +53,45 @@ describe('AiController', () => {
 
         controller = module.get(AiController);
         requestDispatcher = module.get(RequestDispatcher);
-        conversationService = module.get(ConversationService);
+        roomService = module.get(RoomService);
     });
 
     describe('POST /ai/chat', () => {
-        it('should create a conversation when no conversationId is provided', async () => {
+        it('should create a room when no roomId is provided', async () => {
             const result = await controller.sendMessage({
                 content: 'Hello, world!',
             } as any);
 
-            expect(conversationService.create).toHaveBeenCalled();
+            expect(roomService.create).toHaveBeenCalled();
             expect(requestDispatcher.dispatch).toHaveBeenCalled();
             expect(result.success).toBe(true);
-            expect(result.conversationId).toBe('conv-1');
+            expect(result.roomId).toBe('room-1');
         });
 
-        it('should use provided conversationId without creating a new one', async () => {
-            (conversationService.findById as jest.Mock).mockResolvedValue(mockConversation);
+        it('should use provided roomId without creating a new one', async () => {
+            (roomService.findById as jest.Mock).mockResolvedValue(mockRoom);
 
             const result = await controller.sendMessage({
-                conversationId: 'existing-conv',
+                roomId: 'existing-room',
                 content: 'Hello!',
             } as any);
 
-            expect(conversationService.create).not.toHaveBeenCalled();
+            expect(roomService.create).not.toHaveBeenCalled();
             expect(requestDispatcher.dispatch).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    conversationId: 'existing-conv',
+                    roomId: 'existing-room',
                     content: 'Hello!',
                 }),
             );
             expect(result.success).toBe(true);
-            expect(result.conversationId).toBe('existing-conv');
+            expect(result.roomId).toBe('existing-room');
         });
 
         it('should pass context to RequestDispatcher when provided', async () => {
             const ctx = { source: 'web' };
 
             await controller.sendMessage({
-                conversationId: 'conv-1',
+                roomId: 'room-1',
                 content: 'Test',
                 context: ctx,
             } as any);
@@ -103,7 +103,7 @@ describe('AiController', () => {
 
         it('should use a synthetic clientId for REST dispatch', async () => {
             await controller.sendMessage({
-                conversationId: 'conv-1',
+                roomId: 'room-1',
                 content: 'Test',
             } as any);
 

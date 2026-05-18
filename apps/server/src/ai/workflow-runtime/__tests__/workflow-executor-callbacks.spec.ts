@@ -2,11 +2,10 @@
  * WorkflowExecutor callback decoupling test
  *
  * Verifies that WorkflowExecutor uses the injected callback interface
- * (WorkflowCallbacks) instead of directly calling ConversationStateMachine.
+ * (WorkflowCallbacks) instead of directly calling RoomStateMachine.
  */
 
 import { describe, expect, it, jest } from '@jest/globals';
-import { Test, TestingModule } from '@nestjs/testing';
 import type {
     WorkflowCallbacks,
     WorkflowExecutionContext,
@@ -22,12 +21,12 @@ describe('WorkflowExecutor callbacks', () => {
                 onError: jest.fn(),
             };
 
-            const conversationId = 'conv-1';
+            const roomId = 'room-1';
             const chunkContent = 'Hello, world';
 
-            callbacks.onTextChunk(conversationId, chunkContent);
+            callbacks.onTextChunk(roomId, chunkContent);
 
-            expect(callbacks.onTextChunk).toHaveBeenCalledWith(conversationId, chunkContent);
+            expect(callbacks.onTextChunk).toHaveBeenCalledWith(roomId, chunkContent);
         });
 
         it('should have onToolCall callback invoked for each tool call', () => {
@@ -38,7 +37,7 @@ describe('WorkflowExecutor callbacks', () => {
                 onError: jest.fn(),
             };
 
-            const conversationId = 'conv-1';
+            const roomId = 'room-1';
             const toolCallInfo = {
                 toolCallId: 'tc-1',
                 toolName: 'get_weather',
@@ -46,9 +45,9 @@ describe('WorkflowExecutor callbacks', () => {
                 requiresConfirmation: false,
             };
 
-            callbacks.onToolCall(conversationId, toolCallInfo);
+            callbacks.onToolCall(roomId, toolCallInfo);
 
-            expect(callbacks.onToolCall).toHaveBeenCalledWith(conversationId, toolCallInfo);
+            expect(callbacks.onToolCall).toHaveBeenCalledWith(roomId, toolCallInfo);
         });
 
         it('should have onLlmDone callback invoked when execution completes', () => {
@@ -59,10 +58,10 @@ describe('WorkflowExecutor callbacks', () => {
                 onError: jest.fn(),
             };
 
-            const conversationId = 'conv-1';
-            callbacks.onLlmDone(conversationId);
+            const roomId = 'room-1';
+            callbacks.onLlmDone(roomId);
 
-            expect(callbacks.onLlmDone).toHaveBeenCalledWith(conversationId);
+            expect(callbacks.onLlmDone).toHaveBeenCalledWith(roomId);
         });
 
         it('should have onError callback invoked on failure', () => {
@@ -73,11 +72,11 @@ describe('WorkflowExecutor callbacks', () => {
                 onError: jest.fn(),
             };
 
-            const conversationId = 'conv-1';
-            callbacks.onError(conversationId, 'WORKFLOW_ERROR', 'Something went wrong');
+            const roomId = 'room-1';
+            callbacks.onError(roomId, 'WORKFLOW_ERROR', 'Something went wrong');
 
             expect(callbacks.onError).toHaveBeenCalledWith(
-                conversationId,
+                roomId,
                 'WORKFLOW_ERROR',
                 'Something went wrong',
             );
@@ -94,7 +93,7 @@ describe('WorkflowExecutor callbacks', () => {
             };
 
             const ctx: WorkflowExecutionContext = {
-                conversationId: 'conv-1',
+                roomId: 'room-1',
                 sessionId: 'sess-1',
                 content: 'What is the weather?',
                 callbacks,
@@ -106,7 +105,7 @@ describe('WorkflowExecutor callbacks', () => {
 
         it('should work without callbacks (backward compatible)', () => {
             const ctx: WorkflowExecutionContext = {
-                conversationId: 'conv-1',
+                roomId: 'room-1',
                 sessionId: 'sess-1',
                 content: 'What is the weather?',
             };
@@ -119,32 +118,32 @@ describe('WorkflowExecutor callbacks', () => {
         it('should invoke all callbacks in correct order for a simple flow', () => {
             const callOrder: string[] = [];
             const callbacks: WorkflowCallbacks = {
-                onTextChunk: (convId: string, content: string) => {
+                onTextChunk: (rId: string, content: string) => {
                     callOrder.push('textChunk');
                 },
-                onToolCall: (convId: string, info) => {
+                onToolCall: (rId: string, info) => {
                     callOrder.push('toolCall');
                 },
-                onLlmDone: (convId: string) => {
+                onLlmDone: (rId: string) => {
                     callOrder.push('llmDone');
                 },
-                onError: (convId: string, code: string, message: string) => {
+                onError: (rId: string, code: string, message: string) => {
                     callOrder.push('error');
                 },
             };
 
-            const conversationId = 'conv-1';
+            const roomId = 'room-1';
 
             // Simulate the execute flow:
-            callbacks.onTextChunk(conversationId, 'streaming...');
-            callbacks.onToolCall(conversationId, {
+            callbacks.onTextChunk(roomId, 'streaming...');
+            callbacks.onToolCall(roomId, {
                 toolCallId: 'tc-1',
                 toolName: 'search',
                 input: { query: 'test' },
                 requiresConfirmation: false,
             });
-            callbacks.onTextChunk(conversationId, 'result...');
-            callbacks.onLlmDone(conversationId);
+            callbacks.onTextChunk(roomId, 'result...');
+            callbacks.onLlmDone(roomId);
 
             expect(callOrder).toEqual(['textChunk', 'toolCall', 'textChunk', 'llmDone']);
         });
@@ -158,10 +157,10 @@ describe('WorkflowExecutor callbacks', () => {
                 onError: () => callOrder.push('error'),
             };
 
-            const conversationId = 'conv-1';
+            const roomId = 'room-1';
 
-            callbacks.onTextChunk(conversationId, 'partial...');
-            callbacks.onError(conversationId, 'WORKFLOW_ERROR', 'failed');
+            callbacks.onTextChunk(roomId, 'partial...');
+            callbacks.onError(roomId, 'WORKFLOW_ERROR', 'failed');
 
             expect(callOrder).toEqual(['textChunk', 'error']);
         });
@@ -191,7 +190,7 @@ describe('WorkflowExecutor callbacks', () => {
 
             // Verify the callback interface works as expected when wired into execute flow
             const ctx: WorkflowExecutionContext = {
-                conversationId: 'conv-1',
+                roomId: 'room-1',
                 sessionId: 'sess-1',
                 content: 'Hello',
                 callbacks,
@@ -205,7 +204,7 @@ describe('WorkflowExecutor callbacks', () => {
         it('should support optional callbacks on WorkflowExecutionContext', () => {
             // Backward compatibility: WorkflowExecutionContext without callbacks
             const ctx: WorkflowExecutionContext = {
-                conversationId: 'conv-1',
+                roomId: 'room-1',
                 sessionId: 'sess-1',
                 content: 'Hello',
             };

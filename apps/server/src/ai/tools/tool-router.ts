@@ -17,7 +17,7 @@ export interface ToolRouteDecision {
     mode: ToolRouteMode;
     toolName: string;
     input: unknown;
-    conversationId: string;
+    roomId: string;
     toolCallId: string;
     requiresConfirmation: boolean;
     error?: string;
@@ -30,7 +30,7 @@ export class ToolRouter {
     private _onAutoExecute = new Emitter<{
         toolName: string;
         input: unknown;
-        conversationId: string;
+        roomId: string;
         toolCallId: string;
     }>();
 
@@ -44,14 +44,14 @@ export class ToolRouter {
      * Route a tool call and emit the decision.
      * Returns immediately — actual execution is async via events.
      */
-    route(toolName: string, input: unknown, conversationId: string, toolCallId: string): void {
+    route(toolName: string, input: unknown, roomId: string, toolCallId: string): void {
         const tool = this._tools.get(toolName);
         if (!tool) {
             this._onDecision.fire({
                 mode: 'error',
                 toolName,
                 input,
-                conversationId,
+                roomId,
                 toolCallId,
                 requiresConfirmation: false,
                 error: `Unknown tool: ${toolName}`,
@@ -67,7 +67,7 @@ export class ToolRouter {
 
         if (execution === 'backend' && danger === 'low') {
             mode = 'auto_execute';
-            this._onAutoExecute.fire({ toolName, input, conversationId, toolCallId });
+            this._onAutoExecute.fire({ toolName, input, roomId, toolCallId });
         } else if (execution === 'backend' && danger === 'high') {
             mode = 'frontend_confirm';
             requiresConfirmation = true;
@@ -79,7 +79,7 @@ export class ToolRouter {
             mode,
             toolName,
             input,
-            conversationId,
+            roomId,
             toolCallId,
             requiresConfirmation,
         });
@@ -102,7 +102,7 @@ export class ToolRouter {
     get onAutoExecute(): Event<{
         toolName: string;
         input: unknown;
-        conversationId: string;
+        roomId: string;
         toolCallId: string;
     }> {
         return this._onAutoExecute.event;

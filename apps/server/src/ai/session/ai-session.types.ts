@@ -11,8 +11,8 @@ export type AISessionStatus =
     | 'aborted';
 
 export interface AISession {
-    id: string; // `${clientId}:${conversationId}`
-    conversationId: string;
+    id: string; // `${clientId}:${roomId}`
+    roomId: string;
     clientId: string;
     status: AISessionStatus;
     abortController: AbortController;
@@ -21,6 +21,6 @@ export interface AISession {
 }
 
 export interface CreateAISessionOpts {
-    conversationId: string;
+    roomId: string;
     clientId: string;
 }

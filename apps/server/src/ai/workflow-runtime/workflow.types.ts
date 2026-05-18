@@ -17,21 +17,21 @@ export interface WorkflowToolCall {
 /**
  * Callback interface for WorkflowExecutor events.
  * Allows the business layer to signal lifecycle events without
- * depending on the transport layer (ConversationStateMachine).
+ * depending on the transport layer (RoomStateMachine).
  */
 export interface WorkflowCallbacks {
-    onTextChunk(conversationId: string, content: string): void;
-    onToolCall(conversationId: string, info: WorkflowToolCall): void;
-    onLlmDone(conversationId: string): void;
-    onError(conversationId: string, code: string, message: string): void;
-    onStop?(conversationId: string): void;
+    onTextChunk(roomId: string, content: string): void;
+    onToolCall(roomId: string, info: WorkflowToolCall): void;
+    onLlmDone(roomId: string): void;
+    onError(roomId: string, code: string, message: string): void;
+    onStop?(roomId: string): void;
 }
 
 /**
  * 工作流执行上下文
  */
 export interface WorkflowExecutionContext {
-    conversationId: string;
+    roomId: string;
     sessionId: string;
     content: string;
     llmConfigMap?: NodeLLMConfigMap;

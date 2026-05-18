@@ -198,63 +198,58 @@ export class WSClientService extends ServiceBase {
     }
 
     /**
-     * 加入对话房间
+     * 加入房间
      */
-    joinConversation(conversationId: string): void {
-        console.log(`[AI WS] Joining conversation: ${conversationId}`);
-        this._socket?.emit('join', { type: 'join', conversationId });
+    joinRoom(roomId: string): void {
+        console.log(`[AI WS] Joining room: ${roomId}`);
+        this._socket?.emit('message', { type: 'join', payload: { roomId } });
     }
 
     /**
-     * 创建新对话并发送消息
+     * 创建新房间并发送消息
      */
     sendCreateAndSend(content: string, context: unknown): void {
         if (!this._socket || !this._socket.connected) {
             throw new Error('WebSocket is not connected');
         }
-        this._socket.emit('create_and_send', { type: 'create_and_send', content, context });
+        this._socket.emit('message', { type: 'create_and_send', payload: { content, context } });
     }
 
     /**
-     * 加入对话房间（别名方法，与 joinConversation 行为一致）
+     * 加入房间（别名方法，与 joinRoom 行为一致）
      */
-    sendJoin(conversationId: string): void {
-        this._socket?.emit('join', { type: 'join', conversationId });
+    sendJoin(roomId: string): void {
+        this._socket?.emit('message', { type: 'join', payload: { roomId } });
     }
 
     /**
      * 发送用户消息
      */
-    sendMessage(content: string, context: unknown, conversationId: string): void {
+    sendMessage(content: string, context: unknown, roomId: string): void {
         console.log(`[AI WS] Sending message, length: ${content.length}`);
-        this._socket?.emit('message', { type: 'send_message', conversationId, content, context });
+        this._socket?.emit('message', {
+            type: 'send_message',
+            payload: { roomId, content, context },
+        });
     }
 
     /**
      * 发送工具执行结果
      */
-    sendToolResult(
-        conversationId: string,
-        toolCallId: string,
-        result: unknown,
-        error?: string,
-    ): void {
+    sendToolResult(roomId: string, toolCallId: string, result: unknown, error?: string): void {
         console.log(`[AI WS] Sending tool result: ${toolCallId}`);
-        this._socket?.emit('tool_result', {
+        this._socket?.emit('message', {
             type: 'tool_result',
-            conversationId,
-            toolCallId,
-            result,
-            error,
+            payload: { roomId, toolCallId, result, error },
         });
     }
 
     /**
      * 停止 AI 生成
      */
-    stopGenerating(conversationId: string): void {
+    stopGenerating(roomId: string): void {
         console.log(`[AI WS] Stop generating`);
-        this._socket?.emit('stop', { type: 'stop', conversationId });
+        this._socket?.emit('message', { type: 'stop', payload: { roomId } });
     }
 
     override dispose(): void {

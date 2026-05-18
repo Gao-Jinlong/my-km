@@ -33,15 +33,14 @@ export function AIPanel() {
         selectedText,
         documentTitle,
         error,
-        joinConversation,
         sendMessage,
         stopGenerating,
         registerTools,
     } = useAIHarness();
 
-    // Track which conversation is currently generating
-    const [generatingConversationId, setGeneratingConversationId] = useState<string | undefined>();
-    const [activeConversationId, setActiveConversationId] = useState<string | undefined>();
+    // Track which room is currently generating
+    const [generatingRoomId, setGeneratingRoomId] = useState<string | undefined>();
+    const [activeRoomId, setActiveRoomId] = useState<string | undefined>();
 
     // 初始化：注册工具 + 对话恢复
     useEffect(() => {
@@ -53,36 +52,37 @@ export function AIPanel() {
             registerTools(registerDefaultTools);
         });
 
-        // Conversation recovery: check localStorage for saved conversation
+        // Room recovery: check localStorage for saved room
         const harness = getContainer().get<AIHarnessService>('aiHarness');
+        const joinRoom = (id: string) => harness.joinRoom(id);
         const savedId = (() => {
             try {
-                return localStorage.getItem('activeConversationId');
+                return localStorage.getItem('activeRoomId');
             } catch {
                 return null;
             }
         })();
 
         if (savedId) {
-            // Restore existing conversation
-            setActiveConversationId(savedId);
-            harness.restoreConversation(savedId);
+            // Restore existing room
+            setActiveRoomId(savedId);
+            harness.restoreRoom(savedId);
         } else {
-            // Create new conversation
-            const conversationId = `conv-${nanoid(8)}`;
-            setActiveConversationId(conversationId);
-            joinConversation(conversationId);
+            // Create new room
+            const roomId = `room-${nanoid(8)}`;
+            setActiveRoomId(roomId);
+            joinRoom(roomId);
         }
-    }, [joinConversation, registerTools]);
+    }, [registerTools]);
 
     // Track generating state
     useEffect(() => {
-        if (isGenerating && activeConversationId) {
-            setGeneratingConversationId(activeConversationId);
+        if (isGenerating && activeRoomId) {
+            setGeneratingRoomId(activeRoomId);
         } else {
-            setGeneratingConversationId(undefined);
+            setGeneratingRoomId(undefined);
         }
-    }, [isGenerating, activeConversationId]);
+    }, [isGenerating, activeRoomId]);
 
     // 当 harness 选中文字变化时，重新显示 badge
     useEffect(() => {
@@ -116,22 +116,24 @@ export function AIPanel() {
         stopGenerating();
     }, [stopGenerating]);
 
-    const handleJoinConversation = useCallback(
+    const harness = useAIHarness().harness;
+
+    const handleJoinRoom = useCallback(
         (id: string) => {
-            setActiveConversationId(id);
-            joinConversation(id);
+            setActiveRoomId(id);
+            harness.joinRoom(id);
             setAIPanelViewMode('chat');
         },
-        [joinConversation, setAIPanelViewMode],
+        [harness, setAIPanelViewMode],
     );
 
-    const handleCreateNewConversation = useCallback(
+    const handleCreateNewRoom = useCallback(
         (id: string) => {
-            setActiveConversationId(id);
-            joinConversation(id);
+            setActiveRoomId(id);
+            harness.joinRoom(id);
             setAIPanelViewMode('chat');
         },
-        [joinConversation, setAIPanelViewMode],
+        [harness, setAIPanelViewMode],
     );
 
     return (
@@ -145,10 +147,10 @@ export function AIPanel() {
 
             {aiViewMode === 'list' ? (
                 <ConversationList
-                    onJoinConversation={handleJoinConversation}
-                    onCreateNewConversation={handleCreateNewConversation}
-                    activeConversationId={activeConversationId}
-                    generatingConversationId={generatingConversationId}
+                    onJoinRoom={handleJoinRoom}
+                    onCreateNewRoom={handleCreateNewRoom}
+                    activeRoomId={activeRoomId}
+                    generatingRoomId={generatingRoomId}
                 />
             ) : (
                 <>

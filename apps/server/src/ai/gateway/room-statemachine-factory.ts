@@ -2,16 +2,16 @@
  * RoomStateMachineFactory — manages per-room FSM instances.
  *
  * Each room gets its own state machine instance.
- * The factory tracks sessions by conversationId and by clientId
+ * The factory tracks sessions by roomId and by clientId
  * (for cleanup on disconnect).
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { ConversationState } from './conversation-statemachine.types';
 import { EmitFn, RoomStateMachine } from './room-statemachine';
+import { RoomState } from './room-statemachine.types';
 
 export interface CreateOptions {
-    conversationId: string;
+    roomId: string;
     clientId: string;
     emit: EmitFn;
 }
@@ -19,47 +19,47 @@ export interface CreateOptions {
 @Injectable()
 export class RoomStateMachineFactory {
     private readonly logger = new Logger(RoomStateMachineFactory.name);
-    private byConversationId = new Map<string, RoomStateMachine>();
+    private byRoomId = new Map<string, RoomStateMachine>();
     private byClientId = new Map<string, Set<string>>();
 
     create(options: CreateOptions): RoomStateMachine {
-        const existing = this.byConversationId.get(options.conversationId);
-        if (existing && existing.state !== ConversationState.Done) {
-            throw new Error(`Conversation ${options.conversationId} already active`);
+        const existing = this.byRoomId.get(options.roomId);
+        if (existing && existing.state !== RoomState.Done) {
+            throw new Error(`Room ${options.roomId} already active`);
         }
 
         // Clean up any stale Done session
         if (existing) {
-            this.byConversationId.delete(options.conversationId);
+            this.byRoomId.delete(options.roomId);
             const clientSet = this.byClientId.get(options.clientId);
-            clientSet?.delete(options.conversationId);
+            clientSet?.delete(options.roomId);
         }
 
-        const sm = new RoomStateMachine(options.conversationId, options.clientId, options.emit);
-        this.byConversationId.set(options.conversationId, sm);
+        const sm = new RoomStateMachine(options.roomId, options.clientId, options.emit);
+        this.byRoomId.set(options.roomId, sm);
 
         if (!this.byClientId.has(options.clientId)) {
             this.byClientId.set(options.clientId, new Set());
         }
-        this.byClientId.get(options.clientId)!.add(options.conversationId);
+        this.byClientId.get(options.clientId)!.add(options.roomId);
 
-        this.logger.debug(`FSM created for room ${options.conversationId}`);
+        this.logger.debug(`FSM created for room ${options.roomId}`);
         return sm;
     }
 
-    get(conversationId: string): RoomStateMachine | null {
-        return this.byConversationId.get(conversationId) ?? null;
+    get(roomId: string): RoomStateMachine | null {
+        return this.byRoomId.get(roomId) ?? null;
     }
 
-    destroy(conversationId: string): void {
-        const sm = this.byConversationId.get(conversationId);
+    destroy(roomId: string): void {
+        const sm = this.byRoomId.get(roomId);
         if (sm) {
             sm.abortController.abort();
             const clientSet = this.byClientId.get(sm.clientId);
-            clientSet?.delete(conversationId);
+            clientSet?.delete(roomId);
         }
-        this.byConversationId.delete(conversationId);
-        this.logger.debug(`FSM destroyed for room ${conversationId}`);
+        this.byRoomId.delete(roomId);
+        this.logger.debug(`FSM destroyed for room ${roomId}`);
     }
 
     destroyByClientId(clientId: string): void {

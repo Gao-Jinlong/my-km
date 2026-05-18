@@ -1,5 +1,5 @@
 /**
- * ConversationState 回滚和清理测试
+ * RoomState 回滚和清理测试
  *
  * 验证：
  * - removeMessage 正确移除消息并触发 onStateChange
@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-// Mock implementation of ConversationState to avoid alias issues
+// Mock implementation of RoomState to avoid alias issues
 const createState = () => {
     const messages: Array<{ id: string; role: string; content: string; createdAt: string }> = [];
     let isGenerating = false;
@@ -80,7 +80,7 @@ const createState = () => {
     };
 };
 
-describe('ConversationState rollback and cleanup', () => {
+describe('RoomState rollback and cleanup', () => {
     describe('removeMessage', () => {
         it('should remove the message and fire state change', () => {
             const state = createState();

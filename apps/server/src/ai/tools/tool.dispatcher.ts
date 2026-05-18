@@ -15,7 +15,7 @@ interface WaitingSession {
     results: Record<string, unknown>;
     expectedToolCallIds: Set<string>;
     timeout: ReturnType<typeof setTimeout>;
-    conversationId: string; // for conversationId-based lookup (legacy path)
+    roomId: string; // for roomId-based lookup (legacy path)
 }
 
 @Injectable()
@@ -29,7 +29,7 @@ export class ToolDispatcher {
      */
     waitForResults(
         sessionId: string,
-        conversationId: string,
+        roomId: string,
         toolCalls: InFlightToolCall[],
         timeoutMs: number,
     ): Promise<Record<string, unknown> | null> {
@@ -47,26 +47,26 @@ export class ToolDispatcher {
                 results: {},
                 expectedToolCallIds: expectedIds,
                 timeout,
-                conversationId,
+                roomId,
             });
         });
     }
 
     /**
-     * 按 conversationId 等待工具结果 — 由 AiService 遗留路径调用
+     * 按 roomId 等待工具结果 — 遗留路径调用
      */
-    waitForResultsByConversation(
-        conversationId: string,
+    waitForResultsByRoom(
+        roomId: string,
         toolCalls: InFlightToolCall[],
         timeoutMs: number,
     ): Promise<Record<string, unknown> | null> {
         return new Promise(resolve => {
             const expectedIds = new Set(toolCalls.map(tc => tc.id));
-            const sessionKey = `conv:${conversationId}:${Date.now()}`;
+            const sessionKey = `conv:${roomId}:${Date.now()}`;
 
             const timeout = setTimeout(() => {
                 this.waitingSessions.delete(sessionKey);
-                this.logger.warn(`Tool results timed out for conversation ${conversationId}`);
+                this.logger.warn(`Tool results timed out for room ${roomId}`);
                 resolve(null);
             }, timeoutMs);
 
@@ -75,7 +75,7 @@ export class ToolDispatcher {
                 results: {},
                 expectedToolCallIds: expectedIds,
                 timeout,
-                conversationId,
+                roomId,
             });
         });
     }
@@ -85,10 +85,10 @@ export class ToolDispatcher {
      *
      * 查找策略：
      * 1. 先按 sessionId 精确查找（新路径：AILoopOrchestrator）
-     * 2. 再按 conversationId 模糊查找（遗留路径：AiService）
+     * 2. 再按 roomId 模糊查找（遗留路径：AiService）
      */
     deliverResult(
-        conversationId: string,
+        roomId: string,
         toolCallId: string,
         result: unknown,
         error?: string,
@@ -100,16 +100,16 @@ export class ToolDispatcher {
         // 1. 精确查找（如果有 sessionId）
         if (sessionId) {
             const s = this.waitingSessions.get(sessionId);
-            if (s && s.conversationId === conversationId) {
+            if (s && s.roomId === roomId) {
                 session = s;
                 sessionKey = sessionId;
             }
         }
 
-        // 2. 按 conversationId 模糊查找
+        // 2. 按 roomId 模糊查找
         if (!session) {
             for (const [key, s] of this.waitingSessions) {
-                if (s.conversationId === conversationId && key.startsWith('conv:')) {
+                if (s.roomId === roomId && key.startsWith('conv:')) {
                     session = s;
                     sessionKey = key;
                     break;
@@ -118,9 +118,7 @@ export class ToolDispatcher {
         }
 
         if (!session) {
-            this.logger.warn(
-                `No waiting session for conversation ${conversationId}, toolCallId ${toolCallId}`,
-            );
+            this.logger.warn(`No waiting session for room ${roomId}, toolCallId ${toolCallId}`);
             return;
         }
 
@@ -137,7 +135,7 @@ export class ToolDispatcher {
     /**
      * 取消等待（会话中断时调用）
      */
-    cancelWaiting(conversationId: string, sessionId?: string): void {
+    cancelWaiting(roomId: string, sessionId?: string): void {
         const toRemove: string[] = [];
 
         if (sessionId) {
@@ -149,9 +147,9 @@ export class ToolDispatcher {
             }
         }
 
-        // 清理该 conversation 下的所有遗留等待
+        // 清理该 room 下的所有遗留等待
         for (const [key, s] of this.waitingSessions) {
-            if (s.conversationId === conversationId) {
+            if (s.roomId === roomId) {
                 clearTimeout(s.timeout);
                 s.resolve(null);
                 toRemove.push(key);

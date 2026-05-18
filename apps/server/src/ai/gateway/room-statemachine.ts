@@ -8,34 +8,32 @@
  */
 
 import type { ErrorCode, ServerMessage } from './ai-ws-events.types';
-import { ConversationState, isValidTransition } from './conversation-statemachine.types';
+import { isValidTransition, RoomState } from './room-statemachine.types';
 
 export type EmitFn = (msg: ServerMessage) => void;
 
 export class RoomStateMachine {
-    readonly conversationId: string;
+    readonly roomId: string;
     readonly clientId: string;
-    state: ConversationState = ConversationState.Idle;
+    state: RoomState = RoomState.Idle;
     abortController = new AbortController();
     createdAt = new Date();
     lastActivityAt = new Date();
 
     private emit: EmitFn;
 
-    constructor(conversationId: string, clientId: string, emit: EmitFn) {
-        this.conversationId = conversationId;
+    constructor(roomId: string, clientId: string, emit: EmitFn) {
+        this.roomId = roomId;
         this.clientId = clientId;
         this.emit = emit;
     }
 
-    private _transition(to: ConversationState): void {
+    private _transition(to: RoomState): void {
         const from = this.state;
         if (from === to) return;
 
         if (!isValidTransition(from, to)) {
-            throw new Error(
-                `Invalid transition: ${from} -> ${to} for conversation ${this.conversationId}`,
-            );
+            throw new Error(`Invalid transition: ${from} -> ${to} for room ${this.roomId}`);
         }
 
         this.state = to;
@@ -43,15 +41,15 @@ export class RoomStateMachine {
     }
 
     receiveMessage(): void {
-        this._transition(ConversationState.BuildingContext);
+        this._transition(RoomState.BuildingContext);
     }
 
     contextReady(): void {
-        this._transition(ConversationState.Processing);
+        this._transition(RoomState.Processing);
     }
 
     textChunk(content: string): void {
-        this.emit({ type: 'text_chunk', conversationId: this.conversationId, content });
+        this.emit({ type: 'text_chunk', roomId: this.roomId, content });
     }
 
     toolCall(
@@ -61,53 +59,53 @@ export class RoomStateMachine {
         requiresConfirmation: boolean,
     ): void {
         if (requiresConfirmation) {
-            this._transition(ConversationState.ToolWaiting);
+            this._transition(RoomState.ToolWaiting);
             this.emit({
                 type: 'tool_call',
-                conversationId: this.conversationId,
+                roomId: this.roomId,
                 toolCallId,
                 toolName,
                 input,
                 requiresConfirmation: true,
             });
         } else {
-            this._transition(ConversationState.ToolExecuting);
+            this._transition(RoomState.ToolExecuting);
         }
     }
 
     toolResult(): void {
-        this._transition(ConversationState.ToolExecuting);
+        this._transition(RoomState.ToolExecuting);
     }
 
     toolDone(): void {
-        this._transition(ConversationState.Processing);
+        this._transition(RoomState.Processing);
     }
 
     llmDone(): void {
-        this._transition(ConversationState.Done);
+        this._transition(RoomState.Done);
         this.emit({
             type: 'done',
-            conversationId: this.conversationId,
+            roomId: this.roomId,
             finishReason: 'complete',
         });
     }
 
     stop(): void {
         this.abortController.abort();
-        this._transition(ConversationState.Done);
+        this._transition(RoomState.Done);
         this.emit({
             type: 'done',
-            conversationId: this.conversationId,
+            roomId: this.roomId,
             finishReason: 'stopped',
         });
     }
 
     error(code: string, message: string): void {
         this.abortController.abort();
-        this._transition(ConversationState.Done);
+        this._transition(RoomState.Done);
         this.emit({
             type: 'error',
-            conversationId: this.conversationId,
+            roomId: this.roomId,
             code: code as ErrorCode,
             message,
         });

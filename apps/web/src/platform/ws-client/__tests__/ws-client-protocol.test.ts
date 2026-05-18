@@ -29,8 +29,8 @@ vi.mock('socket.io-client', () => ({
 interface TestableWSClient {
     subscribe(messageType: string, callback: (data: unknown) => void): IDisposable;
     sendCreateAndSend(content: string, context: unknown): void;
-    sendJoin(conversationId: string): void;
-    sendMessage(content: string, context: unknown, conversationId: string): void;
+    sendJoin(roomId: string): void;
+    sendMessage(content: string, context: unknown, roomId: string): void;
     dispose(): void;
     _dispatchMessage(data: unknown): void;
 }
@@ -55,10 +55,10 @@ describe('WSClientService subscribe and routing', () => {
             const received: unknown[] = [];
             client.subscribe('created', data => received.push(data));
 
-            client._dispatchMessage({ type: 'created', conversationId: 'conv-1' });
+            client._dispatchMessage({ type: 'created', roomId: 'room-1' });
 
             expect(received).toHaveLength(1);
-            expect((received[0] as { conversationId: string }).conversationId).toBe('conv-1');
+            expect((received[0] as { roomId: string }).roomId).toBe('room-1');
         });
 
         it('routes status message to subscribers', () => {
@@ -67,7 +67,7 @@ describe('WSClientService subscribe and routing', () => {
 
             client._dispatchMessage({
                 type: 'status',
-                conversationId: 'conv-1',
+                roomId: 'room-1',
                 status: 'thinking',
             });
 
@@ -81,7 +81,7 @@ describe('WSClientService subscribe and routing', () => {
 
             client._dispatchMessage({
                 type: 'done',
-                conversationId: 'conv-1',
+                roomId: 'room-1',
                 finishReason: 'complete',
             });
 
@@ -95,13 +95,13 @@ describe('WSClientService subscribe and routing', () => {
 
             client._dispatchMessage({
                 type: 'error',
-                conversationId: 'conv-1',
-                code: 'CONVERSATION_NOT_FOUND',
+                roomId: 'room-1',
+                code: 'ROOM_NOT_FOUND',
                 message: 'Not found',
             });
 
             expect(received).toHaveLength(1);
-            expect((received[0] as { code: string }).code).toBe('CONVERSATION_NOT_FOUND');
+            expect((received[0] as { code: string }).code).toBe('ROOM_NOT_FOUND');
         });
 
         it('routes text_chunk to subscribers', () => {
@@ -110,7 +110,7 @@ describe('WSClientService subscribe and routing', () => {
 
             client._dispatchMessage({
                 type: 'text_chunk',
-                conversationId: 'conv-1',
+                roomId: 'room-1',
                 content: 'Hello world',
             });
 
@@ -126,7 +126,7 @@ describe('WSClientService subscribe and routing', () => {
 
             client._dispatchMessage({
                 type: 'done',
-                conversationId: 'conv-1',
+                roomId: 'room-1',
                 finishReason: 'stop',
             });
 
@@ -138,12 +138,12 @@ describe('WSClientService subscribe and routing', () => {
             const received: unknown[] = [];
             const unsub = client.subscribe('done', data => received.push(data));
 
-            client._dispatchMessage({ type: 'done', conversationId: '1', finishReason: 'a' });
+            client._dispatchMessage({ type: 'done', roomId: '1', finishReason: 'a' });
             expect(received).toHaveLength(1);
 
             unsub.dispose();
 
-            client._dispatchMessage({ type: 'done', conversationId: '2', finishReason: 'b' });
+            client._dispatchMessage({ type: 'done', roomId: '2', finishReason: 'b' });
             expect(received).toHaveLength(1); // still 1
         });
 
@@ -161,10 +161,9 @@ describe('WSClientService subscribe and routing', () => {
             const unsub = client.subscribe('done', () => {});
             client.sendCreateAndSend('Hello world', { docId: 'doc-1' });
 
-            expect(mockSocket.emit).toHaveBeenCalledWith('create_and_send', {
+            expect(mockSocket.emit).toHaveBeenCalledWith('message', {
                 type: 'create_and_send',
-                content: 'Hello world',
-                context: { docId: 'doc-1' },
+                payload: { content: 'Hello world', context: { docId: 'doc-1' } },
             });
             unsub.dispose();
         });
@@ -180,11 +179,11 @@ describe('WSClientService subscribe and routing', () => {
         it('sendJoin emits join event', () => {
             // Need to subscribe first to establish connection
             const unsub = client.subscribe('done', () => {});
-            client.sendJoin('conv-1');
+            client.sendJoin('room-1');
 
-            expect(mockSocket.emit).toHaveBeenCalledWith('join', {
+            expect(mockSocket.emit).toHaveBeenCalledWith('message', {
                 type: 'join',
-                conversationId: 'conv-1',
+                payload: { roomId: 'room-1' },
             });
             unsub.dispose();
         });
@@ -192,13 +191,11 @@ describe('WSClientService subscribe and routing', () => {
         it('sendMessage uses send_message type', () => {
             // Need to subscribe first to establish connection
             const unsub = client.subscribe('done', () => {});
-            client.sendMessage('test content', { docId: 'doc-1' }, 'conv-1');
+            client.sendMessage('test content', { docId: 'doc-1' }, 'room-1');
 
             expect(mockSocket.emit).toHaveBeenCalledWith('message', {
                 type: 'send_message',
-                conversationId: 'conv-1',
-                content: 'test content',
-                context: { docId: 'doc-1' },
+                payload: { roomId: 'room-1', content: 'test content', context: { docId: 'doc-1' } },
             });
             unsub.dispose();
         });

@@ -21,10 +21,10 @@ export class AISessionManager {
 
     /**
      * 创建新会话
-     * 如果该 conversationId 已有活跃会话，抛出并发错误
+     * 如果该 roomId 已有活跃会话，抛出并发错误
      */
     create(opts: CreateAISessionOpts): AISession {
-        const existing = this.findByConversationId(opts.conversationId);
+        const existing = this.findByRoomId(opts.roomId);
         if (
             existing &&
             existing.status !== 'completed' &&
@@ -32,7 +32,7 @@ export class AISessionManager {
             existing.status !== 'aborted'
         ) {
             throw new Error(
-                `Conversation ${opts.conversationId} already has an active session (${existing.id}, status: ${existing.status})`,
+                `Room ${opts.roomId} already has an active session (${existing.id}, status: ${existing.status})`,
             );
         }
 
@@ -42,8 +42,8 @@ export class AISessionManager {
         }
 
         const session: AISession = {
-            id: `${opts.clientId}:${opts.conversationId}`,
-            conversationId: opts.conversationId,
+            id: `${opts.clientId}:${opts.roomId}`,
+            roomId: opts.roomId,
             clientId: opts.clientId,
             status: 'pending',
             abortController: new AbortController(),
@@ -66,9 +66,9 @@ export class AISessionManager {
     /**
      * 根据会话 ID 查找（同一时间只有一个活跃会话）
      */
-    findByConversationId(conversationId: string): AISession | null {
+    findByRoomId(roomId: string): AISession | null {
         for (const session of this.sessions.values()) {
-            if (session.conversationId === conversationId) {
+            if (session.roomId === roomId) {
                 return session;
             }
         }
@@ -118,8 +118,8 @@ export class AISessionManager {
     /**
      * 清理会话
      */
-    cleanup(conversationId: string): void {
-        const session = this.findByConversationId(conversationId);
+    cleanup(roomId: string): void {
+        const session = this.findByRoomId(roomId);
         if (!session) return;
 
         this.sessions.delete(session.id);

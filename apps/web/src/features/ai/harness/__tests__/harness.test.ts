@@ -28,9 +28,11 @@ describe('AIHarnessService subscription-based connection', () => {
         ) {
             socket.emit('message', {
                 type: 'send_message',
-                conversationId: 'conv-test',
-                content,
-                context: null,
+                payload: {
+                    roomId: 'room-test',
+                    content,
+                    context: null,
+                },
             });
         }
 
@@ -38,9 +40,11 @@ describe('AIHarnessService subscription-based connection', () => {
 
         expect(emitMock).toHaveBeenCalledWith('message', {
             type: 'send_message',
-            conversationId: 'conv-test',
-            content: 'hello',
-            context: null,
+            payload: {
+                roomId: 'room-test',
+                content: 'hello',
+                context: null,
+            },
         });
     });
 
@@ -50,23 +54,27 @@ describe('AIHarnessService subscription-based connection', () => {
 
         function simulatedToolCallHandler(
             socket: { emit: (event: string, data: unknown) => void },
-            conversationId: string,
+            roomId: string,
         ) {
-            socket.emit('tool_result', {
+            socket.emit('message', {
                 type: 'tool_result',
-                conversationId,
-                toolCallId: 'tool-1',
-                result: 'mock result',
+                payload: {
+                    roomId,
+                    toolCallId: 'tool-1',
+                    result: 'mock result',
+                },
             });
         }
 
-        simulatedToolCallHandler({ emit: emitMock }, 'conv-test');
+        simulatedToolCallHandler({ emit: emitMock }, 'room-test');
 
-        expect(emitMock).toHaveBeenCalledWith('tool_result', {
+        expect(emitMock).toHaveBeenCalledWith('message', {
             type: 'tool_result',
-            conversationId: 'conv-test',
-            toolCallId: 'tool-1',
-            result: 'mock result',
+            payload: {
+                roomId: 'room-test',
+                toolCallId: 'tool-1',
+                result: 'mock result',
+            },
         });
     });
 });

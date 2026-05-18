@@ -12,7 +12,7 @@ import { Inject } from '@/platform/di';
 import { WSClientService } from '@/platform/ws-client';
 import type { AIContextWire, MessageWire, ToolHandler } from '../types/ai.types';
 import { type ContextCollector, createContextCollector } from './context-collector';
-import { type ConversationState, createConversationState } from './conversation-state';
+import { createRoomState, type RoomState } from './conversation-state';
 import { createToolRegistry, type ToolRegistry } from './tool-registry';
 
 /**
@@ -28,10 +28,10 @@ export interface AIHarnessService {
     // 对话相关
     connect(wsUrl: string): Promise<void>;
     disconnect(): void;
-    joinConversation(conversationId: string): void;
-    sendMessage(content: string, conversationId?: string): Promise<string | null>; // Returns conversationId
-    sendCreateAndSend(content: string): Promise<string | null>; // For new conversations
-    restoreConversation(conversationId: string): void; // Conversation recovery
+    joinRoom(roomId: string): void;
+    sendMessage(content: string, roomId?: string): Promise<string | null>; // Returns roomId
+    sendCreateAndSend(content: string): Promise<string | null>; // For new rooms
+    restoreRoom(roomId: string): void; // Room recovery
     stopGenerating(): void;
 
     // 工具相关
@@ -42,7 +42,7 @@ export interface AIHarnessService {
     get messages(): ReadonlyArray<MessageWire>;
     get isGenerating(): boolean;
     get isProcessing(): boolean;
-    get conversationId(): string | null;
+    get roomId(): string | null;
     get selectedText(): string | null;
     get wsClient(): WSClientService;
 
@@ -59,9 +59,9 @@ export interface AIHarnessService {
     }>;
     get onSelectionChange(): Event<{ selectedText: string | null; documentTitle: string }>;
     get onConnectionChange(): Event<{ connected: boolean }>;
-    get onStatus(): Event<{ conversationId: string; status: string; message?: string }>;
-    get onCreated(): Event<{ conversationId: string }>;
-    get onDone(): Event<{ conversationId: string; finishReason: string; error?: string }>;
+    get onStatus(): Event<{ roomId: string; status: string; message?: string }>;
+    get onCreated(): Event<{ roomId: string }>;
+    get onDone(): Event<{ roomId: string; finishReason: string; error?: string }>;
 
     dispose(): void;
 }
@@ -70,7 +70,7 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
     private _contextCollector: ContextCollector;
     private _wsClient: WSClientService;
     private _toolRegistry: ToolRegistry;
-    private _conversationState: ConversationState;
+    private _roomState: RoomState;
 
     // 事件代理：将子模块事件转发到 Harness
     private _onStreamChunk = new Emitter<{ content: string }>();
@@ -88,10 +88,10 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
         documentTitle: string;
     }>();
     private _onConnectionChange = new Emitter<{ connected: boolean }>();
-    private _onStatus = new Emitter<{ conversationId: string; status: string; message?: string }>();
-    private _onCreated = new Emitter<{ conversationId: string }>();
+    private _onStatus = new Emitter<{ roomId: string; status: string; message?: string }>();
+    private _onCreated = new Emitter<{ roomId: string }>();
     private _onDone = new Emitter<{
-        conversationId: string;
+        roomId: string;
         finishReason: string;
         error?: string;
     }>();
@@ -106,7 +106,7 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
         this._contextCollector = createContextCollector();
         this._wsClient = wsClient;
         this._toolRegistry = createToolRegistry();
-        this._conversationState = createConversationState();
+        this._roomState = createRoomState();
 
         // 设置事件代理
         this._setupEventProxy();
@@ -121,7 +121,7 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
         this._store.add(
             this._wsClient.subscribe('text_chunk', (raw: unknown) => {
                 const msg = raw as { content: string };
-                this._conversationState.appendStreamChunk(msg.content);
+                this._roomState.appendStreamChunk(msg.content);
                 this._onStreamChunk.fire({ content: msg.content });
             }),
         );
@@ -138,12 +138,12 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
         this._store.add(
             this._wsClient.subscribe('done', (raw: unknown) => {
                 const msg = raw as {
-                    conversationId: string;
+                    roomId: string;
                     finishReason: string;
                     error?: string;
                 };
-                this._conversationState.stopGenerating();
-                this._clearActiveConversationId();
+                this._roomState.stopGenerating();
+                this._clearActiveRoomId();
                 this._onDone.fire(msg);
                 this._onStreamDone.fire();
             }),
@@ -169,7 +169,7 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
             this._wsClient.subscribe('history', (raw: unknown) => {
                 const msg = raw as { messages: MessageWire[] };
                 this._onHistory.fire(msg);
-                this._conversationState.setHistory(msg.messages);
+                this._roomState.setHistory(msg.messages);
             }),
         );
 
@@ -190,9 +190,9 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
         // created → onCreated
         this._store.add(
             this._wsClient.subscribe('created', (raw: unknown) => {
-                const msg = raw as { conversationId: string };
-                this._conversationState.setConversationId(msg.conversationId);
-                this._saveActiveConversationId(msg.conversationId);
+                const msg = raw as { roomId: string };
+                this._roomState.setRoomId(msg.roomId);
+                this._saveActiveRoomId(msg.roomId);
                 this._onCreated.fire(msg);
             }),
         );
@@ -200,7 +200,7 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
         // status → onStatus
         this._store.add(
             this._wsClient.subscribe('status', (raw: unknown) => {
-                const msg = raw as { conversationId: string; status: string; message?: string };
+                const msg = raw as { roomId: string; status: string; message?: string };
                 this._onStatus.fire(msg);
             }),
         );
@@ -218,7 +218,7 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
         );
 
         // 对话状态变化
-        this._store.add(this._conversationState.onStateChange(e => this._onStateChange.fire(e)));
+        this._store.add(this._roomState.onStateChange(e => this._onStateChange.fire(e)));
     }
 
     /**
@@ -230,15 +230,15 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
                 const msg = raw as { id: string; name: string };
                 try {
                     const result = await this._toolRegistry.execute(msg.name, {});
-                    const conversationId = this._conversationState.conversationId;
-                    if (conversationId) {
-                        this._wsClient.sendToolResult(conversationId, msg.id, result);
+                    const roomId = this._roomState.roomId;
+                    if (roomId) {
+                        this._wsClient.sendToolResult(roomId, msg.id, result);
                     }
                 } catch (error) {
-                    const conversationId = this._conversationState.conversationId;
-                    if (conversationId) {
+                    const roomId = this._roomState.roomId;
+                    if (roomId) {
                         this._wsClient.sendToolResult(
-                            conversationId,
+                            roomId,
                             msg.id,
                             null,
                             (error as Error).message,
@@ -277,95 +277,92 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
         // WS 连接由订阅自动管理
     }
 
-    joinConversation(conversationId: string): void {
-        this._conversationState.setConversationId(conversationId);
-        this._wsClient.joinConversation(conversationId);
+    joinRoom(roomId: string): void {
+        this._roomState.setRoomId(roomId);
+        this._wsClient.joinRoom(roomId);
     }
 
-    async sendMessage(content: string, conversationId?: string): Promise<string | null> {
-        const targetConv = conversationId ?? this._conversationState.conversationId;
-        if (targetConv) {
-            return this._sendExistingConversation(targetConv, content);
+    async sendMessage(content: string, roomId?: string): Promise<string | null> {
+        const targetRoom = roomId ?? this._roomState.roomId;
+        if (targetRoom) {
+            return this._sendExistingRoom(targetRoom, content);
         }
         return this.sendCreateAndSend(content);
     }
 
-    private async _sendExistingConversation(
-        conversationId: string,
-        content: string,
-    ): Promise<string | null> {
-        if (this._conversationState.isProcessing) {
-            console.warn('[AI Harness] Cannot send: conversation is processing');
+    private async _sendExistingRoom(roomId: string, content: string): Promise<string | null> {
+        if (this._roomState.isProcessing) {
+            console.warn('[AI Harness] Cannot send: room is processing');
             return null;
         }
 
         const userMsgId = `user-${Date.now()}`;
-        this._conversationState.addMessage({
+        this._roomState.addMessage({
             id: userMsgId,
             role: 'user',
             content,
             createdAt: new Date().toISOString(),
         });
-        this._conversationState.startGenerating();
+        this._roomState.startGenerating();
 
-        this._saveActiveConversationId(conversationId);
+        this._saveActiveRoomId(roomId);
 
-        const ctx = await this._contextCollector.getContext(conversationId.replace('doc-', ''));
-        this._wsClient.sendMessage(content, ctx, conversationId);
+        const ctx = await this._contextCollector.getContext(roomId.replace('doc-', ''));
+        this._wsClient.sendMessage(content, ctx, roomId);
 
-        return conversationId;
+        return roomId;
     }
 
     async sendCreateAndSend(content: string): Promise<string | null> {
-        if (this._conversationState.isProcessing) {
-            console.warn('[AI Harness] Cannot send: conversation is processing');
+        if (this._roomState.isProcessing) {
+            console.warn('[AI Harness] Cannot send: room is processing');
             return null;
         }
 
         const userMsgId = `user-${Date.now()}`;
-        this._conversationState.addMessage({
+        this._roomState.addMessage({
             id: userMsgId,
             role: 'user',
             content,
             createdAt: new Date().toISOString(),
         });
-        this._conversationState.startGenerating();
+        this._roomState.startGenerating();
 
         const ctx = await this._contextCollector.getContext('');
         this._wsClient.sendCreateAndSend(content, ctx);
 
-        // conversationId will be set when 'created' event arrives
+        // roomId will be set when 'created' event arrives
         return null;
     }
 
-    restoreConversation(conversationId: string): void {
-        this._conversationState.setConversationId(conversationId);
-        this._wsClient.sendJoin(conversationId);
+    restoreRoom(roomId: string): void {
+        this._roomState.setRoomId(roomId);
+        this._wsClient.sendJoin(roomId);
         // History will arrive via 'history' event and be loaded by _setupEventProxy
     }
 
-    private _saveActiveConversationId(id: string): void {
+    private _saveActiveRoomId(id: string): void {
         try {
-            localStorage.setItem('activeConversationId', id);
+            localStorage.setItem('activeRoomId', id);
         } catch {
             // localStorage may be unavailable
         }
     }
 
-    private _clearActiveConversationId(): void {
+    private _clearActiveRoomId(): void {
         try {
-            localStorage.removeItem('activeConversationId');
+            localStorage.removeItem('activeRoomId');
         } catch {
             // localStorage may be unavailable
         }
     }
 
     stopGenerating(): void {
-        const conversationId = this._conversationState.conversationId;
-        if (conversationId) {
-            this._wsClient.stopGenerating(conversationId);
+        const roomId = this._roomState.roomId;
+        if (roomId) {
+            this._wsClient.stopGenerating(roomId);
         }
-        this._conversationState.stopGenerating();
+        this._roomState.stopGenerating();
     }
 
     // ========== 工具相关 ==========
@@ -381,19 +378,19 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
     // ========== 状态访问 ==========
 
     get messages(): ReadonlyArray<MessageWire> {
-        return this._conversationState.messages;
+        return this._roomState.messages;
     }
 
     get isGenerating(): boolean {
-        return this._conversationState.isGenerating;
+        return this._roomState.isGenerating;
     }
 
     get isProcessing(): boolean {
-        return this._conversationState.isProcessing;
+        return this._roomState.isProcessing;
     }
 
-    get conversationId(): string | null {
-        return this._conversationState.conversationId;
+    get roomId(): string | null {
+        return this._roomState.roomId;
     }
 
     get selectedText(): string | null {
@@ -442,15 +439,15 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
         return this._onConnectionChange.event;
     }
 
-    get onStatus(): Event<{ conversationId: string; status: string; message?: string }> {
+    get onStatus(): Event<{ roomId: string; status: string; message?: string }> {
         return this._onStatus.event;
     }
 
-    get onCreated(): Event<{ conversationId: string }> {
+    get onCreated(): Event<{ roomId: string }> {
         return this._onCreated.event;
     }
 
-    get onDone(): Event<{ conversationId: string; finishReason: string; error?: string }> {
+    get onDone(): Event<{ roomId: string; finishReason: string; error?: string }> {
         return this._onDone.event;
     }
 
@@ -458,7 +455,7 @@ class AIHarnessServiceImpl extends ServiceBase implements AIHarnessService {
         this._contextCollector.dispose();
         this._wsClient.dispose();
         this._toolRegistry.dispose();
-        this._conversationState.dispose();
+        this._roomState.dispose();
         this._onStreamChunk.dispose();
         this._onToolCall.dispose();
         this._onStreamDone.dispose();

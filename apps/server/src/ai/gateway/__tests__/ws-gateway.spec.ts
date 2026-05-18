@@ -1,41 +1,24 @@
 import { Test } from '@nestjs/testing';
 import type { Socket } from 'socket.io';
+import { MessageBus } from '../../../ws/message-bus';
 import { SocketRegistry } from '../../../ws/socket-registry';
 import { WsGateway } from '../../../ws/ws-gateway';
-import { ToolDispatcher } from '../../tools/tool.dispatcher';
-import { RoomRouter } from '../room-router';
+import { ClientMessageType, TransportMessageType } from '../ai-ws-events.types';
 
-describe('WsGateway', () => {
+describe('WsGateway (integration)', () => {
     let gateway: WsGateway;
     let registry: SocketRegistry;
-    let roomRouter: jest.Mocked<RoomRouter>;
-    let toolDispatcher: jest.Mocked<ToolDispatcher>;
+    let messageBus: MessageBus;
     let mockSocket: Partial<Socket>;
 
     beforeEach(async () => {
-        roomRouter = {
-            createAndSend: jest.fn(),
-            sendMessage: jest.fn(),
-            joinRoom: jest.fn(),
-            stop: jest.fn(),
-            onClientDisconnect: jest.fn(),
-        } as any;
-
-        toolDispatcher = {
-            deliverResult: jest.fn(),
-        } as any;
-
         const module = await Test.createTestingModule({
-            providers: [
-                WsGateway,
-                SocketRegistry,
-                { provide: RoomRouter, useValue: roomRouter },
-                { provide: ToolDispatcher, useValue: toolDispatcher },
-            ],
+            providers: [WsGateway, SocketRegistry, MessageBus],
         }).compile();
 
         gateway = module.get(WsGateway);
         registry = module.get(SocketRegistry);
+        messageBus = module.get(MessageBus);
         mockSocket = { id: 'test-sock', emit: jest.fn() };
     });
 
@@ -50,45 +33,43 @@ describe('WsGateway', () => {
         expect(registry.getSocket('test-sock')).toBeNull();
     });
 
-    it('routes create_and_send to roomRouter', async () => {
+    it('publishes envelope message to MessageBus', async () => {
+        const publishSpy = jest.spyOn(messageBus, 'publish');
         const mockClient = mockSocket as Socket;
-        await gateway.handleCreateAndSend(
-            { type: 'create_and_send', content: 'hello', context: undefined },
-            mockClient,
-        );
-        expect(roomRouter.createAndSend).toHaveBeenCalledWith(
-            'test-sock',
-            'hello',
-            undefined,
-            expect.any(Function),
-        );
-    });
-
-    it('routes tool_result to toolDispatcher', async () => {
-        const mockClient = mockSocket as Socket;
-        await gateway.handleToolResult(
+        await gateway.handleMessage(
             {
-                type: 'tool_result',
-                conversationId: 'conv-1',
-                toolCallId: 'tc-1',
-                result: 'ok',
+                type: ClientMessageType.CreateAndSend,
+                payload: { content: 'hello', context: undefined },
             },
             mockClient,
         );
-        expect(toolDispatcher.deliverResult).toHaveBeenCalledWith('conv-1', 'tc-1', 'ok');
+        expect(publishSpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                type: ClientMessageType.CreateAndSend,
+                clientId: 'test-sock',
+            }),
+        );
     });
 
-    it('emits error on createAndSend failure', async () => {
-        roomRouter.createAndSend.mockRejectedValue(new Error('boom'));
+    it('publishes tool_result envelope to MessageBus', async () => {
+        const publishSpy = jest.spyOn(messageBus, 'publish');
         const mockClient = mockSocket as Socket;
-        gateway.handleConnection(mockClient);
-        await gateway.handleCreateAndSend(
-            { type: 'create_and_send', content: 'hello', context: undefined },
+        await gateway.handleMessage(
+            {
+                type: ClientMessageType.ToolResult,
+                payload: {
+                    roomId: 'room-1',
+                    toolCallId: 'tc-1',
+                    result: 'ok',
+                },
+            },
             mockClient,
         );
-        expect(mockSocket.emit).toHaveBeenCalledWith(
-            'error',
-            expect.objectContaining({ type: 'error', code: 'LLM_UNAVAILABLE' }),
+        expect(publishSpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                type: ClientMessageType.ToolResult,
+                clientId: 'test-sock',
+            }),
         );
     });
 });

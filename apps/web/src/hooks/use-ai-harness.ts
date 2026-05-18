@@ -158,9 +158,9 @@ export function useAIHarness() {
         harness.disconnect();
     }, [harness]);
 
-    const joinConversation = useCallback(
-        (conversationId: string) => {
-            harness.joinConversation(conversationId);
+    const joinRoom = useCallback(
+        (roomId: string) => {
+            harness.joinRoom(roomId);
         },
         [harness],
     );
@@ -200,7 +200,7 @@ export function useAIHarness() {
             // 操作
             connect,
             disconnect,
-            joinConversation,
+            joinRoom,
             sendMessage,
             stopGenerating,
             registerTools,
@@ -216,7 +216,7 @@ export function useAIHarness() {
             harness,
             connect,
             disconnect,
-            joinConversation,
+            joinRoom,
             sendMessage,
             stopGenerating,
             registerTools,

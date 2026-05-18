@@ -14,7 +14,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import type { InFlightToolCall, LLMMessage } from '../ai.types';
 
 export interface CreateMessageOpts {
-    conversationId: string;
+    roomId: string;
     role: string;
     content: string | null;
     toolCalls?: InFlightToolCall[];
@@ -42,7 +42,7 @@ export class MessageService {
     async create(opts: CreateMessageOpts) {
         const message = await this.prisma.message.create({
             data: {
-                conversationId: opts.conversationId,
+                roomId: opts.roomId,
                 role: opts.role,
                 content: opts.content,
                 toolCalls:
@@ -65,11 +65,11 @@ export class MessageService {
     /**
      * 查询对话历史（默认 100 条，升序）
      */
-    async findByConversationId(conversationId: string, opts: ListMessageOpts = {}) {
+    async findByRoomId(roomId: string, opts: ListMessageOpts = {}) {
         const { limit = 100, offset = 0, orderBy = 'asc' } = opts;
 
         return this.prisma.message.findMany({
-            where: { conversationId },
+            where: { roomId },
             orderBy: { createdAt: orderBy },
             take: limit,
             skip: offset,
@@ -94,10 +94,9 @@ export class MessageService {
      *
      * 注意：当 maxTokens 未指定时，不限制条数（避免长对话静默截断）。
      */
-    async buildLLMHistory(conversationId: string, maxTokens?: number): Promise<LLMMessage[]> {
-        // 如果指定了 token 上限，先加载足够的消息（默认 200 条，足够覆盖大多数场景）
+    async buildLLMHistory(roomId: string, maxTokens?: number): Promise<LLMMessage[]> {
         const loadLimit = maxTokens !== undefined ? 200 : undefined;
-        const messages = await this.findByConversationId(conversationId, {
+        const messages = await this.findByRoomId(roomId, {
             orderBy: 'asc',
             ...(loadLimit !== undefined && { limit: loadLimit }),
         });
@@ -112,9 +111,9 @@ export class MessageService {
     /**
      * 获取对话的 token 使用量
      */
-    async getTokenUsage(conversationId: string): Promise<number> {
+    async getTokenUsage(roomId: string): Promise<number> {
         const result = await this.prisma.message.aggregate({
-            where: { conversationId },
+            where: { roomId },
             _sum: { tokenCount: true },
         });
 

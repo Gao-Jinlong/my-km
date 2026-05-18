@@ -1,7 +1,11 @@
 /**
- * WsGateway — thin WebSocket router (transport layer only).
+ * WsGateway — pure WebSocket transport layer.
  *
- * Routes messages to RoomRouter for business logic.
+ * Subscribes only to the generic 'message' event, extracts the inner business
+ * message from the envelope, and publishes to MessageBus. Knows nothing about
+ * business message types (create_and_send, send_message, etc.).
+ *
+ * Provides emitToClient for business modules to send responses.
  * Maintains clientId → Socket mapping via SocketRegistry.
  */
 
@@ -14,9 +18,7 @@ import {
     WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import type { ErrorCode, ServerMessage } from '../ai/gateway/ai-ws-events.types';
-import { RoomRouter } from '../ai/gateway/room-router';
-import { ToolDispatcher } from '../ai/tools/tool.dispatcher';
+import { MessageBus } from './message-bus';
 import { SocketRegistry } from './socket-registry';
 
 @WebSocketGateway({
@@ -32,12 +34,16 @@ export class WsGateway {
 
     constructor(
         private registry: SocketRegistry,
-        private roomRouter: RoomRouter,
-        private toolDispatcher: ToolDispatcher,
+        private messageBus: MessageBus,
     ) {}
 
     @WebSocketServer()
     server!: Server;
+
+    /** Send a message to a specific client. Used by business modules. */
+    emitToClient(clientId: string, event: string, data: unknown): void {
+        this.registry.emitToClient(clientId, event, data);
+    }
 
     handleConnection(client: Socket): void {
         this.logger.log(`Client connected: ${client.id}`);
@@ -46,115 +52,33 @@ export class WsGateway {
 
     handleDisconnect(client: Socket): void {
         this.logger.log(`Client disconnected: ${client.id}`);
-        this.roomRouter.onClientDisconnect(client.id);
+        this.messageBus.publish({
+            type: 'disconnect',
+            clientId: client.id,
+            payload: {},
+        });
         this.registry.unregister(client.id);
     }
 
-    private _emitToClient(clientId: string, msg: ServerMessage): void {
-        this.registry.emitToClient(clientId, msg.type, msg);
-    }
-
-    private _emitError(
-        clientId: string,
-        conversationId: string,
-        code: ErrorCode,
-        message: string,
-    ): void {
-        this._emitToClient(clientId, {
-            type: 'error',
-            conversationId,
-            code,
-            message,
-        });
-    }
-
-    @SubscribeMessage('create_and_send')
-    async handleCreateAndSend(
-        @MessageBody()
-        data: { type: 'create_and_send'; content: string; context?: unknown },
+    /**
+     * Generic message handler — the ONLY inbound business message handler.
+     * Expects envelope format: { type: string, payload: unknown }
+     * Extracts inner type/payload and publishes to MessageBus.
+     */
+    @SubscribeMessage('message')
+    async handleMessage(
+        @MessageBody() data: Record<string, unknown>,
         @ConnectedSocket() client: Socket,
     ): Promise<void> {
-        try {
-            await this.roomRouter.createAndSend(client.id, data.content, data.context, msg =>
-                this._emitToClient(client.id, msg),
+        const innerType = data?.type;
+        if (typeof innerType !== 'string' || innerType.length === 0) {
+            this.logger.warn(
+                `Received message with missing/invalid type from ${client.id}: ${JSON.stringify(data)}`,
             );
-        } catch (error) {
-            this._emitError(client.id, '', 'LLM_UNAVAILABLE', (error as Error).message);
+            return;
         }
-    }
 
-    @SubscribeMessage('send_message')
-    async handleSendMessage(
-        @MessageBody()
-        data: {
-            type: 'send_message';
-            conversationId: string;
-            content: string;
-            context?: unknown;
-        },
-        @ConnectedSocket() client: Socket,
-    ): Promise<void> {
-        try {
-            await this.roomRouter.sendMessage(
-                client.id,
-                data.conversationId,
-                data.content,
-                data.context,
-                msg => this._emitToClient(client.id, msg),
-            );
-        } catch (error) {
-            const msg = (error as Error).message;
-            if (msg.includes('already active') || msg.includes('already has an active')) {
-                this._emitError(
-                    client.id,
-                    data.conversationId,
-                    'CONVERSATION_BUSY',
-                    'Conversation is currently processing',
-                );
-            } else {
-                this._emitError(client.id, data.conversationId, 'LLM_UNAVAILABLE', msg);
-            }
-        }
-    }
-
-    @SubscribeMessage('join')
-    async handleJoin(
-        @MessageBody() data: { type: 'join'; conversationId: string },
-        @ConnectedSocket() client: Socket,
-    ): Promise<void> {
-        try {
-            await this.roomRouter.joinRoom(data.conversationId, msg =>
-                this._emitToClient(client.id, msg),
-            );
-        } catch (error) {
-            this._emitError(
-                client.id,
-                data.conversationId,
-                'CONVERSATION_NOT_FOUND',
-                (error as Error).message,
-            );
-        }
-    }
-
-    @SubscribeMessage('stop')
-    async handleStop(
-        @MessageBody() data: { type: 'stop'; conversationId: string },
-        @ConnectedSocket() _client: Socket,
-    ): Promise<void> {
-        this.roomRouter.stop(data.conversationId);
-    }
-
-    @SubscribeMessage('tool_result')
-    async handleToolResult(
-        @MessageBody()
-        data: {
-            type: 'tool_result';
-            conversationId: string;
-            toolCallId: string;
-            result: unknown;
-        },
-        @ConnectedSocket() _client: Socket,
-    ): Promise<void> {
-        this.toolDispatcher.deliverResult(data.conversationId, data.toolCallId, data.result);
+        const payload = (data?.payload ?? {}) as Record<string, unknown>;
+        this.messageBus.publish({ type: innerType, clientId: client.id, payload });
     }
 }

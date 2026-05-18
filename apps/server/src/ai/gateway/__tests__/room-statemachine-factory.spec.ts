@@ -1,4 +1,4 @@
-import { ConversationState } from '../conversation-statemachine.types';
+import { RoomState } from '../room-statemachine.types';
 import { RoomStateMachineFactory } from '../room-statemachine-factory';
 
 describe('RoomStateMachineFactory', () => {
@@ -13,38 +13,38 @@ describe('RoomStateMachineFactory', () => {
     describe('destroyByClientId', () => {
         it('destroys all FSMs for a given client', () => {
             factory.create({
-                conversationId: 'conv-1',
+                roomId: 'room-1',
                 clientId: 'client-1',
                 emit: mockEmit,
             });
             factory.create({
-                conversationId: 'conv-2',
+                roomId: 'room-2',
                 clientId: 'client-1',
                 emit: mockEmit,
             });
             factory.create({
-                conversationId: 'conv-3',
+                roomId: 'room-3',
                 clientId: 'client-2',
                 emit: mockEmit,
             });
 
             factory.destroyByClientId('client-1');
 
-            expect(factory.get('conv-1')).toBeNull();
-            expect(factory.get('conv-2')).toBeNull();
+            expect(factory.get('room-1')).toBeNull();
+            expect(factory.get('room-2')).toBeNull();
             // client-2's FSM should still exist
-            expect(factory.get('conv-3')).not.toBeNull();
+            expect(factory.get('room-3')).not.toBeNull();
         });
 
         it('aborts active sessions', () => {
             const sm = factory.create({
-                conversationId: 'conv-1',
+                roomId: 'room-1',
                 clientId: 'client-1',
                 emit: mockEmit,
             });
 
             // Simulate active state
-            sm.state = ConversationState.Processing;
+            sm.state = RoomState.Processing;
 
             factory.destroyByClientId('client-1');
 
@@ -59,7 +59,7 @@ describe('RoomStateMachineFactory', () => {
 
         it('cleans up the byClientId map entry', () => {
             factory.create({
-                conversationId: 'conv-1',
+                roomId: 'room-1',
                 clientId: 'client-1',
                 emit: mockEmit,
             });
@@ -68,13 +68,13 @@ describe('RoomStateMachineFactory', () => {
 
             // After cleanup, creating a new FSM for the same client should work fresh
             const sm = factory.create({
-                conversationId: 'conv-4',
+                roomId: 'room-4',
                 clientId: 'client-1',
                 emit: mockEmit,
             });
 
             expect(sm).not.toBeNull();
-            expect(factory.get('conv-4')).not.toBeNull();
+            expect(factory.get('room-4')).not.toBeNull();
         });
     });
 });
