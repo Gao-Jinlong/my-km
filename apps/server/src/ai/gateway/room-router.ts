@@ -33,7 +33,7 @@ export class RoomRouter {
         emit: EmitFn,
     ): Promise<void> {
         const room = await this.roomService.create({
-            title: content.substring(0, 50),
+            title: content.substring(0, 20),
         });
 
         emit({ type: 'created', roomId: room.id });

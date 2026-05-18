@@ -2,20 +2,19 @@
  * RequestDispatcher — 请求分发
  *
  * 负责：
- * - 消息验证和速率限制
+ * - 速率限制
  * - 会话创建和并发控制
  * - 调用 RoomOrchestrator 执行对话
  *
  * 请求分发流程:
  * ┌───────────┐    ┌──────────────┐    ┌───────────────┐    ┌──────────────────┐
- * │  Message   │───▶│  Validate    │───▶│  Create       │───▶│  Room             │
- * │  Received  │    │  + RateLimit │    │  AISession    │    │  Orchestrator    │
+ * │  Message   │───▶│  RateLimit  │───▶│  Create       │───▶│  Room             │
+ * │  Received  │    │              │    │  AISession    │    │  Orchestrator    │
  * └───────────┘    └──────────────┘    └───────────────┘    └──────────────────┘
  */
 
 import { Injectable, Logger } from '@nestjs/common';
 import { SocketRegistry } from '../../ws/socket-registry';
-import { RoomService } from '../conversation/room.service';
 import { AISessionManager } from '../session/ai-session-manager';
 import { RoomOrchestrator } from '../workflow-runtime/room-orchestrator';
 import { AiRateLimiter } from './rate-limiter.guard';
@@ -45,7 +44,6 @@ export class RequestDispatcher {
         private sessionManager: AISessionManager,
         private orchestrator: RoomOrchestrator,
         private socketRegistry: SocketRegistry,
-        private roomService: RoomService,
         private rateLimiter: AiRateLimiter,
     ) {}
 
@@ -55,18 +53,8 @@ export class RequestDispatcher {
     async dispatch(ctx: DispatchContext): Promise<void> {
         const { roomId, clientId, content } = ctx;
 
-        // 1. 查找对话（不存在则自动创建，兼容 join 尚未到达的竞态）
-        let room = await this.roomService.findById(roomId);
-        if (!room) {
-            this.logger.log(`[${clientId}] room not found in dispatch, creating: ${roomId}`);
-            room = await this.roomService.create({
-                id: roomId,
-                userId: undefined,
-            });
-        }
-
-        const userId = room.userId ?? null;
-        if (!this.rateLimiter.check(userId, clientId)) {
+        // 1. 速率检查
+        if (!this.rateLimiter.check(null, clientId)) {
             this.socketRegistry.emitToClient(clientId, 'error', {
                 type: 'error',
                 message: 'Rate limit exceeded. Please try again later.',

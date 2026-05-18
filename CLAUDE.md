@@ -40,5 +40,5 @@ Key routing rules:
 - Config file: ~/.gbrain/config.json (mode 0600)
 - Setup date: 2026-04-29
 - MCP registered: yes
-- Memory sync: full
+- Artifacts sync: full
 - Current repo policy: unset

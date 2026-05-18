@@ -61,5 +61,6 @@ apps/server/prisma/migrations/
 .turbo/
 
 # Worktrees
+.claude/worktrees/
 .worktrees/
 .gstack/

@@ -35,16 +35,20 @@ export class RoomStateMachineFactory {
             clientSet?.delete(options.roomId);
         }
 
-        const sm = new RoomStateMachine(options.roomId, options.clientId, options.emit);
-        this.byRoomId.set(options.roomId, sm);
+        const roomStateMachine = new RoomStateMachine(
+            options.roomId,
+            options.clientId,
+            options.emit,
+        );
+        this.byRoomId.set(options.roomId, roomStateMachine);
 
         if (!this.byClientId.has(options.clientId)) {
             this.byClientId.set(options.clientId, new Set());
         }
-        this.byClientId.get(options.clientId)!.add(options.roomId);
+        this.byClientId.get(options.clientId)?.add(options.roomId);
 
         this.logger.debug(`FSM created for room ${options.roomId}`);
-        return sm;
+        return roomStateMachine;
     }
 
     get(roomId: string): RoomStateMachine | null {
