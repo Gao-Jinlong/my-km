@@ -9,8 +9,8 @@
 
 import type { BaseGraph } from '@my-km/langgraph-workflows';
 import { Injectable, Logger } from '@nestjs/common';
-import { LLMFactory } from '../provider/llm-factory';
-import type { LLMConfig, LLMProvider, NodeLLMConfigMap } from '../provider/provider.types';
+import { LLMFactory } from '../llm/llm-factory';
+import type { LLMConfig, LLMProvider, NodeLLMConfigMap } from '../llm/provider.types';
 
 @Injectable()
 export class LLMResolver {

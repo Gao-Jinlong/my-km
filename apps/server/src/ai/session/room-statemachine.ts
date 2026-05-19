@@ -5,7 +5,7 @@
  * States: Idle → BuildingContext → Processing → [ToolWaiting → ToolExecuting → Processing]* → Done
  */
 
-import type { ErrorCode, FinishReason, ServerMessage } from './ai-ws-events.types';
+import type { ErrorCode, FinishReason, ServerMessage } from '../ws/ai-ws-events.types';
 import { isValidTransition, RoomState } from './room-session.types';
 
 export class RoomStateMachine {

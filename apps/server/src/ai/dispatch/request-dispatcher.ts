@@ -7,8 +7,9 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { SocketRegistry } from '../../ws/socket-registry';
-import type { WorkflowCallbacks } from '../gateway/room-session.types';
-import { RoomOrchestrator } from '../workflow-runtime/orchestrator';
+import type { LLMConfig } from '../llm/provider.types';
+import type { WorkflowCallbacks } from '../session/room-session.types';
+import { RoomOrchestrator } from '../workflow/orchestrator';
 import { AiRateLimiter } from './rate-limiter.guard';
 
 export interface DispatchContext {
@@ -16,10 +17,7 @@ export interface DispatchContext {
     clientId: string;
     content: string;
     context?: Record<string, unknown>;
-    llmConfigMap?: Record<
-        string,
-        { provider: string; model: string; temperature?: number; maxTokens?: number }
-    >;
+    llmConfigMap?: Record<string, LLMConfig>;
     graphName?: string;
     callbacks?: WorkflowCallbacks;
 }

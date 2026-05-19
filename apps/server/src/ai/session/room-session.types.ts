@@ -5,7 +5,7 @@
  * Re-exports executor types for use in gateway layer.
  */
 
-import type { ErrorCode, FinishReason, ServerMessage } from './ai-ws-events.types';
+import type { ErrorCode, FinishReason, ServerMessage } from '../ws/ai-ws-events.types';
 
 // === RoomStateMachine states ===
 
@@ -38,7 +38,7 @@ export type {
     ExecutorDependencies,
     WorkflowCallbacks,
     WorkflowToolCall,
-} from '../workflow-runtime/executor.types';
+} from '../workflow/executor.types';
 
 // === EmitFn ===
 

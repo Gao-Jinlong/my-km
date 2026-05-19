@@ -38,8 +38,3 @@ export interface LLMProvider {
         abortSignal?: AbortSignal,
     ): AsyncIterable<LLMOutput>;
 }
-
-export interface ProviderSelectOpts {
-    model?: string;
-    provider?: string;
-}

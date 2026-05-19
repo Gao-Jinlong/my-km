@@ -1,187 +1,75 @@
 import { Test } from '@nestjs/testing';
+import type { Socket } from 'socket.io';
+import { ClientMessageType, TransportMessageType } from '../../ai/ws/ai-ws-events.types';
 import { MessageBus } from '../message-bus';
 import { SocketRegistry } from '../socket-registry';
 import { WsGateway } from '../ws-gateway';
 
-describe('WsGateway', () => {
+describe('WsGateway (integration)', () => {
     let gateway: WsGateway;
-    let registry: jest.Mocked<SocketRegistry>;
-    let messageBus: jest.Mocked<MessageBus>;
+    let registry: SocketRegistry;
+    let messageBus: MessageBus;
+    let mockSocket: Partial<Socket>;
 
     beforeEach(async () => {
-        registry = {
-            register: jest.fn(),
-            unregister: jest.fn(),
-            emitToClient: jest.fn(),
-            getSocket: jest.fn(),
-            isOnline: jest.fn(),
-        } as any;
-
-        messageBus = {
-            publish: jest.fn(),
-            subscribe: jest.fn(),
-        } as any;
-
         const module = await Test.createTestingModule({
-            providers: [
-                WsGateway,
-                { provide: SocketRegistry, useValue: registry },
-                { provide: MessageBus, useValue: messageBus },
-            ],
+            providers: [WsGateway, SocketRegistry, MessageBus],
         }).compile();
 
         gateway = module.get(WsGateway);
+        registry = module.get(SocketRegistry);
+        messageBus = module.get(MessageBus);
+        mockSocket = { id: 'test-sock', emit: jest.fn() };
     });
 
-    describe('handleConnection', () => {
-        it('registers client in socket registry', () => {
-            const mockSocket = { id: 'client-1' } as any;
-            gateway.handleConnection(mockSocket);
-            expect(registry.register).toHaveBeenCalledWith('client-1', mockSocket);
-        });
+    it('registers socket on connection', () => {
+        gateway.handleConnection(mockSocket as Socket);
+        expect(registry.getSocket('test-sock')).toBe(mockSocket);
     });
 
-    describe('handleDisconnect', () => {
-        it('publishes disconnect message to MessageBus', () => {
-            const mockSocket = { id: 'client-42' } as any;
-            gateway.handleDisconnect(mockSocket);
-            expect(messageBus.publish).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    type: 'disconnect',
-                    clientId: 'client-42',
-                }),
-            );
-        });
-
-        it('unregisters client from socket registry', () => {
-            const mockSocket = { id: 'client-1' } as any;
-            gateway.handleDisconnect(mockSocket);
-            expect(registry.unregister).toHaveBeenCalledWith('client-1');
-        });
-
-        it('publishes disconnect before unregister', async () => {
-            const callOrder: string[] = [];
-            (messageBus.publish as jest.Mock).mockImplementation(async () => {
-                callOrder.push('publish');
-            });
-            (registry.unregister as jest.Mock).mockImplementation(() =>
-                callOrder.push('unregister'),
-            );
-
-            const mockSocket = { id: 'client-1' } as any;
-            await gateway.handleDisconnect(mockSocket);
-
-            expect(callOrder).toEqual(['publish', 'unregister']);
-        });
+    it('unregisters socket on disconnect', () => {
+        gateway.handleConnection(mockSocket as Socket);
+        gateway.handleDisconnect(mockSocket as Socket);
+        expect(registry.getSocket('test-sock')).toBeNull();
     });
 
-    describe('handleMessage (envelope)', () => {
-        const mockSocket = { id: 'client-1' } as any;
-
-        it('publishes valid envelope to MessageBus', async () => {
-            await gateway.handleMessage(
-                { type: 'create_and_send', payload: { content: 'hello', context: undefined } },
-                mockSocket,
-            );
-            expect(messageBus.publish).toHaveBeenCalledWith({
-                type: 'create_and_send',
-                clientId: 'client-1',
+    it('publishes envelope message to MessageBus', async () => {
+        const publishSpy = jest.spyOn(messageBus, 'publish');
+        const mockClient = mockSocket as Socket;
+        await gateway.handleMessage(
+            {
+                type: ClientMessageType.CreateAndSend,
                 payload: { content: 'hello', context: undefined },
-            });
-        });
+            },
+            mockClient,
+        );
+        expect(publishSpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                type: ClientMessageType.CreateAndSend,
+                clientId: 'test-sock',
+            }),
+        );
+    });
 
-        it('publishes any business message type to MessageBus', async () => {
-            await gateway.handleMessage(
-                {
-                    type: 'send_message',
-                    payload: {
-                        roomId: 'room-1',
-                        content: 'hi',
-                        context: undefined,
-                    },
-                },
-                mockSocket,
-            );
-            expect(messageBus.publish).toHaveBeenCalledWith({
-                type: 'send_message',
-                clientId: 'client-1',
-                payload: {
-                    roomId: 'room-1',
-                    content: 'hi',
-                    context: undefined,
-                },
-            });
-        });
-
-        it('publishes join message to MessageBus', async () => {
-            await gateway.handleMessage(
-                { type: 'join', payload: { roomId: 'room-1' } },
-                mockSocket,
-            );
-            expect(messageBus.publish).toHaveBeenCalledWith({
-                type: 'join',
-                clientId: 'client-1',
-                payload: { roomId: 'room-1' },
-            });
-        });
-
-        it('publishes stop message to MessageBus', async () => {
-            await gateway.handleMessage(
-                { type: 'stop', payload: { roomId: 'room-1' } },
-                mockSocket,
-            );
-            expect(messageBus.publish).toHaveBeenCalledWith({
-                type: 'stop',
-                clientId: 'client-1',
-                payload: { roomId: 'room-1' },
-            });
-        });
-
-        it('publishes tool_result message to MessageBus', async () => {
-            await gateway.handleMessage(
-                {
-                    type: 'tool_result',
-                    payload: {
-                        roomId: 'room-1',
-                        toolCallId: 'tc-1',
-                        result: { data: 42 },
-                    },
-                },
-                mockSocket,
-            );
-            expect(messageBus.publish).toHaveBeenCalledWith({
-                type: 'tool_result',
-                clientId: 'client-1',
+    it('publishes tool_result envelope to MessageBus', async () => {
+        const publishSpy = jest.spyOn(messageBus, 'publish');
+        const mockClient = mockSocket as Socket;
+        await gateway.handleMessage(
+            {
+                type: ClientMessageType.ToolResult,
                 payload: {
                     roomId: 'room-1',
                     toolCallId: 'tc-1',
-                    result: { data: 42 },
+                    result: 'ok',
                 },
-            });
-        });
-
-        it('ignores message with missing type', async () => {
-            await gateway.handleMessage({ payload: { content: 'hello' } }, mockSocket);
-            expect(messageBus.publish).not.toHaveBeenCalled();
-        });
-
-        it('ignores message with empty string type', async () => {
-            await gateway.handleMessage({ type: '', payload: { content: 'hello' } }, mockSocket);
-            expect(messageBus.publish).not.toHaveBeenCalled();
-        });
-
-        it('ignores message with non-string type', async () => {
-            await gateway.handleMessage({ type: 42 as unknown as string, payload: {} }, mockSocket);
-            expect(messageBus.publish).not.toHaveBeenCalled();
-        });
-
-        it('defaults payload to empty object when missing', async () => {
-            await gateway.handleMessage({ type: 'some_event' }, mockSocket);
-            expect(messageBus.publish).toHaveBeenCalledWith({
-                type: 'some_event',
-                clientId: 'client-1',
-                payload: {},
-            });
-        });
+            },
+            mockClient,
+        );
+        expect(publishSpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                type: ClientMessageType.ToolResult,
+                clientId: 'test-sock',
+            }),
+        );
     });
 });

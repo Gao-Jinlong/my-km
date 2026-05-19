@@ -1,4 +1,4 @@
-import { SocketRegistry } from '../../../ws/socket-registry';
+import { SocketRegistry } from '../socket-registry';
 
 describe('SocketRegistry', () => {
     let registry: SocketRegistry;

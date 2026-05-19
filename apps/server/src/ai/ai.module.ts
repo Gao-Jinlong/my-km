@@ -8,21 +8,21 @@ import { AiController } from './ai.controller';
 import { RoomService } from './conversation/room.service';
 import { AiRateLimiter } from './dispatch/rate-limiter.guard';
 import { RequestDispatcher } from './dispatch/request-dispatcher';
-import { AiMessageRouter } from './gateway/ai-message-router';
-import { RoomSessionRegistry } from './gateway/room-session-registry';
+import { AnthropicProvider } from './llm/anthropic.provider';
+import { DashscopeProvider } from './llm/dashscope.provider';
+import { LLMFactory } from './llm/llm-factory';
+import { OpenAIProvider } from './llm/openai.provider';
+import type { LLMConfig, LLMProvider } from './llm/provider.types';
+import { ProviderRegistry } from './llm/provider-registry';
+import { ZhipuProvider } from './llm/zhipu.provider';
 import { MessageService } from './message/message.service';
-import { AnthropicProvider } from './provider/anthropic.provider';
-import { DashscopeProvider } from './provider/dashscope.provider';
-import { LLMFactory } from './provider/llm-factory';
-import { OpenAIProvider } from './provider/openai.provider';
-import type { LLMConfig, LLMProvider } from './provider/provider.types';
-import { ProviderRegistry } from './provider/provider-registry';
-import { ZhipuProvider } from './provider/zhipu.provider';
+import { RoomSessionRegistry } from './session/room-session-registry';
 import { ToolDispatcher } from './tools/tool.dispatcher';
 import { ToolRouter } from './tools/tool-router';
-import { GraphRegistry } from './workflow-runtime/graph-registry';
-import { LLMResolver } from './workflow-runtime/llm-resolver';
-import { RoomOrchestrator } from './workflow-runtime/orchestrator';
+import { GraphRegistry } from './workflow/graph-registry';
+import { LLMResolver } from './workflow/llm-resolver';
+import { RoomOrchestrator } from './workflow/orchestrator';
+import { AiMessageRouter } from './ws/ai-message-router';
 /**
  * AI 模块
  *

@@ -6,9 +6,9 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { RoomSessionRegistry } from '../gateway/room-session-registry';
+import type { NodeLLMConfigMap } from '../llm/provider.types';
 import { MessageService } from '../message/message.service';
-import type { NodeLLMConfigMap } from '../provider/provider.types';
+import { RoomSessionRegistry } from '../session/room-session-registry';
 import { ToolDispatcher } from '../tools/tool.dispatcher';
 import { ToolRouter } from '../tools/tool-router';
 import { Executor } from './executor';

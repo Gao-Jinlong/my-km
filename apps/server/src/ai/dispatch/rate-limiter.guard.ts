@@ -15,7 +15,7 @@ interface RateWindow {
     windowStart: number;
 }
 
-export interface RateLimitOpts {
+interface RateLimitOpts {
     maxRequests?: number; // 窗口内最大请求数，默认 20
     windowMs?: number; // 窗口时长（毫秒），默认 60s
 }

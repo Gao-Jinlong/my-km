@@ -4,11 +4,11 @@
  * Defines the per-execution context, callbacks, and dependency bundle.
  */
 
-import type { FinishReason } from '../gateway/ai-ws-events.types';
+import type { NodeLLMConfigMap } from '../llm/provider.types';
 import type { MessageService } from '../message/message.service';
-import type { NodeLLMConfigMap } from '../provider/provider.types';
 import type { ToolDispatcher } from '../tools/tool.dispatcher';
 import type { ToolRouter } from '../tools/tool-router';
+import type { FinishReason } from '../ws/ai-ws-events.types';
 import type { GraphRegistry } from './graph-registry';
 import type { LLMResolver } from './llm-resolver';
 

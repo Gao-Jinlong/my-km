@@ -7,5 +7,3 @@ export const ROOM_STATUS = {
     ARCHIVED: 'archived',
     DELETED: 'deleted',
 } as const;
-
-export type RoomStatus = (typeof ROOM_STATUS)[keyof typeof ROOM_STATUS];

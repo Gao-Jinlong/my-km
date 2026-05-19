@@ -11,11 +11,11 @@ import { WsGateway } from '../../ws/ws-gateway';
 import { RoomService } from '../conversation/room.service';
 import { RequestDispatcher } from '../dispatch/request-dispatcher';
 import { MessageService } from '../message/message.service';
+import type { EmitFn, WorkflowCallbacks } from '../session/room-session.types';
+import { RoomSessionRegistry } from '../session/room-session-registry';
 import { ToolDispatcher } from '../tools/tool.dispatcher';
 import type { MessageWire, ServerMessage } from './ai-ws-events.types';
 import { ClientMessageType, TransportMessageType } from './ai-ws-events.types';
-import type { EmitFn, WorkflowCallbacks } from './room-session.types';
-import { RoomSessionRegistry } from './room-session-registry';
 
 type EmitToClient = (serverMsg: ServerMessage) => void;
 
@@ -216,7 +216,9 @@ export class AiMessageRouter implements OnModuleInit {
     }
 
     /** Build the WorkflowCallbacks bridge that decouples Executor from transport. */
-    private _buildCallbacks(session: import('./room-session').RoomSession): WorkflowCallbacks {
+    private _buildCallbacks(
+        session: import('../session/room-session').RoomSession,
+    ): WorkflowCallbacks {
         const sm = session.stateMachine;
 
         return {
