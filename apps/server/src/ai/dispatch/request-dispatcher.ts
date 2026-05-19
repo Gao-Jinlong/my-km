@@ -1,22 +1,14 @@
 /**
- * RequestDispatcher — 请求分发
+ * RequestDispatcher — rate limit + dispatch execution.
  *
- * 负责：
- * - 速率限制
- * - 会话创建和并发控制
- * - 调用 RoomOrchestrator 执行对话
- *
- * 请求分发流程:
- * ┌───────────┐    ┌──────────────┐    ┌───────────────┐    ┌──────────────────┐
- * │  Message   │───▶│  RateLimit  │───▶│  Create       │───▶│  Room             │
- * │  Received  │    │              │    │  AISession    │    │  Orchestrator    │
- * └───────────┘    └──────────────┘    └───────────────┘    └──────────────────┘
+ * Phase 3 rewrite: uses RoomSessionRegistry for concurrency guard (not AISessionManager).
+ * Calls the orchestrator directly with callbacks already built by AiMessageRouter.
  */
 
 import { Injectable, Logger } from '@nestjs/common';
 import { SocketRegistry } from '../../ws/socket-registry';
-import { AISessionManager } from '../session/ai-session-manager';
-import { RoomOrchestrator } from '../workflow-runtime/room-orchestrator';
+import type { WorkflowCallbacks } from '../gateway/room-session.types';
+import { RoomOrchestrator } from '../workflow-runtime/orchestrator';
 import { AiRateLimiter } from './rate-limiter.guard';
 
 export interface DispatchContext {
@@ -26,14 +18,10 @@ export interface DispatchContext {
     context?: Record<string, unknown>;
     llmConfigMap?: Record<
         string,
-        {
-            provider: string;
-            model: string;
-            temperature?: number;
-            maxTokens?: number;
-        }
+        { provider: string; model: string; temperature?: number; maxTokens?: number }
     >;
     graphName?: string;
+    callbacks?: WorkflowCallbacks;
 }
 
 @Injectable()
@@ -41,19 +29,15 @@ export class RequestDispatcher {
     private readonly logger = new Logger(RequestDispatcher.name);
 
     constructor(
-        private sessionManager: AISessionManager,
         private orchestrator: RoomOrchestrator,
         private socketRegistry: SocketRegistry,
         private rateLimiter: AiRateLimiter,
     ) {}
 
-    /**
-     * 分发用户消息
-     */
     async dispatch(ctx: DispatchContext): Promise<void> {
         const { roomId, clientId, content } = ctx;
 
-        // 1. 速率检查
+        // 1. Rate limit check
         if (!this.rateLimiter.check(null, clientId)) {
             this.socketRegistry.emitToClient(clientId, 'error', {
                 type: 'error',
@@ -63,28 +47,34 @@ export class RequestDispatcher {
             return;
         }
 
-        // 2. 创建 AI 会话（并发控制）
-        const session = this.sessionManager.create({
-            roomId,
-            clientId,
-        });
+        // 2. Execute orchestration with callbacks (default to no-op for REST callers)
+        const callbacks = ctx.callbacks ?? this._noOpCallbacks();
 
         try {
-            // 3. 执行对话编排
-            await this.orchestrator.dispatch(session, content, {
+            await this.orchestrator.dispatch({
+                roomId,
+                clientId,
+                content,
                 llmConfigMap: ctx.llmConfigMap,
                 graphName: ctx.graphName,
+                callbacks,
             });
         } catch (error) {
-            this.logger.error(`Dispatch failed for session ${session.id}:`, error);
+            this.logger.error(`Dispatch failed for room ${roomId}:`, error);
             this.socketRegistry.emitToClient(clientId, 'error', {
                 type: 'error',
                 message: error instanceof Error ? error.message : 'Unknown error',
                 code: 'DISPATCH_ERROR',
             });
-        } finally {
-            // 4. 清理会话
-            this.sessionManager.cleanup(roomId);
         }
+    }
+
+    private _noOpCallbacks(): WorkflowCallbacks {
+        return {
+            onTextChunk: () => {},
+            onToolCall: () => {},
+            onLlmDone: () => {},
+            onError: () => {},
+        };
     }
 }

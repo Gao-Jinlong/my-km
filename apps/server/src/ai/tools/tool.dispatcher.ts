@@ -1,10 +1,8 @@
 /**
- * ToolDispatcher — 工具结果分发
+ * ToolDispatcher — tool result delivery.
  *
- * 替代全局 EventEmitter，使用会话级事件。
- * 负责：
- * - 接收前端返回的 tool_result
- * - 分发到正确的等待循环（通过 sessionId）
+ * Phase 5 rewrite: simplified to only use roomId-based waiting sessions.
+ * Removed dual lookup (sessionId + roomId) since Executor always uses roomId.
  */
 
 import { Injectable, Logger } from '@nestjs/common';
@@ -15,7 +13,7 @@ interface WaitingSession {
     results: Record<string, unknown>;
     expectedToolCallIds: Set<string>;
     timeout: ReturnType<typeof setTimeout>;
-    roomId: string; // for roomId-based lookup (legacy path)
+    roomId: string;
 }
 
 @Injectable()
@@ -25,35 +23,8 @@ export class ToolDispatcher {
     private toolDefinitions: ToolDefinition[] = [];
 
     /**
-     * 等待工具结果（带超时）— 由 AILoopOrchestrator 调用（通过 sessionId）
-     */
-    waitForResults(
-        sessionId: string,
-        roomId: string,
-        toolCalls: InFlightToolCall[],
-        timeoutMs: number,
-    ): Promise<Record<string, unknown> | null> {
-        return new Promise(resolve => {
-            const expectedIds = new Set(toolCalls.map(tc => tc.id));
-
-            const timeout = setTimeout(() => {
-                this.waitingSessions.delete(sessionId);
-                this.logger.warn(`Tool results timed out for session ${sessionId}`);
-                resolve(null);
-            }, timeoutMs);
-
-            this.waitingSessions.set(sessionId, {
-                resolve,
-                results: {},
-                expectedToolCallIds: expectedIds,
-                timeout,
-                roomId,
-            });
-        });
-    }
-
-    /**
-     * 按 roomId 等待工具结果 — 遗留路径调用
+     * Wait for tool results from a room (with timeout).
+     * Returns results map keyed by toolCallId, or null on timeout.
      */
     waitForResultsByRoom(
         roomId: string,
@@ -62,7 +33,7 @@ export class ToolDispatcher {
     ): Promise<Record<string, unknown> | null> {
         return new Promise(resolve => {
             const expectedIds = new Set(toolCalls.map(tc => tc.id));
-            const sessionKey = `conv:${roomId}:${Date.now()}`;
+            const sessionKey = `room:${roomId}:${Date.now()}`;
 
             const timeout = setTimeout(() => {
                 this.waitingSessions.delete(sessionKey);
@@ -81,39 +52,17 @@ export class ToolDispatcher {
     }
 
     /**
-     * 交付工具结果（由 Gateway 调用）
-     *
-     * 查找策略：
-     * 1. 先按 sessionId 精确查找（新路径：AILoopOrchestrator）
-     * 2. 再按 roomId 模糊查找（遗留路径：AiService）
+     * Deliver a tool result to the waiting session.
      */
-    deliverResult(
-        roomId: string,
-        toolCallId: string,
-        result: unknown,
-        error?: string,
-        sessionId?: string,
-    ): void {
+    deliverResult(roomId: string, toolCallId: string, result: unknown, error?: string): void {
         let session: WaitingSession | null = null;
         let sessionKey: string | null = null;
 
-        // 1. 精确查找（如果有 sessionId）
-        if (sessionId) {
-            const s = this.waitingSessions.get(sessionId);
-            if (s && s.roomId === roomId) {
+        for (const [key, s] of this.waitingSessions) {
+            if (s.roomId === roomId) {
                 session = s;
-                sessionKey = sessionId;
-            }
-        }
-
-        // 2. 按 roomId 模糊查找
-        if (!session) {
-            for (const [key, s] of this.waitingSessions) {
-                if (s.roomId === roomId && key.startsWith('conv:')) {
-                    session = s;
-                    sessionKey = key;
-                    break;
-                }
+                sessionKey = key;
+                break;
             }
         }
 
@@ -124,7 +73,6 @@ export class ToolDispatcher {
 
         session.results[toolCallId] = error ? { error } : result;
 
-        // 检查是否所有工具都已返回结果
         if (Object.keys(session.results).length >= session.expectedToolCallIds.size) {
             clearTimeout(session.timeout);
             if (sessionKey) this.waitingSessions.delete(sessionKey);
@@ -133,21 +81,11 @@ export class ToolDispatcher {
     }
 
     /**
-     * 取消等待（会话中断时调用）
+     * Cancel waiting for a room's tool results (on abort).
      */
-    cancelWaiting(roomId: string, sessionId?: string): void {
+    cancelWaiting(roomId: string): void {
         const toRemove: string[] = [];
 
-        if (sessionId) {
-            const s = this.waitingSessions.get(sessionId);
-            if (s) {
-                clearTimeout(s.timeout);
-                s.resolve(null);
-                toRemove.push(sessionId);
-            }
-        }
-
-        // 清理该 room 下的所有遗留等待
         for (const [key, s] of this.waitingSessions) {
             if (s.roomId === roomId) {
                 clearTimeout(s.timeout);
@@ -162,14 +100,14 @@ export class ToolDispatcher {
     }
 
     /**
-     * 获取所有工具定义（发送给 LLM）
+     * Get all tool definitions registered.
      */
     getDefinitions(): ToolDefinition[] {
         return this.toolDefinitions;
     }
 
     /**
-     * 批量注册工具
+     * Register tool definitions in bulk.
      */
     registerMany(tools: ToolDefinition[]): void {
         this.toolDefinitions = [...tools];

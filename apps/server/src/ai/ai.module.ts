@@ -9,8 +9,7 @@ import { RoomService } from './conversation/room.service';
 import { AiRateLimiter } from './dispatch/rate-limiter.guard';
 import { RequestDispatcher } from './dispatch/request-dispatcher';
 import { AiMessageRouter } from './gateway/ai-message-router';
-import { RoomRouter } from './gateway/room-router';
-import { RoomStateMachineFactory } from './gateway/room-statemachine-factory';
+import { RoomSessionRegistry } from './gateway/room-session-registry';
 import { MessageService } from './message/message.service';
 import { AnthropicProvider } from './provider/anthropic.provider';
 import { DashscopeProvider } from './provider/dashscope.provider';
@@ -19,13 +18,11 @@ import { OpenAIProvider } from './provider/openai.provider';
 import type { LLMConfig, LLMProvider } from './provider/provider.types';
 import { ProviderRegistry } from './provider/provider-registry';
 import { ZhipuProvider } from './provider/zhipu.provider';
-import { AISessionManager } from './session/ai-session-manager';
 import { ToolDispatcher } from './tools/tool.dispatcher';
 import { ToolRouter } from './tools/tool-router';
 import { GraphRegistry } from './workflow-runtime/graph-registry';
 import { LLMResolver } from './workflow-runtime/llm-resolver';
-import { RoomOrchestrator } from './workflow-runtime/room-orchestrator';
-import { WorkflowExecutor } from './workflow-runtime/workflow-executor';
+import { RoomOrchestrator } from './workflow-runtime/orchestrator';
 /**
  * AI 模块
  *
@@ -38,14 +35,12 @@ import { WorkflowExecutor } from './workflow-runtime/workflow-executor';
     providers: [
         RoomService,
         MessageService,
-        AISessionManager,
         SocketRegistry,
-        RoomRouter,
         ToolDispatcher,
         ToolRouter,
         RequestDispatcher,
         AiRateLimiter,
-        RoomStateMachineFactory,
+        RoomSessionRegistry,
         // Message routing (self-subscribing)
         AiMessageRouter,
         // New architecture
@@ -53,7 +48,6 @@ import { WorkflowExecutor } from './workflow-runtime/workflow-executor';
         LLMFactory,
         LLMResolver,
         GraphRegistry,
-        WorkflowExecutor,
         RoomOrchestrator,
     ],
     exports: [
@@ -63,9 +57,8 @@ import { WorkflowExecutor } from './workflow-runtime/workflow-executor';
         LLMFactory,
         LLMResolver,
         GraphRegistry,
-        WorkflowExecutor,
         RoomOrchestrator,
-        RoomRouter,
+        AiMessageRouter,
     ],
 })
 export class AiModule implements OnModuleInit {

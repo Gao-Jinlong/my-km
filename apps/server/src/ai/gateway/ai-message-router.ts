@@ -1,32 +1,39 @@
 /**
- * AiMessageRouter — MessageBus handler for AI room-level and tool messages.
+ * AiMessageRouter — unified message router for AI WebSocket messages.
  *
- * Self-subscribes to the MessageBus on module init, routing incoming messages
- * to the appropriate handler (RoomRouter or ToolDispatcher).
- *
- * This keeps ai.module.ts focused on provider registration and initialization,
- * while business message routing lives alongside the handlers it dispatches to.
+ * Phase 2 rewrite: replaces RoomRouter + old AiMessageRouter.
+ * Self-subscribes to MessageBus, directly calls RoomService/RoomSessionRegistry/RequestDispatcher.
  */
 
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { MessageBus } from '../../ws/message-bus';
 import { WsGateway } from '../../ws/ws-gateway';
+import { RoomService } from '../conversation/room.service';
+import { RequestDispatcher } from '../dispatch/request-dispatcher';
+import { MessageService } from '../message/message.service';
 import { ToolDispatcher } from '../tools/tool.dispatcher';
-import type { ServerMessage } from './ai-ws-events.types';
+import type { MessageWire, ServerMessage } from './ai-ws-events.types';
 import { ClientMessageType, TransportMessageType } from './ai-ws-events.types';
-import { RoomRouter } from './room-router';
+import type { EmitFn, WorkflowCallbacks } from './room-session.types';
+import { RoomSessionRegistry } from './room-session-registry';
+
+type EmitToClient = (serverMsg: ServerMessage) => void;
 
 @Injectable()
 export class AiMessageRouter implements OnModuleInit {
     constructor(
         private messageBus: MessageBus,
         private wsGateway: WsGateway,
-        private roomRouter: RoomRouter,
+        private roomService: RoomService,
+        private messageService: MessageService,
+        private roomSessionRegistry: RoomSessionRegistry,
+        private requestDispatcher: RequestDispatcher,
         private toolDispatcher: ToolDispatcher,
     ) {}
 
     onModuleInit() {
-        // Subscribe to room-level messages
+        this.roomSessionRegistry.startPeriodicCleanup();
+
         this.messageBus.subscribe({
             allowedTypes: new Set([
                 ClientMessageType.CreateAndSend,
@@ -38,7 +45,6 @@ export class AiMessageRouter implements OnModuleInit {
             handle: msg => this._routeRoomMessage(msg),
         });
 
-        // Subscribe to tool result messages
         this.messageBus.subscribe({
             allowedTypes: new Set([ClientMessageType.ToolResult]),
             handle: async msg => {
@@ -48,25 +54,28 @@ export class AiMessageRouter implements OnModuleInit {
         });
     }
 
-    /** Route incoming bus messages to the appropriate RoomRouter method. */
+    private _buildEmit(clientId: string): EmitToClient {
+        return (serverMsg: ServerMessage) => {
+            this.wsGateway.emitToClient(clientId, serverMsg.type, serverMsg);
+        };
+    }
+
     private async _routeRoomMessage(msg: {
         type: string;
         clientId: string;
         payload: Record<string, unknown>;
     }): Promise<void> {
-        const emit = (serverMsg: ServerMessage) => {
-            this.wsGateway.emitToClient(msg.clientId, serverMsg.type, serverMsg);
-        };
+        const emit = this._buildEmit(msg.clientId);
 
         switch (msg.type) {
             case ClientMessageType.CreateAndSend: {
                 const { content, context } = msg.payload as Record<string, unknown>;
-                await this.roomRouter.createAndSend(msg.clientId, String(content), context, emit);
+                await this._handleCreateAndSend(msg.clientId, String(content), context, emit);
                 break;
             }
             case ClientMessageType.SendMessage: {
                 const { roomId, content, context } = msg.payload as Record<string, unknown>;
-                await this.roomRouter.sendMessage(
+                await this._handleSendMessage(
                     msg.clientId,
                     String(roomId),
                     String(content),
@@ -77,18 +86,145 @@ export class AiMessageRouter implements OnModuleInit {
             }
             case ClientMessageType.Join: {
                 const { roomId } = msg.payload as Record<string, unknown>;
-                await this.roomRouter.joinRoom(String(roomId), emit);
+                await this._handleJoinRoom(String(roomId), emit);
                 break;
             }
             case ClientMessageType.Stop: {
                 const { roomId } = msg.payload as Record<string, unknown>;
-                this.roomRouter.stop(String(roomId));
+                this._handleStop(String(roomId));
                 break;
             }
             case TransportMessageType.Disconnect: {
-                this.roomRouter.onClientDisconnect(msg.clientId);
+                this._handleDisconnect(msg.clientId);
                 break;
             }
         }
+    }
+
+    private async _handleCreateAndSend(
+        clientId: string,
+        content: string,
+        context: unknown,
+        emit: EmitToClient,
+    ): Promise<void> {
+        // 1. Create room
+        const room = await this.roomService.create({
+            title: content.substring(0, 20),
+        });
+
+        emit({ type: 'created', roomId: room.id });
+
+        // 2. Create room session
+        const session = this.roomSessionRegistry.create({
+            roomId: room.id,
+            clientId,
+            emit,
+        });
+
+        // 3. Start FSM: receiveMessage → BuildingContext
+        session.stateMachine.receiveMessage();
+
+        // 4. Build callbacks bridge
+        const callbacks = this._buildCallbacks(session);
+
+        // 5. Dispatch
+        await this.requestDispatcher.dispatch({
+            roomId: room.id,
+            clientId,
+            content,
+            context: context as Record<string, unknown> | undefined,
+            callbacks,
+        });
+    }
+
+    private async _handleSendMessage(
+        clientId: string,
+        roomId: string,
+        content: string,
+        context: unknown,
+        emit: EmitToClient,
+    ): Promise<void> {
+        const room = await this.roomService.findById(roomId);
+        if (!room) {
+            emit({
+                type: 'error',
+                roomId,
+                code: 'ROOM_NOT_FOUND',
+                message: 'Room not found',
+            });
+            return;
+        }
+
+        // Create/refresh room session
+        const session = this.roomSessionRegistry.create({
+            roomId,
+            clientId,
+            emit,
+        });
+
+        // Start FSM: receiveMessage → BuildingContext
+        session.stateMachine.receiveMessage();
+
+        // Build callbacks bridge
+        const callbacks = this._buildCallbacks(session);
+
+        await this.requestDispatcher.dispatch({
+            roomId,
+            clientId,
+            content,
+            context: context as Record<string, unknown> | undefined,
+            callbacks,
+        });
+    }
+
+    private async _handleJoinRoom(roomId: string, emit: EmitFn): Promise<void> {
+        const room = await this.roomService.findById(roomId);
+        if (!room) {
+            emit({
+                type: 'error',
+                roomId,
+                code: 'ROOM_NOT_FOUND',
+                message: 'Room not found',
+            });
+            return;
+        }
+
+        const messages = await this.messageService.findByRoomId(roomId);
+        emit({
+            type: 'history',
+            roomId,
+            messages: messages.map(m => ({
+                id: m.id,
+                role: m.role as MessageWire['role'],
+                content: m.content,
+                toolCalls:
+                    (m.toolCalls as Array<{ id: string; name: string }> | undefined) ?? undefined,
+                createdAt: m.createdAt.toISOString(),
+            })),
+        });
+    }
+
+    private _handleStop(roomId: string): void {
+        const session = this.roomSessionRegistry.get(roomId);
+        if (session && session.isActive()) {
+            session.stateMachine.stop();
+        }
+    }
+
+    private _handleDisconnect(clientId: string): void {
+        this.roomSessionRegistry.destroyByClientId(clientId);
+    }
+
+    /** Build the WorkflowCallbacks bridge that decouples Executor from transport. */
+    private _buildCallbacks(session: import('./room-session').RoomSession): WorkflowCallbacks {
+        const sm = session.stateMachine;
+
+        return {
+            onTextChunk: (_rid, chunk) => sm.textChunk(chunk),
+            onToolCall: (_rid, info) => sm.toolCall(info),
+            onLlmDone: _rid => sm.llmDone(),
+            onError: (_rid, code, message) => sm.error(code, message),
+            onStop: () => sm.stop(),
+        };
     }
 }

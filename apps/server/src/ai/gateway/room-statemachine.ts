@@ -1,43 +1,30 @@
 /**
- * RoomStateMachine — lifecycle FSM for a single room (conversation).
+ * RoomStateMachine — protocol FSM for a single room.
  *
+ * Owned by RoomSession. Not a NestJS injectable.
  * States: Idle → BuildingContext → Processing → [ToolWaiting → ToolExecuting → Processing]* → Done
- *
- * Uses an emit callback to send events to the transport layer,
- * decoupling business logic from WebSocket protocol.
  */
 
-import type { ErrorCode, ServerMessage } from './ai-ws-events.types';
-import { isValidTransition, RoomState } from './room-statemachine.types';
-
-export type EmitFn = (msg: ServerMessage) => void;
+import type { ErrorCode, FinishReason, ServerMessage } from './ai-ws-events.types';
+import { isValidTransition, RoomState } from './room-session.types';
 
 export class RoomStateMachine {
-    readonly roomId: string;
-    readonly clientId: string;
     state: RoomState = RoomState.Idle;
-    abortController = new AbortController();
-    createdAt = new Date();
-    lastActivityAt = new Date();
+    readonly abortController = new AbortController();
 
-    private emit: EmitFn;
-
-    constructor(roomId: string, clientId: string, emit: EmitFn) {
-        this.roomId = roomId;
-        this.clientId = clientId;
-        this.emit = emit;
-    }
+    constructor(
+        readonly roomId: string,
+        readonly clientId: string,
+        private emit: (msg: ServerMessage) => void,
+    ) {}
 
     private _transition(to: RoomState): void {
         const from = this.state;
         if (from === to) return;
-
         if (!isValidTransition(from, to)) {
-            throw new Error(`Invalid transition: ${from} -> ${to} for room ${this.roomId}`);
+            throw new Error(`Invalid state transition: ${from} → ${to} for room ${this.roomId}`);
         }
-
         this.state = to;
-        this.lastActivityAt = new Date();
     }
 
     receiveMessage(): void {
@@ -52,20 +39,20 @@ export class RoomStateMachine {
         this.emit({ type: 'text_chunk', roomId: this.roomId, content });
     }
 
-    toolCall(
-        toolCallId: string,
-        toolName: string,
-        input: unknown,
-        requiresConfirmation: boolean,
-    ): void {
-        if (requiresConfirmation) {
+    toolCall(info: {
+        toolCallId: string;
+        toolName: string;
+        input: unknown;
+        requiresConfirmation: boolean;
+    }): void {
+        if (info.requiresConfirmation) {
             this._transition(RoomState.ToolWaiting);
             this.emit({
                 type: 'tool_call',
                 roomId: this.roomId,
-                toolCallId,
-                toolName,
-                input,
+                toolCallId: info.toolCallId,
+                toolName: info.toolName,
+                input: info.input,
                 requiresConfirmation: true,
             });
         } else {
@@ -73,31 +60,19 @@ export class RoomStateMachine {
         }
     }
 
-    toolResult(): void {
-        this._transition(RoomState.ToolExecuting);
-    }
-
     toolDone(): void {
         this._transition(RoomState.Processing);
     }
 
-    llmDone(): void {
+    llmDone(finishReason: FinishReason = 'complete'): void {
         this._transition(RoomState.Done);
-        this.emit({
-            type: 'done',
-            roomId: this.roomId,
-            finishReason: 'complete',
-        });
+        this.emit({ type: 'done', roomId: this.roomId, finishReason });
     }
 
     stop(): void {
         this.abortController.abort();
         this._transition(RoomState.Done);
-        this.emit({
-            type: 'done',
-            roomId: this.roomId,
-            finishReason: 'stopped',
-        });
+        this.emit({ type: 'done', roomId: this.roomId, finishReason: 'stopped' });
     }
 
     error(code: string, message: string): void {
@@ -109,9 +84,5 @@ export class RoomStateMachine {
             code: code as ErrorCode,
             message,
         });
-    }
-
-    getAbortSignal(): AbortSignal {
-        return this.abortController.signal;
     }
 }

@@ -15,12 +15,6 @@ export type ToolExecution = 'backend' | 'frontend';
  */
 export type ToolDanger = 'low' | 'high';
 
-export interface ToolResultPayload {
-    toolCallId: string;
-    result: unknown;
-    error?: string;
-}
-
 export interface RegisteredTool {
     name: string;
     definition: ToolDefinition;
