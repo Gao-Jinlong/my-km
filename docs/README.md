@@ -10,7 +10,11 @@
 docs/
 ├── architecture/     # 系统架构
 ├── frontend/         # 前端架构和平台层
+│   ├── architecture.md
+│   ├── platform/services.md
+│   └── frontend-chat-refactor-plan.md  # 对话模块重构方案
 ├── backend/          # 后端架构
+│   └── llm-integration-guide.md  # LLM 对话流程前端对接文档
 ├── guides/           # 开发指南和参考
 ├── plan/             # 实施计划和记录
 └── tech-debt.md      # 技术债务追踪

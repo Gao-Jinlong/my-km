@@ -42,6 +42,7 @@ export class RequestDispatcher {
                 message: 'Rate limit exceeded. Please try again later.',
                 code: 'RATE_LIMITED',
             });
+            // TODO: 超时信息也可以让 llm 进行感知，因此可以将错误写入到对话历史中，而不仅仅是通过 WebSocket 发送错误消息。这样用户在查看对话历史时也能看到哪些消息被限流了。
             return;
         }
 

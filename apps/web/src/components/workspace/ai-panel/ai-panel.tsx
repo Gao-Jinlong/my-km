@@ -6,7 +6,6 @@
  */
 
 import { Loader2, Send } from 'lucide-react';
-import { nanoid } from 'nanoid';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import type { AIHarnessService } from '@/features/ai/harness';
@@ -54,7 +53,6 @@ export function AIPanel() {
 
         // Room recovery: check localStorage for saved room
         const harness = getContainer().get<AIHarnessService>('aiHarness');
-        const joinRoom = (id: string) => harness.joinRoom(id);
         const savedId = (() => {
             try {
                 return localStorage.getItem('activeRoomId');
@@ -64,15 +62,11 @@ export function AIPanel() {
         })();
 
         if (savedId) {
-            // Restore existing room
+            // Restore existing room from previous session
             setActiveRoomId(savedId);
             harness.restoreRoom(savedId);
-        } else {
-            // Create new room
-            const roomId = `room-${nanoid(8)}`;
-            setActiveRoomId(roomId);
-            joinRoom(roomId);
         }
+        // No saved room → show empty panel, wait for user to send first message
     }, [registerTools]);
 
     // Track generating state

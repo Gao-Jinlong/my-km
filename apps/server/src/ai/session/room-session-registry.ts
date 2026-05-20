@@ -40,7 +40,7 @@ export class RoomSessionRegistry implements OnModuleDestroy {
     /** Create a new RoomSession for the given room. Throws if already active. */
     create(opts: { roomId: string; clientId: string; emit: EmitFn }): RoomSession {
         const existing = this.sessions.get(opts.roomId);
-        if (existing && existing.isActive()) {
+        if (existing?.isActive()) {
             throw new Error(`Room ${opts.roomId} already has an active session`);
         }
 
@@ -55,7 +55,13 @@ export class RoomSessionRegistry implements OnModuleDestroy {
         if (!this.byClientId.has(opts.clientId)) {
             this.byClientId.set(opts.clientId, new Set());
         }
-        this.byClientId.get(opts.clientId)!.add(opts.roomId);
+        const clientSet = this.byClientId.get(opts.clientId);
+        if (!clientSet) {
+            throw new Error(
+                `Invariant violation: byClientId missing set for client ${opts.clientId}`,
+            );
+        }
+        clientSet.add(opts.roomId);
 
         this.logger.debug(`RoomSession created for room ${opts.roomId}`);
         return session;
