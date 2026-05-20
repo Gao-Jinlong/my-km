@@ -50,4 +50,21 @@ export class ProviderRegistry {
     isRegistered(name: string): boolean {
         return this.factories.has(name);
     }
+
+    private _defaultConfig: LLMConfig | undefined;
+
+    /**
+     * 设置系统默认 LLM 配置（启动时调用一次）
+     */
+    setDefaultConfig(config: LLMConfig): void {
+        this._defaultConfig = config;
+        this.logger.log(`Default LLM config set: ${config.provider}/${config.model}`);
+    }
+
+    /**
+     * 获取系统默认 LLM 配置
+     */
+    get defaultConfig(): LLMConfig | undefined {
+        return this._defaultConfig;
+    }
 }

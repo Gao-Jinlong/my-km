@@ -1,4 +1,4 @@
-import { Module, OnModuleInit } from '@nestjs/common';
+import { Logger, Module, OnModuleInit } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PrismaModule } from '../prisma/prisma.module';
 import { SocketRegistry } from '../ws/socket-registry';
@@ -10,6 +10,7 @@ import { RequestDispatcher } from './dispatch/request-dispatcher';
 import { ChatGraph } from './langgraph';
 import { AnthropicProvider } from './llm/anthropic.provider';
 import { DashscopeProvider } from './llm/dashscope.provider';
+import { buildDefaultLlmConfig } from './llm/llm-default-config';
 import { LLMFactory } from './llm/llm-factory';
 import { OpenAIProvider } from './llm/openai.provider';
 import type { LLMConfig, LLMProvider } from './llm/provider.types';
@@ -62,6 +63,7 @@ import { AiMessageRouter } from './ws/ai-message-router';
     ],
 })
 export class AiModule implements OnModuleInit {
+    private readonly logger = new Logger(AiModule.name);
     constructor(
         private configService: ConfigService,
         private providerRegistry: ProviderRegistry,
@@ -74,6 +76,15 @@ export class AiModule implements OnModuleInit {
         this.registerProvider('openai', OpenAIProvider);
         this.registerProvider('zhipu', ZhipuProvider);
         this.registerProvider('dashscope', DashscopeProvider);
+
+        // Build and register default LLM config from environment
+        const defaultConfig = buildDefaultLlmConfig();
+        if (defaultConfig) {
+            this.providerRegistry.setDefaultConfig(defaultConfig);
+            this.logger.log(`Default LLM: ${defaultConfig.provider}/${defaultConfig.model}`);
+        } else {
+            this.logger.warn('No LLM API keys found — LLM calls will fail until configured');
+        }
 
         // Register built-in graph definitions
         this.graphRegistry.register(new ChatGraph());
