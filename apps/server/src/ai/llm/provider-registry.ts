@@ -58,7 +58,6 @@ export class ProviderRegistry {
      */
     setDefaultConfig(config: LLMConfig): void {
         this._defaultConfig = config;
-        this.logger.log(`Default LLM config set: ${config.provider}/${config.model}`);
     }
 
     /**
