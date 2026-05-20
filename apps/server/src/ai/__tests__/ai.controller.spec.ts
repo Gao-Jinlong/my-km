@@ -10,6 +10,7 @@ import { AiController } from '../ai.controller';
 import { RoomService } from '../conversation/room.service';
 import type { DispatchContext } from '../dispatch/request-dispatcher';
 import { RequestDispatcher } from '../dispatch/request-dispatcher';
+import { ProviderRegistry } from '../llm/provider-registry';
 import { MessageService } from '../message/message.service';
 
 describe('AiController', () => {
@@ -47,6 +48,10 @@ describe('AiController', () => {
                 {
                     provide: MessageService,
                     useValue: {},
+                },
+                {
+                    provide: ProviderRegistry,
+                    useValue: { defaultConfig: undefined },
                 },
             ],
         }).compile();

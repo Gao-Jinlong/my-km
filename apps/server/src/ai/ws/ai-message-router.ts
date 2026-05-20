@@ -10,6 +10,7 @@ import { MessageBus } from '../../ws/message-bus';
 import { WsGateway } from '../../ws/ws-gateway';
 import { RoomService } from '../conversation/room.service';
 import { RequestDispatcher } from '../dispatch/request-dispatcher';
+import { ProviderRegistry } from '../llm/provider-registry';
 import { MessageService } from '../message/message.service';
 import type { EmitFn, WorkflowCallbacks } from '../session/room-session.types';
 import { RoomSessionRegistry } from '../session/room-session-registry';
@@ -29,6 +30,7 @@ export class AiMessageRouter implements OnModuleInit {
         private roomSessionRegistry: RoomSessionRegistry,
         private requestDispatcher: RequestDispatcher,
         private toolDispatcher: ToolDispatcher,
+        private providerRegistry: ProviderRegistry,
     ) {}
 
     onModuleInit() {
@@ -69,17 +71,27 @@ export class AiMessageRouter implements OnModuleInit {
 
         switch (msg.type) {
             case ClientMessageType.CreateAndSend: {
-                const { content, context } = msg.payload as Record<string, unknown>;
-                await this._handleCreateAndSend(msg.clientId, String(content), context, emit);
+                const { content, context, llmConfig } = msg.payload as Record<string, unknown>;
+                await this._handleCreateAndSend(
+                    msg.clientId,
+                    String(content),
+                    context,
+                    llmConfig as import('./ai-ws-events.types').LlmConfig | undefined,
+                    emit,
+                );
                 break;
             }
             case ClientMessageType.SendMessage: {
-                const { roomId, content, context } = msg.payload as Record<string, unknown>;
+                const { roomId, content, context, llmConfig } = msg.payload as Record<
+                    string,
+                    unknown
+                >;
                 await this._handleSendMessage(
                     msg.clientId,
                     String(roomId),
                     String(content),
                     context,
+                    llmConfig as import('./ai-ws-events.types').LlmConfig | undefined,
                     emit,
                 );
                 break;
@@ -105,6 +117,7 @@ export class AiMessageRouter implements OnModuleInit {
         clientId: string,
         content: string,
         context: unknown,
+        llmConfig: import('./ai-ws-events.types').LlmConfig | undefined,
         emit: EmitToClient,
     ): Promise<void> {
         // 1. Create room
@@ -133,6 +146,10 @@ export class AiMessageRouter implements OnModuleInit {
             clientId,
             content,
             context: context as Record<string, unknown> | undefined,
+            llmConfigMap: llmConfig
+                ? { llm_call: { provider: llmConfig.provider, model: llmConfig.model || '' } }
+                : undefined,
+            defaultConfig: this.providerRegistry.defaultConfig,
             callbacks,
         });
     }
@@ -142,6 +159,7 @@ export class AiMessageRouter implements OnModuleInit {
         roomId: string,
         content: string,
         context: unknown,
+        llmConfig: import('./ai-ws-events.types').LlmConfig | undefined,
         emit: EmitToClient,
     ): Promise<void> {
         const room = await this.roomService.findById(roomId);
@@ -173,6 +191,10 @@ export class AiMessageRouter implements OnModuleInit {
             clientId,
             content,
             context: context as Record<string, unknown> | undefined,
+            llmConfigMap: llmConfig
+                ? { llm_call: { provider: llmConfig.provider, model: llmConfig.model || '' } }
+                : undefined,
+            defaultConfig: this.providerRegistry.defaultConfig,
             callbacks,
         });
     }

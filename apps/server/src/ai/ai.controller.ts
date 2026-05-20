@@ -14,6 +14,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { RoomService } from './conversation/room.service';
 import { RequestDispatcher } from './dispatch/request-dispatcher';
 import { SendMessageDto } from './dto/send-message.dto';
+import { ProviderRegistry } from './llm/provider-registry';
 import { MessageService } from './message/message.service';
 
 interface CreateRoomBody {
@@ -40,6 +41,7 @@ export class AiController {
         private requestDispatcher: RequestDispatcher,
         private roomService: RoomService,
         private messageService: MessageService,
+        private providerRegistry: ProviderRegistry,
     ) {}
 
     @Post('chat')
@@ -61,6 +63,15 @@ export class AiController {
                 clientId: `rest:${Date.now()}`,
                 content: dto.content,
                 context: dto.context,
+                llmConfigMap: dto.llmConfig
+                    ? {
+                          llm_call: {
+                              provider: dto.llmConfig.provider,
+                              model: dto.llmConfig.model || '',
+                          },
+                      }
+                    : undefined,
+                defaultConfig: this.providerRegistry.defaultConfig,
             });
 
             return { success: true, roomId };
