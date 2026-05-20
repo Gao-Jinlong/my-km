@@ -32,6 +32,14 @@ export interface MessageWire {
     createdAt: string;
 }
 
+/**
+ * LLM configuration sent from frontend with messages
+ */
+export interface LlmConfig {
+    provider: string;
+    model?: string;
+}
+
 // === Client → Server ===
 
 export enum ClientMessageType {
@@ -48,12 +56,18 @@ export enum TransportMessageType {
 }
 
 export type ClientMessage =
-    | { type: ClientMessageType.CreateAndSend; content: string; context?: EditorContext }
+    | {
+          type: ClientMessageType.CreateAndSend;
+          content: string;
+          context?: EditorContext;
+          llmConfig?: LlmConfig;
+      }
     | {
           type: ClientMessageType.SendMessage;
           roomId: string;
           content: string;
           context?: EditorContext;
+          llmConfig?: LlmConfig;
       }
     | { type: ClientMessageType.ToolResult; roomId: string; toolCallId: string; result: unknown }
     | { type: ClientMessageType.Stop; roomId: string }
