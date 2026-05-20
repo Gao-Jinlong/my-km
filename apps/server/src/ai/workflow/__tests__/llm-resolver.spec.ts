@@ -64,9 +64,25 @@ describe('LLMResolver', () => {
         expect(provider.model).toBe('default-model');
     });
 
-    it('prefers configMap[nodeId] over defaultConfig', () => {
+    it('returns the same provider instance for repeated calls with same config', () => {
         const configMap: NodeLLMConfigMap = { llm_call: nodeConfig };
-        const provider = resolver.resolve('llm_call', configMap, defaultConfig);
-        expect(provider.model).toBe('node-specific');
+        const p1 = resolver.resolve('llm_call', configMap);
+        const p2 = resolver.resolve('llm_call', configMap);
+        expect(p1).toBe(p2); // Same object reference (cached)
+    });
+
+    it('resolveAll returns providers for all node IDs', () => {
+        const configMap: NodeLLMConfigMap = {
+            llm_call: nodeConfig,
+            other_node: defaultConfig,
+        };
+        const resolved = resolver.resolveAll(['llm_call', 'other_node'], configMap);
+        expect(resolved.size).toBe(2);
+        const llmCall = resolved.get('llm_call');
+        const otherNode = resolved.get('other_node');
+        expect(llmCall).toBeDefined();
+        expect(otherNode).toBeDefined();
+        expect(llmCall?.model).toBe('node-specific');
+        expect(otherNode?.model).toBe('default-model');
     });
 });
