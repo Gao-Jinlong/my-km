@@ -91,4 +91,17 @@ describe('buildDefaultLlmConfig', () => {
             model: 'claude-opus-4-7',
         });
     });
+
+    it('falls through to priority scan when override provider has no API key', () => {
+        process.env.DEFAULT_LLM_PROVIDER = 'openai';
+        process.env.ANTHROPIC_API_KEY = 'sk-ant-xxx';
+        // No OPENAI_API_KEY set
+
+        const result = buildDefaultLlmConfig();
+        // Should fall back to anthropic since openai has no key
+        expect(result).toEqual({
+            provider: 'anthropic',
+            model: 'claude-sonnet-4-6-20250514',
+        });
+    });
 });
