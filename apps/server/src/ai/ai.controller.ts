@@ -14,6 +14,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { RoomService } from './conversation/room.service';
 import { RequestDispatcher } from './dispatch/request-dispatcher';
 import { SendMessageDto } from './dto/send-message.dto';
+import type { LLMConfig } from './llm/provider.types';
 import { ProviderRegistry } from './llm/provider-registry';
 import { MessageService } from './message/message.service';
 
@@ -64,12 +65,12 @@ export class AiController {
                 content: dto.content,
                 context: dto.context,
                 llmConfigMap: dto.llmConfig
-                    ? {
+                    ? ({
                           llm_call: {
                               provider: dto.llmConfig.provider,
-                              model: dto.llmConfig.model || '',
+                              ...(dto.llmConfig.model ? { model: dto.llmConfig.model } : {}),
                           },
-                      }
+                      } as Record<string, LLMConfig>)
                     : undefined,
                 defaultConfig: this.providerRegistry.defaultConfig,
             });

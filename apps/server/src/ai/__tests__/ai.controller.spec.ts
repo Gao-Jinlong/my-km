@@ -17,6 +17,7 @@ describe('AiController', () => {
     let controller: AiController;
     let requestDispatcher: RequestDispatcher;
     let roomService: RoomService;
+    let providerRegistry: ProviderRegistry;
 
     const mockRoom = {
         id: 'room-1',
@@ -59,6 +60,7 @@ describe('AiController', () => {
         controller = module.get(AiController);
         requestDispatcher = module.get(RequestDispatcher);
         roomService = module.get(RoomService);
+        providerRegistry = module.get(ProviderRegistry);
     });
 
     describe('POST /ai/chat', () => {
@@ -116,6 +118,36 @@ describe('AiController', () => {
                 .calls[0][0] as DispatchContext;
             expect(dispatchCtx.clientId).toBeDefined();
             expect(typeof dispatchCtx.clientId).toBe('string');
+        });
+
+        it('should pass llmConfigMap to RequestDispatcher when llmConfig is provided', async () => {
+            await controller.sendMessage({
+                roomId: 'room-1',
+                content: 'Test',
+                llmConfig: { provider: 'openai', model: 'gpt-4o' },
+            } as any);
+
+            const dispatchCtx = (requestDispatcher.dispatch as jest.Mock).mock
+                .calls[0][0] as DispatchContext;
+            expect(dispatchCtx.llmConfigMap).toEqual({
+                llm_call: { provider: 'openai', model: 'gpt-4o' },
+            });
+        });
+
+        it('should pass defaultConfig from ProviderRegistry to RequestDispatcher', async () => {
+            const mockDefaultConfig = { provider: 'anthropic', model: 'claude-sonnet' };
+            (
+                providerRegistry as { defaultConfig: { provider: string; model: string } }
+            ).defaultConfig = mockDefaultConfig;
+
+            await controller.sendMessage({
+                roomId: 'room-1',
+                content: 'Test',
+            } as any);
+
+            const dispatchCtx = (requestDispatcher.dispatch as jest.Mock).mock
+                .calls[0][0] as DispatchContext;
+            expect(dispatchCtx.defaultConfig).toBe(mockDefaultConfig);
         });
     });
 });
