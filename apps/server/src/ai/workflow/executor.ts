@@ -13,9 +13,9 @@
  *   6. Signal completion via callbacks
  */
 
-import type { GraphConfig, WorkflowMessage, WorkflowState } from '@my-km/langgraph-workflows';
 import { Logger } from '@nestjs/common';
 import type { LLMMessage } from '../ai.types';
+import type { GraphConfig, WorkflowMessage, WorkflowState } from '../langgraph';
 import type { ExecutionCtx, ExecutorDependencies, WorkflowToolCall } from './executor.types';
 
 export class Executor {
@@ -143,6 +143,10 @@ export class Executor {
 
                 if (!results) {
                     this.logger.warn(`Tool execution timed out for room ${roomId}`);
+                    callbacks.onTimeout?.(
+                        roomId,
+                        `Tool execution timed out after 30s for ${lastState.pendingToolCalls.map(tc => tc.name).join(', ')}`,
+                    );
                     break;
                 }
 

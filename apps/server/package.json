@@ -24,7 +24,8 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",
     "@keyv/redis": "^2.8.5",
-    "@my-km/langgraph-workflows": "workspace:*",
+    "@langchain/core": "^0.3.0",
+    "@langchain/langgraph": "^0.2.0",
     "@my-km/prisma": "workspace:*",
     "@nestjs-modules/mailer": "^2.0.2",
     "@nestjs/cache-manager": "^3.1.0",

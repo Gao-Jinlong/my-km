@@ -7,8 +7,8 @@
  * - 启动时自动注册内置图
  */
 
-import type { BaseGraph } from '@my-km/langgraph-workflows';
 import { Injectable, Logger } from '@nestjs/common';
+import type { BaseGraph } from '../langgraph';
 
 @Injectable()
 export class GraphRegistry {

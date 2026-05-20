@@ -226,6 +226,7 @@ export class AiMessageRouter implements OnModuleInit {
             onToolCall: (_rid, info) => sm.toolCall(info),
             onLlmDone: _rid => sm.llmDone(),
             onError: (_rid, code, message) => sm.error(code, message),
+            onTimeout: (_rid, detail) => sm.timeout(detail),
             onStop: () => sm.stop(),
         };
     }

@@ -43,13 +43,16 @@ importers:
     dependencies:
       '@anthropic-ai/sdk':
         specifier: ^0.91.1
-        version: 0.91.1(zod@4.3.5)
+        version: 0.91.1(zod@3.25.76)
       '@keyv/redis':
         specifier: ^2.8.5
         version: 2.8.5
-      '@my-km/langgraph-workflows':
-        specifier: workspace:*
-        version: link:../../packages/langgraph-workflows
+      '@langchain/core':
+        specifier: ^0.3.0
+        version: 0.3.80(openai@6.36.0(ws@8.19.0)(zod@3.25.76))
+      '@langchain/langgraph':
+        specifier: ^0.2.0
+        version: 0.2.74(@langchain/core@0.3.80(openai@6.36.0(ws@8.19.0)(zod@3.25.76)))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(zod-to-json-schema@3.25.2(zod@3.25.76))
       '@my-km/prisma':
         specifier: workspace:*
         version: link:../../packages/prisma
@@ -109,7 +112,7 @@ importers:
         version: link:@nestjs/modules/mailer
       openai:
         specifier: ^6.36.0
-        version: 6.36.0(ws@8.19.0)(zod@4.3.5)
+        version: 6.36.0(ws@8.19.0)(zod@3.25.76)
       passport:
         specifier: ^0.7.0
         version: 0.7.0
@@ -421,25 +424,6 @@ importers:
       vitest:
         specifier: ^3.1.2
         version: 3.2.4(@types/node@22.19.5)(happy-dom@20.1.0)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.30.2)(terser@5.44.1)(yaml@2.8.2)
-
-  packages/langgraph-workflows:
-    dependencies:
-      '@langchain/core':
-        specifier: ^0.3.0
-        version: 0.3.80(openai@6.36.0(ws@8.19.0)(zod@3.25.76))
-      '@langchain/langgraph':
-        specifier: ^0.2.0
-        version: 0.2.74(@langchain/core@0.3.80(openai@6.36.0(ws@8.19.0)(zod@3.25.76)))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(zod-to-json-schema@3.25.2(zod@3.25.76))
-      zod:
-        specifier: ^3.24.0
-        version: 3.25.76
-    devDependencies:
-      '@types/node':
-        specifier: ^22.19.5
-        version: 22.19.5
-      typescript:
-        specifier: ^5.7.3
-        version: 5.9.3
 
   packages/prisma:
     dependencies:
@@ -8016,11 +8000,11 @@ snapshots:
     transitivePeerDependencies:
       - chokidar
 
-  '@anthropic-ai/sdk@0.91.1(zod@4.3.5)':
+  '@anthropic-ai/sdk@0.91.1(zod@3.25.76)':
     dependencies:
       json-schema-to-ts: 3.1.1
     optionalDependencies:
-      zod: 4.3.5
+      zod: 3.25.76
 
   '@asamuzakjp/css-color@3.2.0':
     dependencies:
@@ -14984,12 +14968,6 @@ snapshots:
     optionalDependencies:
       ws: 8.19.0
       zod: 3.25.76
-    optional: true
-
-  openai@6.36.0(ws@8.19.0)(zod@4.3.5):
-    optionalDependencies:
-      ws: 8.19.0
-      zod: 4.3.5
 
   optionator@0.9.4:
     dependencies:

@@ -22,8 +22,7 @@
         "strictBindCallApply": true,
         "noFallthroughCasesInSwitch": true,
         "paths": {
-            "@my-km/shared": ["../../packages/shared/src"],
-            "@my-km/langgraph-workflows": ["../../packages/langgraph-workflows/dist"]
+            "@my-km/shared": ["../../packages/shared/src"]
         }
     }
 }

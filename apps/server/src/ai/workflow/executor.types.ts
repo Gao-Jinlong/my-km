@@ -31,6 +31,7 @@ export interface WorkflowCallbacks {
     onToolCall(roomId: string, info: WorkflowToolCall): void;
     onLlmDone(roomId: string, finishReason?: FinishReason): void;
     onError(roomId: string, code: string, message: string): void;
+    onTimeout?(roomId: string, detail: string): void;
     onStop?(roomId: string): void;
 }
 

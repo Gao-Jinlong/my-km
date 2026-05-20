@@ -1,4 +1,3 @@
-import { ChatGraph } from '@my-km/langgraph-workflows';
 import { Module, OnModuleInit } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -8,6 +7,7 @@ import { AiController } from './ai.controller';
 import { RoomService } from './conversation/room.service';
 import { AiRateLimiter } from './dispatch/rate-limiter.guard';
 import { RequestDispatcher } from './dispatch/request-dispatcher';
+import { ChatGraph } from './langgraph';
 import { AnthropicProvider } from './llm/anthropic.provider';
 import { DashscopeProvider } from './llm/dashscope.provider';
 import { LLMFactory } from './llm/llm-factory';

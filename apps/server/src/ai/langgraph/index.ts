@@ -1,7 +1,7 @@
 /**
- * @my-km/langgraph-workflows
+ * LangGraph 工作流定义
  *
- * LangGraph 工作流定义包。纯函数式代码，无 NestJS 依赖。
+ * 图定义和节点实现。纯函数式代码，无 NestJS 依赖。
  */
 
 export type { BaseGraph, GraphFactory } from './graphs/base-graph';

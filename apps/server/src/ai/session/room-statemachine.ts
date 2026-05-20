@@ -85,4 +85,15 @@ export class RoomStateMachine {
             message,
         });
     }
+
+    timeout(detail: string): void {
+        this.abortController.abort();
+        this._transition(RoomState.Done);
+        this.emit({
+            type: 'error',
+            roomId: this.roomId,
+            code: 'TOOL_TIMEOUT' as ErrorCode,
+            message: detail,
+        });
+    }
 }

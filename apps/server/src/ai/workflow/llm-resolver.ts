@@ -7,7 +7,6 @@
  * - 注入到节点执行上下文
  */
 
-import type { BaseGraph } from '@my-km/langgraph-workflows';
 import { Injectable, Logger } from '@nestjs/common';
 import { LLMFactory } from '../llm/llm-factory';
 import type { LLMConfig, LLMProvider, NodeLLMConfigMap } from '../llm/provider.types';
