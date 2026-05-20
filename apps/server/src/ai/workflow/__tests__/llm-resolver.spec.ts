@@ -15,7 +15,7 @@ function mockProvider(name: string, model: string): LLMProvider {
         name,
         model,
         chat: async function* (_msgs: LLMMessage[], _tools?: ToolDefinition[], _sig?: AbortSignal) {
-            yield { content: 'mock', done: true } as LLMOutput;
+            yield { type: 'done' as const, content: 'mock' };
         },
     };
 }
