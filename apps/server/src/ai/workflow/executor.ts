@@ -229,8 +229,9 @@ export class Executor {
      * Create LLM caller function bridging LLMProvider to LangGraph's LLMCaller interface.
      */
     private createLLMCaller(configMap?: import('../llm/provider.types').NodeLLMConfigMap) {
+        const defaultConfig = this.ctx.defaultConfig;
         return async function* (messages: LLMMessage[], signal?: AbortSignal) {
-            const provider = this.deps.llmResolver.resolve('llm_call', configMap);
+            const provider = this.deps.llmResolver.resolve('llm_call', configMap, defaultConfig);
             const tools = this.deps.toolDispatcher.getDefinitions();
             yield* provider.chat(messages, tools, signal);
         }.bind(this);

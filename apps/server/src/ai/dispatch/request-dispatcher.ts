@@ -18,6 +18,7 @@ export interface DispatchContext {
     content: string;
     context?: Record<string, unknown>;
     llmConfigMap?: Record<string, LLMConfig>;
+    defaultConfig?: LLMConfig;
     graphName?: string;
     callbacks?: WorkflowCallbacks;
 }
@@ -55,6 +56,7 @@ export class RequestDispatcher {
                 clientId,
                 content,
                 llmConfigMap: ctx.llmConfigMap,
+                defaultConfig: ctx.defaultConfig,
                 graphName: ctx.graphName,
                 callbacks,
             });

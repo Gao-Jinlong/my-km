@@ -22,6 +22,7 @@ export interface OrchestratorDispatchCtx {
     content: string;
     callbacks: WorkflowCallbacks;
     llmConfigMap?: NodeLLMConfigMap;
+    defaultConfig?: import('../llm/provider.types').LLMConfig;
     graphName?: string;
     tokenLimit?: number;
 }
@@ -55,6 +56,7 @@ export class RoomOrchestrator {
             callbacks,
             abortSignal: session.abortController.signal,
             llmConfigMap: ctx.llmConfigMap,
+            defaultConfig: ctx.defaultConfig,
             graphName: ctx.graphName,
             tokenLimit: ctx.tokenLimit,
         };
