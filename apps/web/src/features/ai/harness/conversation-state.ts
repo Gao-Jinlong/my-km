@@ -123,11 +123,25 @@ class RoomStateImpl extends Disposable implements RoomState {
      * 追加流式文本片段
      */
     appendStreamChunk(content: string): void {
-        if (this._currentAssistantMessage) {
-            this._currentAssistantMessage.content =
-                (this._currentAssistantMessage.content ?? '') + content;
+        if (!this._currentAssistantMessage) {
+            return;
         }
-        // 流式片段只触发 onStreamChunk，不触发全量 onStateChange
+        // 创建新的消息对象，确保 React 能检测到引用变化
+        const updatedMessage = {
+            ...this._currentAssistantMessage,
+            content: (this._currentAssistantMessage.content ?? '') + content,
+        };
+        this._currentAssistantMessage = updatedMessage;
+        // 替换数组中的旧引用
+        const idx = this._messages.findIndex(m => m.id === updatedMessage.id);
+        if (idx >= 0) {
+            this._messages[idx] = updatedMessage;
+        }
+        this._onStateChange.fire({
+            messages: [...this._messages],
+            isGenerating: this._isGenerating,
+            isProcessing: this._isProcessing,
+        });
         this._onStreamChunk.fire({ content });
     }
 

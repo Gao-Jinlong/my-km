@@ -25,6 +25,7 @@ export class WSClientService extends ServiceBase {
     private _subscriptionCount = 0;
     private readonly _subscriptions = new DisposableStore();
     private readonly _msgSubscribers = new Map<string, Set<(data: unknown) => void>>();
+    private readonly _socketListeners = new Map<string, (data: unknown) => void>();
 
     // 连接级事件（不属于任何业务消息类型）
     private readonly _onConnectionChange = new Emitter<{ connected: boolean }>();
@@ -47,10 +48,16 @@ export class WSClientService extends ServiceBase {
      * 首次调用时自动建立 WebSocket 连接。
      */
     subscribe(messageType: string, callback: (data: unknown) => void): IDisposable {
+        const isFirstForType = !this._msgSubscribers.has(messageType);
         const subs = this._msgSubscribers.get(messageType) ?? new Set<(data: unknown) => void>();
         subs.add(callback);
-        if (!this._msgSubscribers.has(messageType)) {
+        if (isFirstForType) {
             this._msgSubscribers.set(messageType, subs);
+        }
+
+        // 首次订阅某个消息类型时，在 socket 上注册对应的事件监听
+        if (isFirstForType && this._socket) {
+            this._registerSocketListener(messageType);
         }
 
         const wrapped: IDisposable = {
@@ -58,11 +65,41 @@ export class WSClientService extends ServiceBase {
                 const s = this._msgSubscribers.get(messageType);
                 if (s) {
                     s.delete(callback);
-                    if (s.size === 0) this._msgSubscribers.delete(messageType);
+                    if (s.size === 0) {
+                        this._msgSubscribers.delete(messageType);
+                        this._unregisterSocketListener(messageType);
+                    }
                 }
             },
         };
         return this._registerSubscription(wrapped);
+    }
+
+    /**
+     * 在 socket 上注册事件监听，将数据分发给订阅者。
+     */
+    private _registerSocketListener(eventType: string): void {
+        if (!this._socket) return;
+        const handler = (data: unknown) => {
+            const subs = this._msgSubscribers.get(eventType);
+            if (!subs) return;
+            for (const cb of subs) {
+                cb(data);
+            }
+        };
+        this._socketListeners.set(eventType, handler);
+        this._socket.on(eventType, handler);
+    }
+
+    /**
+     * 注销 socket 上的事件监听。
+     */
+    private _unregisterSocketListener(eventType: string): void {
+        const handler = this._socketListeners.get(eventType);
+        if (handler && this._socket) {
+            this._socket.off(eventType, handler);
+        }
+        this._socketListeners.delete(eventType);
     }
 
     /**
@@ -113,6 +150,10 @@ export class WSClientService extends ServiceBase {
         this._socket.on('connect', () => {
             console.log(`[AI WS] Connected, socket id: ${this._socket?.id}`);
             this._onConnectionChange.fire({ connected: true });
+            // 连接成功后，为已订阅的消息类型注册 socket 监听
+            for (const eventType of this._msgSubscribers.keys()) {
+                this._registerSocketListener(eventType);
+            }
         });
 
         this._socket.on('connect_error', err => {
@@ -123,6 +164,10 @@ export class WSClientService extends ServiceBase {
         this._socket.on('disconnect', reason => {
             console.log(`[AI WS] Disconnected, reason: ${reason}`);
             this._onConnectionChange.fire({ connected: false });
+            // 连接断开时清理已注册的 socket 监听器
+            for (const eventType of this._msgSubscribers.keys()) {
+                this._unregisterSocketListener(eventType);
+            }
         });
 
         this._socket.on('reconnect', attempt => {
@@ -136,26 +181,6 @@ export class WSClientService extends ServiceBase {
         this._socket.on('error', err => {
             console.error(`[AI WS] Error: ${err}`);
         });
-
-        this._socket.on('message', (data: unknown) => {
-            this._dispatchMessage(data);
-        });
-    }
-
-    /**
-     * 按 message.type 动态派发消息到订阅者
-     */
-    private _dispatchMessage(data: unknown): void {
-        try {
-            const msg = data as { type: string };
-            const subs = this._msgSubscribers.get(msg.type);
-            if (!subs) return;
-            for (const cb of subs) {
-                cb(data);
-            }
-        } catch (error) {
-            console.error('Failed to dispatch WebSocket message:', error);
-        }
     }
 
     /**
@@ -255,6 +280,7 @@ export class WSClientService extends ServiceBase {
     override dispose(): void {
         this._stopIdleTimer();
         this._subscriptions.dispose();
+        this._socketListeners.clear();
         this._msgSubscribers.clear();
         this._socket?.disconnect();
         this._socket = null;

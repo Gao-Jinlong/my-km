@@ -60,7 +60,7 @@ export class OpenAIProvider implements LLMProvider {
                 max_tokens: this.maxTokens,
                 temperature: this.temperature,
                 messages: openaiMessages,
-                tools: openaiTools,
+                tools: openaiTools && openaiTools.length > 0 ? openaiTools : undefined,
                 stream: true,
             },
             {

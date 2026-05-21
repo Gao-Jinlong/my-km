@@ -45,14 +45,20 @@ export class AnthropicProvider implements LLMProvider {
                 max_tokens: this.maxTokens,
                 temperature: this.temperature,
                 messages: anthropicMessages as Anthropic.MessageParam[],
-                tools: tools?.map(
-                    t =>
-                        ({
-                            name: t.name,
-                            description: t.description,
-                            input_schema: { type: 'object', ...(t.input_schema as object) },
-                        }) as Anthropic.Tool,
-                ),
+                tools:
+                    tools && tools.length > 0
+                        ? tools.map(
+                              t =>
+                                  ({
+                                      name: t.name,
+                                      description: t.description,
+                                      input_schema: {
+                                          type: 'object',
+                                          ...(t.input_schema as object),
+                                      },
+                                  }) as Anthropic.Tool,
+                          )
+                        : undefined,
                 stream: true,
             },
             {

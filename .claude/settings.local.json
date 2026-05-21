@@ -27,7 +27,8 @@
             "Bash(npx tsc *)",
             "Bash(Select-Object -First 50)",
             "Bash(Set-Location d:\\\\project\\\\my-km)",
-            "Bash(git status *)"
+            "Bash(git status *)",
+            "Bash(npx vitest *)"
         ]
     }
 }

@@ -62,7 +62,7 @@ export class DashscopeProvider implements LLMProvider {
                 max_tokens: this.maxTokens,
                 temperature: this.temperature,
                 messages: openaiMessages,
-                tools: openaiTools,
+                tools: openaiTools && openaiTools.length > 0 ? openaiTools : undefined,
                 stream: true,
                 // DashScope 扩展参数，支持思考过程
                 enable_thinking: true,
