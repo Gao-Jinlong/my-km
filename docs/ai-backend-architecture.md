@@ -1,3 +1,10 @@
+# ⚠️ 已归档 — 请参阅最新文档
+
+> 本文档是 2026-05-06 的 AI 后端重构设计稿，已被 [backend/ai-architecture-v2.md](./backend/ai-architecture-v2.md) 替代。
+> 保留此文件仅供历史参考。
+
+---
+
 # AI 后端架构重构设计
 
 > 日期: 2026-05-06

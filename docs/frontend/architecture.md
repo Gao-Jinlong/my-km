@@ -48,7 +48,7 @@ app/
 | `useAuthStore` | `stores/auth-store.ts` | JWT token、认证状态 |
 | `useWorkspaceStore` | `stores/workspace-store.ts` | 侧边栏、标签页、项目状态 |
 | `useThemeStore` | `stores/theme-store.ts` | 主题切换 |
-| `useEditorUIStore` | `stores/editor-ui-store.ts` | 编辑器 UI 状态 |
+| `useStatusBarStore` | `stores/status-bar-store.ts` | 状态栏 UI 状态 |
 
 ---
 

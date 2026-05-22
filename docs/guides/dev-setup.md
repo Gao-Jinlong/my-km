@@ -49,8 +49,8 @@ pnpm dev
 ## 访问应用
 
 - **前端**: http://localhost:4000
-- **后端 API**: http://localhost:3001
-- **Swagger 文档**: http://localhost:3001/api-docs
+- **后端 API**: http://localhost:3000
+- **Swagger 文档**: http://localhost:3000/api-docs
 
 ---
 

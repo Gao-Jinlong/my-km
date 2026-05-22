@@ -1,9 +1,18 @@
 # AI 后端架构 — 多 LLM + LangGraph 工作流
 
 > 日期: 2026-05-11
-> 版本: v2.0
-> 范围: `apps/server/src/ai/` + `packages/langgraph-workflows/`
+> 版本: v2.1
+> 范围: `apps/server/src/ai/`
 > 状态: 已实现并运行
+>
+> **变更记录 (v2.1)**:
+> - LangGraph 工作流从 `packages/langgraph-workflows/` 合并到 `apps/server/src/ai/langgraph/`
+> - 新增 DashScope Provider (通义千问)
+> - 新增 LLM 默认配置链 (`llm-default-config.ts`)，环境变量驱动，支持 provider 级 fallback
+> - 移除独立的 `connection/` 模块（功能合并到 `ws/socket-registry`）
+> - `workflow-runtime/` 重命名为 `workflow/`
+> - `conversation/conversation.service.ts` 重命名为 `conversation/room.service.ts`
+> - `session/` 从 `ai-session-manager` 改为 `room-session` 体系
 
 ## 1. 架构概述
 
@@ -90,66 +99,68 @@
 apps/server/src/ai/
 ├── ai.module.ts                      # 模块入口，注册所有 provider 和图定义
 ├── ai.types.ts                       # 共享类型 (LLMMessage, LLMOutput, ToolDefinition)
-├── ai.controller.ts                  # REST API (对话管理 + 向后兼容)
+├── ai.controller.ts                  # REST API (房间管理 + 向后兼容)
 │
-├── gateway/
-│   └── ai-ws.gateway.ts              # WebSocket 网关 (join/message/stop/tool_result)
+├── dto/
+│   └── send-message.dto.ts            # 请求 DTO
 │
-├── dispatch/
+├── conversation/                     # Room 管理
+│   ├── room.service.ts               #   Room CRUD + 列表查询
+│   └── room-state.ts                 #   状态常量
+│
+├── dispatch/                         # 请求分发
 │   ├── request-dispatcher.ts          # 请求分发 (验证 + 限流 + 会话管理)
 │   └── rate-limiter.guard.ts          # 速率限制
 │
-├── provider/
+├── langgraph/                        # LangGraph 工作流 (已从独立包合并)
+│   ├── index.ts                       # 模块入口 (导出 GraphRegistry, ChatGraph)
+│   ├── graphs/
+│   │   ├── base-graph.ts              # 图定义接口
+│   │   └── chat-graph.ts              # 标准对话工作流
+│   ├── nodes/
+│   │   ├── llm-node.ts                # LLM 调用节点 (从 configurable 获取 llmCaller)
+│   │   ├── tool-node.ts               # 工具执行节点
+│   │   └── router-node.ts             # 条件路由节点
+│   └── types/
+│       └── workflow.types.ts          # 工作流状态 + 节点配置类型
+│
+├── llm/                              # LLM 抽象层
 │   ├── provider.types.ts              # LLMProvider 接口 + LLMConfig + NodeLLMConfigMap
 │   ├── provider-registry.ts           # Provider 注册表 (运行时注册)
 │   ├── llm-factory.ts                 # LLM 工厂 (按需实例化 + 缓存)
+│   ├── llm-default-config.ts          # 环境变量默认配置 + 多级 fallback
 │   ├── anthropic.provider.ts          # Anthropic Claude 实现
 │   ├── openai.provider.ts             # OpenAI GPT 实现
-│   └── zhipu.provider.ts              # 智谱 AI GLM 实现 (OpenAI 兼容)
+│   ├── zhipu.provider.ts              # 智谱 AI GLM 实现 (OpenAI 兼容)
+│   └── dashscope.provider.ts          # DashScope 通义千问 (新增)
 │
-├── workflow-runtime/                  # 工作流运行时 (NestJS 侧)
-│   ├── conversation-orchestrator.ts   # 对话编排 (消息持久化 + 历史构建 + 触发工作流)
-│   ├── workflow-executor.ts           # 工作流执行 (LangGraph 实例化 + 工具循环)
-│   ├── llm-resolver.ts                # 节点级 LLM 解析
+├── workflow/                         # 工作流运行时 (NestJS 侧)
+│   ├── orchestrator.ts                # 房间编排 (消息持久化 + 历史构建 + 触发工作流)
+│   ├── executor.ts                    # 工作流执行 (LangGraph 实例化 + 工具循环)
+│   ├── executor.types.ts              # 执行运行时类型定义
 │   ├── graph-registry.ts              # 图注册与查找
-│   └── workflow.types.ts              # 运行时类型定义
+│   ├── llm-resolver.ts                # 节点级 LLM 解析
+│   └── __tests__/llm-resolver.spec.ts # LLM 解析单元测试
 │
-├── connection/
-│   └── connection-manager.ts          # WebSocket 连接管理
-│
-├── session/
-│   ├── ai-session-manager.ts          # 会话生命周期管理
-│   └── ai-session.types.ts            # 会话类型
-│
-├── conversation/
-│   └── conversation.service.ts        # Conversation CRUD
+├── session/                          # 会话管理
+│   ├── room-session.ts                # 房间会话 (FSM 状态机)
+│   ├── room-session.types.ts          # 会话类型
+│   └── room-session-registry.ts       # 会话注册表
 │
 ├── message/
 │   └── message.service.ts             # 消息持久化 + 历史构建 + token 裁剪
 │
-├── tools/
+├── tools/                            # 工具管理
 │   ├── tool.dispatcher.ts             # 工具结果分发 (会话级事件)
-│   ├── tool.registry.ts               # 工具 schema 注册
+│   ├── tool-router.ts                 # 工具路由 (execution/danger 决策)
 │   └── tool.types.ts                  # 工具类型
 │
-└── dto/
-    └── send-message.dto.ts            # 请求 DTO
-
-packages/langgraph-workflows/          # LangGraph 工作流包 (纯函数式)
-├── package.json
-├── tsconfig.json
-└── src/
-    ├── index.ts                       # 包入口
-    ├── graphs/
-    │   ├── base-graph.ts              # 图定义接口
-    │   └── chat-graph.ts              # 标准对话工作流
-    ├── nodes/
-    │   ├── llm-node.ts                # LLM 调用节点 (从 configurable 获取 llmCaller)
-    │   ├── tool-node.ts               # 工具执行节点
-    │   └── router-node.ts             # 条件路由节点
-    └── types/
-        └── workflow.types.ts          # 工作流状态 + 节点配置类型
+└── ws/                               # AI WebSocket 路由
+    ├── ai-message-router.ts           # 自订阅 AI 消息路由器
+    └── ai-ws-events.types.ts          # WS 事件类型定义
 ```
+
+~~`packages/langgraph-workflows/`~~ — **已删除**，LangGraph 工作流已合并到 `apps/server/src/ai/langgraph/`。
 
 ## 4. 核心设计详解
 
@@ -341,10 +352,31 @@ interface ConversationLLMConfig {
 | `ANTHROPIC_API_KEY` | Anthropic API Key | - |
 | `OPENAI_API_KEY` | OpenAI API Key | - |
 | `ZHIPUAI_API_KEY` | 智谱 AI API Key | - |
+| `DASHSCOPE_API_KEY` | DashScope API Key | - |
 | `ANTHROPIC_MODEL` | Anthropic 默认模型 | `claude-sonnet-4-20250514` |
 | `OPENAI_MODEL` | OpenAI 默认模型 | `gpt-4o` |
+| `AI_DEFAULT_PROVIDER` | 默认 provider | `anthropic` |
 
-启动时自动注册所有配置了 API Key 的 provider 到 `ProviderRegistry`。
+启动时通过 `buildDefaultLlmConfig()` 从环境变量构建默认配置，并注册所有配置了 API Key 的 provider 到 `ProviderRegistry`。
+
+### LLM 默认配置链
+
+新增 `llm-default-config.ts`，提供三级 fallback 机制：
+
+1. **环境变量直接配置**: 读取 `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, 等
+2. **Provider 级 fallback**: 如果首选 provider 无 API Key，自动降级到下一个可用 provider
+3. **运行时注入**: 在 REST/WS 入口解析 `llmConfig`，合并默认配置后传递给执行层
+
+```typescript
+// buildDefaultLlmConfig() 返回值
+interface DefaultLlmConfig {
+  provider: string;    // 首选可用 provider
+  model: string;       // 对应默认模型
+  // ... 其他参数
+}
+```
+
+此设计确保即使只配置了单一 provider 的 API Key，系统也能正常启动并工作。
 
 ## 7. 已删除的遗留文件
 

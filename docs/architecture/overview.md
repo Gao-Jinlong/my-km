@@ -8,12 +8,12 @@
 
 | 层级 | 技术 |
 |------|------|
-| 前端 | Next.js 16 + React 19 + Tailwind CSS 4 + shadcn/ui |
+| 前端 | Next.js 16 + React 19 + Tailwind CSS 4 + shadcn/ui + Lexical |
 | 后端 | NestJS 11 + Prisma ORM |
 | 数据库 | PostgreSQL 15 + pgvector |
 | 缓存 | Redis (ioredis + cache-manager) |
 | 构建 | Turborepo + pnpm workspace |
-| 质量工具 | Biome (lint/format) + Husky + Jest + Vitest + Playwright |
+| 质量工具 | Biome (lint/format) + Jest + Vitest + Playwright |
 
 ---
 
@@ -28,8 +28,8 @@ my-km/
 │   ├── prisma/         # Prisma schema + 生成客户端
 │   └── shared/         # 前后端共享类型、常量、工具函数
 ├── docs/               # 项目文档
-├── openspec/           # 变更管理 (OpenSpec 工作流)
-└── skills/             # AI 辅助脚本
+├── skills/             # AI 辅助脚本
+└── .claude/            # Claude Code 配置
 ```
 
 ---
@@ -46,16 +46,16 @@ my-km/
 │  │  │ (Router)  │  │ (Editor, │  │ (DI +    │              │ │
 │  │  │          │  │  AI)     │  │  Services)│              │ │
 │  │  └──────────┘  └──────────┘  └──────────┘              │ │
-│  │        ↕ zustand         ↕ ky (HTTP client)             │ │
+│  │        ↕ zustand         ↕ ky (HTTP) + Socket.io (WS)   │ │
 │  └──────────────────────────────┬──────────────────────────┘ │
 └─────────────────────────────────┼────────────────────────────┘
-                                  │ HTTP (REST + JWT)
+                                  │ HTTP (REST + JWT) + WebSocket
 ┌─────────────────────────────────┼────────────────────────────┐
 │                         NestJS 11 │                           │
 │  ┌──────────┐  ┌──────────┐  ┌──┴───────┐  ┌──────────┐    │
-│  │   Auth   │  │   Users  │  │  Cache   │  │   I18n   │    │
-│  │ (JWT +   │  │          │  │ (Redis)  │  │          │    │
-│  │ Passport)│  │          │  │          │  │          │    │
+│  │   Auth   │  │   Users  │  │    AI     │  │   I18n   │    │
+│  │ (JWT +   │  │          │  │ (LangGraph│  │          │    │
+│  │ Passport)│  │          │  │  + LLM)   │  │          │    │
 │  └────┬─────┘  └────┬─────┘  └──────────┘  └──────────┘    │
 │       │             │                                          │
 │  ┌────┴─────────────┴──────────────────────────────────────┐ │
@@ -92,10 +92,13 @@ my-km/
 
 | 模块 | 文档 |
 |------|------|
+| 系统架构 | [architecture/overview.md](./architecture/overview.md) |
 | 前端 | [frontend/architecture.md](./frontend/architecture.md) |
 | 前端 Platform | [frontend/platform/services.md](./frontend/platform/services.md) |
 | 后端 | [backend/architecture.md](./backend/architecture.md) |
+| AI 后端 | [backend/ai-architecture-v2.md](./backend/ai-architecture-v2.md) |
+| LLM 对接 | [backend/llm-integration-guide.md](./backend/llm-integration-guide.md) |
 
 ---
 
-**最后更新**: 2026-03-30
+**最后更新**: 2026-05-22

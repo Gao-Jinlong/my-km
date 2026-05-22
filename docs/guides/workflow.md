@@ -2,20 +2,17 @@
 
 ## 代码修改流程
 
-### 使用 OpenSpec 工作流
+1. 明确修改目标 — 功能、修复、重构还是文档
+2. 确认影响范围 — 涉及哪些模块和文件
+3. 实施修改 — 保持小步提交，每步可验证
+4. 运行测试 — 确保无回归
 
-**所有功能变更**必须通过 OpenSpec 工作流进行：
+### 多步骤任务
 
-```bash
-/opsx:propose <名称>   # 创建变更提案
-/opsx:apply           # 实现变更
-/opsx:archive         # 归档变更
-```
-
-**可跳过 OpenSpec 的情况**：
-- 文档修正
-- 配置文件调整
-- 非功能性的格式修复
+对于涉及多个文件/模块的变更，建议：
+- 先编写设计文档到 `docs/plans/`
+- 按依赖顺序分步实施
+- 每步完成后验证构建和测试通过
 
 ---
 
@@ -38,7 +35,7 @@ pnpm test -- apps/web/src/features/editor
 
 1. Fork 仓库
 2. 创建功能分支 (`git checkout -b feature/amazing-feature`)
-3. 使用 OpenSpec 工作流进行开发
+3. 实施变更
 4. 运行测试确保通过
 5. 提交代码（遵循提交规范）
 6. 创建 Pull Request
@@ -52,7 +49,7 @@ pnpm test -- apps/web/src/features/editor
 | **前端** | Next.js 16 + React 19 + Tailwind CSS 4 + shadcn/ui |
 | **后端** | NestJS 11 + Prisma + PostgreSQL + pgvector |
 | **缓存** | Redis + cache-manager |
-| **质量** | Biome + Husky + Jest + Vitest + Playwright |
+| **质量** | Biome + Jest + Vitest + Playwright |
 
 ---
 
@@ -63,4 +60,4 @@ pnpm test -- apps/web/src/features/editor
 
 ---
 
-**最后更新**: 2026-03-30
+**最后更新**: 2026-05-22
