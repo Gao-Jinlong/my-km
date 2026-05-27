@@ -1,5 +1,5 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
-import { randomUUID } from 'crypto';
 import type { BusMessage, MessageHandler } from '../../ws/message-bus';
 import { SocketRegistry } from '../../ws/socket-registry';
 import type {
@@ -37,16 +37,19 @@ export class AgentOrchestrator implements MessageHandler {
 
         switch (msg.type) {
             case 'agent:start':
-                await this.handleStart(msg.clientId, payload as AgentStartPayload);
+                await this.handleStart(msg.clientId, payload as unknown as AgentStartPayload);
                 break;
             case 'agent:approve':
-                await this.handleApprove(msg.clientId, payload as AgentApprovePayload);
+                await this.handleApprove(msg.clientId, payload as unknown as AgentApprovePayload);
                 break;
             case 'agent:reject':
-                await this.handleReject(msg.clientId, payload as AgentRejectPayload);
+                await this.handleReject(msg.clientId, payload as unknown as AgentRejectPayload);
                 break;
             case 'agent:intervene':
-                await this.handleIntervene(msg.clientId, payload as AgentIntervenePayload);
+                await this.handleIntervene(
+                    msg.clientId,
+                    payload as unknown as AgentIntervenePayload,
+                );
                 break;
         }
     }
