@@ -1,9 +1,10 @@
-import type { SocketRegistry } from '../../../ws/socket-registry';
-import type { AgentDefinition, AgentSession } from '../agent.types';
-import type { AgentHandler } from '../agent-handler';
+// biome-ignore lint: test file uses types for type inference
+import { SocketRegistry } from '../../../ws/socket-registry';
+import { AgentDefinition, AgentSession } from '../agent.types';
+import { AgentHandler } from '../agent-handler';
 import { AgentOrchestrator } from '../agent-orchestrator';
-import type { AgentRegistry } from '../agent-registry';
-import type { AgentStateStore } from '../agent-state-store';
+import { AgentRegistry } from '../agent-registry';
+import { AgentStateStore } from '../agent-state-store';
 
 function makeTestOrchestrator() {
     const emittedEvents: { event: string; data: unknown }[] = [];
