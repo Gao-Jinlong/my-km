@@ -12,15 +12,18 @@
 import { END, START, StateGraph } from '@langchain/langgraph';
 import { createLLMNode } from '../nodes/llm-node';
 import { createToolNode } from '../nodes/tool-node';
-import { type WorkflowState, WorkflowStateAnnotation } from '../types/workflow.types';
+import {
+    type CompiledWorkflowGraph,
+    type WorkflowState,
+    WorkflowStateAnnotation,
+} from '../types/workflow.types';
 import type { BaseGraph } from './base-graph';
 
 export class ChatGraph implements BaseGraph {
     readonly name = 'chat';
     readonly description = '标准对话工作流，支持工具调用循环';
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    createGraph() {
+    createGraph(): CompiledWorkflowGraph {
         // 使用方法链以让 TypeScript 正确收窄节点名称泛型参数 N
         // 参见: https://github.com/langchain-ai/langgraphjs/issues/763
         const graph = new StateGraph(WorkflowStateAnnotation)
@@ -33,6 +36,6 @@ export class ChatGraph implements BaseGraph {
             .addEdge('tools', 'llm_call');
 
         // 编译图
-        return graph.compile();
+        return graph.compile() as CompiledWorkflowGraph;
     }
 }

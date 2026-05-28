@@ -5,7 +5,7 @@
  * 不依赖 NestJS DI，仅依赖 @langchain/langgraph。
  */
 
-import type { NodeLLMConfigMap } from '../types/workflow.types';
+import type { CompiledWorkflowGraph, NodeLLMConfigMap } from '../types/workflow.types';
 
 /**
  * 图定义接口
@@ -23,8 +23,7 @@ export interface BaseGraph {
      * @param llmConfigMap - 运行时 LLM 配置映射（节点 ID -> LLM 配置）
      * @returns 编译后的 StateGraph
      */
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    createGraph(llmConfigMap?: NodeLLMConfigMap): any;
+    createGraph(llmConfigMap?: NodeLLMConfigMap): CompiledWorkflowGraph;
 }
 
 /**

@@ -4,7 +4,25 @@
  * 纯类型定义，无运行时依赖。供 server 侧和 graph 定义共享。
  */
 
+import type { RunnableConfig } from '@langchain/core/runnables';
 import { Annotation } from '@langchain/langgraph';
+
+/**
+ * Minimal interface for a compiled workflow graph.
+ * CompiledStateGraph has deep generics (including specific node name literals) that
+ * cannot be safely widened, so we type only the methods the executor actually uses.
+ */
+export interface CompiledWorkflowGraph {
+    stream(
+        input: Partial<WorkflowState>,
+        options?: Partial<{ configurable: Partial<GraphConfig> }>,
+    ): Promise<AsyncIterable<Partial<WorkflowState>>>;
+    invoke(
+        input: Partial<WorkflowState>,
+        options?: Partial<{ configurable: Partial<GraphConfig> }>,
+    ): Promise<unknown>;
+    withConfig(config: RunnableConfig): this;
+}
 
 /**
  * 单个 LLM 配置（工作流包内部定义，避免循环依赖）

@@ -15,14 +15,19 @@
 
 import { Logger } from '@nestjs/common';
 import type { LLMMessage } from '../ai.types';
-import type { GraphConfig, WorkflowMessage, WorkflowState } from '../langgraph';
+import type {
+    BaseGraph,
+    CompiledWorkflowGraph,
+    GraphConfig,
+    WorkflowMessage,
+    WorkflowState,
+} from '../langgraph';
 import type { ExecutionCtx, ExecutorDependencies } from './executor.types';
 
 export class Executor {
     private readonly logger = new Logger(Executor.name);
     private readonly maxToolRounds = 10;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private graphCache = new Map<string, any>();
+    private graphCache = new Map<string, CompiledWorkflowGraph>();
 
     constructor(
         private ctx: ExecutionCtx,
@@ -229,14 +234,19 @@ export class Executor {
     /**
      * Get or cache compiled graph instance.
      */
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private getOrCreateGraph(graphDef: { name: string; createGraph: () => any }): any {
+    private getOrCreateGraph(graphDef: BaseGraph) {
         const cacheKey = graphDef.name;
         if (!this.graphCache.has(cacheKey)) {
             const graph = graphDef.createGraph();
             this.graphCache.set(cacheKey, graph);
             this.logger.debug(`Graph compiled: ${cacheKey}`);
         }
-        return this.graphCache.get(cacheKey);
+        const graph = this.graphCache.get(cacheKey);
+
+        if (!graph) {
+            throw new Error(`Failed to compile graph: ${cacheKey}`);
+        }
+
+        return graph;
     }
 }

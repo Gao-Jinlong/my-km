@@ -7,6 +7,7 @@
 export type { BaseGraph, GraphFactory } from './graphs/base-graph';
 export { ChatGraph } from './graphs/chat-graph';
 export type {
+    CompiledWorkflowGraph,
     GraphConfig,
     LLMCaller,
     LLMCallResult,
