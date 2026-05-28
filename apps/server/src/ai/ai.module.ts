@@ -1,8 +1,15 @@
 import { Logger, Module, OnModuleInit } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PrismaModule } from '../prisma/prisma.module';
+import { MessageBus } from '../ws/message-bus';
 import { SocketRegistry } from '../ws/socket-registry';
 import { WsModule } from '../ws/ws.module';
+import { AgentHandler } from './agents/agent-handler';
+import { AgentOrchestrator } from './agents/agent-orchestrator';
+import { AgentRegistry } from './agents/agent-registry';
+import { AgentStateStore } from './agents/agent-state-store';
+import { editorAgent } from './agents/agents/editor.agent';
+import { writerAgent } from './agents/agents/writer.agent';
 import { AiController } from './ai.controller';
 import { RoomService } from './conversation/room.service';
 import { AiRateLimiter } from './dispatch/rate-limiter.guard';
@@ -50,6 +57,11 @@ import { AiMessageRouter } from './ws/ai-message-router';
         LLMResolver,
         GraphRegistry,
         RoomOrchestrator,
+        // Agent module
+        AgentRegistry,
+        AgentStateStore,
+        AgentHandler,
+        AgentOrchestrator,
     ],
     exports: [
         MessageService,
@@ -70,6 +82,9 @@ export class AiModule implements OnModuleInit {
         private configService: ConfigService,
         private providerRegistry: ProviderRegistry,
         private graphRegistry: GraphRegistry,
+        private agentRegistry: AgentRegistry,
+        private messageBus: MessageBus,
+        private agentOrchestrator: AgentOrchestrator,
     ) {}
 
     async onModuleInit() {
@@ -90,6 +105,11 @@ export class AiModule implements OnModuleInit {
 
         // Register built-in graph definitions
         this.graphRegistry.register(new ChatGraph());
+
+        // Register agent definitions and wire orchestrator
+        this.agentRegistry.register(editorAgent);
+        this.agentRegistry.register(writerAgent);
+        this.messageBus.subscribe(this.agentOrchestrator);
     }
 
     /**
