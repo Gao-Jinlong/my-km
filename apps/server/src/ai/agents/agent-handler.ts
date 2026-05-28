@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { ToolDispatcher } from '../tools/tool.dispatcher';
-import type { ToolRouter } from '../tools/tool-router';
-import type { GraphRegistry } from '../workflow/graph-registry';
-import type { LLMResolver } from '../workflow/llm-resolver';
+import { ToolDispatcher } from '../tools/tool.dispatcher';
+import { ToolRouter } from '../tools/tool-router';
+import { GraphRegistry } from '../workflow/graph-registry';
+import { LLMResolver } from '../workflow/llm-resolver';
 import type { AgentCallbacks, AgentDefinition } from './agent.types';
 import { AgentExecutor, type AgentExecutorCtx } from './agent-executor';
 

@@ -6,6 +6,7 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
+import { RoomService } from '../conversation/room.service';
 import type { NodeLLMConfigMap } from '../llm/provider.types';
 import { MessageService } from '../message/message.service';
 import { RoomSessionRegistry } from '../session/room-session-registry';
@@ -34,6 +35,7 @@ export class RoomOrchestrator {
     constructor(
         private roomSessionRegistry: RoomSessionRegistry,
         private messageService: MessageService,
+        private roomService: RoomService,
         private graphRegistry: GraphRegistry,
         private llmResolver: LLMResolver,
         private toolDispatcher: ToolDispatcher,
@@ -63,6 +65,7 @@ export class RoomOrchestrator {
 
         const deps: ExecutorDependencies = {
             messageService: this.messageService,
+            roomService: this.roomService,
             graphRegistry: this.graphRegistry,
             llmResolver: this.llmResolver,
             toolDispatcher: this.toolDispatcher,

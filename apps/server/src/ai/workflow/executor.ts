@@ -16,7 +16,7 @@
 import { Logger } from '@nestjs/common';
 import type { LLMMessage } from '../ai.types';
 import type { GraphConfig, WorkflowMessage, WorkflowState } from '../langgraph';
-import type { ExecutionCtx, ExecutorDependencies, WorkflowToolCall } from './executor.types';
+import type { ExecutionCtx, ExecutorDependencies } from './executor.types';
 
 export class Executor {
     private readonly logger = new Logger(Executor.name);
@@ -42,7 +42,15 @@ export class Executor {
         const graphDef = this.deps.graphRegistry.get(graphName);
         const graph = this.getOrCreateGraph(graphDef);
 
-        // Build LLM history from database
+        // Persist user message before calling LLM
+        await this.deps.messageService.create({
+            roomId,
+            role: 'user',
+            content,
+        });
+        this.deps.roomService.incrementMessageCount(roomId).catch(() => {});
+
+        // Re-build history to include the just-persisted user message
         const history = await this.deps.messageService.buildLLMHistory(roomId);
 
         // Create LLM caller function
@@ -61,8 +69,9 @@ export class Executor {
         };
 
         // Initial state for this execution
+        // History already contains the just-persisted user message
         const initialState: Partial<WorkflowState> = {
-            messages: [{ role: 'user' as const, content }],
+            messages: [...(history as WorkflowMessage[])],
             roomId,
             lastAssistantMessage: '',
             hasToolCalls: false,
@@ -74,7 +83,8 @@ export class Executor {
 
         try {
             let round = 0;
-            const currentMessages = [...history];
+            let hadToolCallsInAnyRound = false;
+            let lastState: Partial<WorkflowState> | null = null;
 
             while (round < this.maxToolRounds) {
                 round++;
@@ -86,7 +96,6 @@ export class Executor {
                 }
 
                 // Execute graph stream
-                let lastState: Partial<WorkflowState> | null = null;
                 const stream = await graph.stream(initialState, { configurable });
                 for await (const state of stream) {
                     lastState = state as Partial<WorkflowState>;
@@ -102,6 +111,8 @@ export class Executor {
                 if (!lastState?.hasToolCalls || !lastState.pendingToolCalls?.length) {
                     break; // No more tool calls — done
                 }
+
+                hadToolCallsInAnyRound = true;
 
                 // Persist assistant message with tool calls
                 await this.deps.messageService.create({
@@ -159,43 +170,12 @@ export class Executor {
                         content: resultStr,
                         toolResultId: toolId,
                     });
-
-                    currentMessages.push({
-                        role: 'tool' as const,
-                        content: [
-                            {
-                                type: 'tool_result',
-                                tool_use_id: toolId,
-                                content: resultStr,
-                            },
-                        ],
-                    });
                 }
 
-                // Prepare state for next LLM round
-                const toolResultMessages: WorkflowMessage[] = Object.entries(results).map(
-                    ([toolId, r]) => {
-                        const resultStr = typeof r === 'string' ? r : JSON.stringify(r);
-                        return {
-                            role: 'tool' as const,
-                            content: [
-                                {
-                                    type: 'tool_result' as const,
-                                    tool_use_id: toolId,
-                                    content: resultStr,
-                                },
-                            ],
-                        };
-                    },
-                );
-
-                initialState.messages = [
-                    { role: 'user' as const, content },
-                    ...(lastState.lastAssistantMessage
-                        ? [{ role: 'assistant' as const, content: lastState.lastAssistantMessage }]
-                        : []),
-                    ...toolResultMessages,
-                ];
+                // Prepare state for next LLM round — reload full history from DB
+                // to ensure the LLM sees all prior messages including new tool results
+                const refreshedHistory = await this.deps.messageService.buildLLMHistory(roomId);
+                initialState.messages = [...(refreshedHistory as WorkflowMessage[])];
                 initialState.pendingToolCalls = [];
                 initialState.hasToolCalls = false;
                 initialState.toolResults = results;
@@ -207,8 +187,17 @@ export class Executor {
                 );
             }
 
-            // Persist final assistant message if any
-            // (Already persisted during tool call rounds; only persist if no tool calls occurred)
+            // Persist final assistant message when no tool calls occurred in any round.
+            // (Tool-call rounds already persist assistant messages inside the loop.)
+            if (!hadToolCallsInAnyRound && lastState?.lastAssistantMessage) {
+                await this.deps.messageService.create({
+                    roomId,
+                    role: 'assistant',
+                    content: lastState.lastAssistantMessage,
+                });
+                this.deps.roomService.incrementMessageCount(roomId).catch(() => {});
+            }
+
             // Signal completion
             callbacks.onLlmDone(roomId);
         } catch (error) {

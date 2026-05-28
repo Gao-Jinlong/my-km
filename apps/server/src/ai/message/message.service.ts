@@ -47,10 +47,7 @@ export class MessageService {
                 content: opts.content,
                 toolCalls:
                     opts.toolCalls && opts.toolCalls.length > 0
-                        ? (opts.toolCalls.map(t => ({
-                              id: t.id,
-                              name: t.name,
-                          })) as Prisma.InputJsonValue)
+                        ? (opts.toolCalls as unknown as Prisma.InputJsonValue)
                         : undefined,
                 toolResultId: opts.toolResultId,
                 tokenCount: opts.tokenCount,

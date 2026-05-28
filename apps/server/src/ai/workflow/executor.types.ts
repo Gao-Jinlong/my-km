@@ -4,6 +4,7 @@
  * Defines the per-execution context, callbacks, and dependency bundle.
  */
 
+import type { RoomService } from '../conversation/room.service';
 import type { LLMConfig, NodeLLMConfigMap } from '../llm/provider.types';
 import type { MessageService } from '../message/message.service';
 import type { ToolDispatcher } from '../tools/tool.dispatcher';
@@ -57,6 +58,7 @@ export interface ExecutionCtx {
  */
 export interface ExecutorDependencies {
     messageService: MessageService;
+    roomService: RoomService;
     graphRegistry: GraphRegistry;
     llmResolver: LLMResolver;
     toolDispatcher: ToolDispatcher;
