@@ -1,4 +1,5 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { AgentsModule } from './ai/agents/agents.module';
 import { AiModule } from './ai/ai.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -21,6 +22,7 @@ import { UsersModule } from './users/users.module';
         AuthModule,
         I18nModule,
         AiModule,
+        AgentsModule,
     ],
     controllers: [AppController],
     providers: [AppService],

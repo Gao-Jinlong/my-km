@@ -1,7 +1,7 @@
-import { Module, OnModuleInit } from '@nestjs/common';
+import { forwardRef, Module, OnModuleInit } from '@nestjs/common';
 import { MessageBus } from '../../ws/message-bus';
-import { SocketRegistry } from '../../ws/socket-registry';
 import { WsModule } from '../../ws/ws.module';
+import { AiModule } from '../ai.module';
 import { ToolDispatcher } from '../tools/tool.dispatcher';
 import { ToolRouter } from '../tools/tool-router';
 import { GraphRegistry } from '../workflow/graph-registry';
@@ -14,7 +14,7 @@ import { editorAgent } from './agents/editor.agent';
 import { writerAgent } from './agents/writer.agent';
 
 @Module({
-    imports: [WsModule],
+    imports: [forwardRef(() => AiModule), WsModule],
     providers: [AgentRegistry, AgentStateStore, AgentHandler, AgentOrchestrator],
     exports: [AgentRegistry],
 })

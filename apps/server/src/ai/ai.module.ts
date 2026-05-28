@@ -3,7 +3,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PrismaModule } from '../prisma/prisma.module';
 import { SocketRegistry } from '../ws/socket-registry';
 import { WsModule } from '../ws/ws.module';
-import { AgentsModule } from './agents/agents.module';
 import { AiController } from './ai.controller';
 import { RoomService } from './conversation/room.service';
 import { AiRateLimiter } from './dispatch/rate-limiter.guard';
@@ -32,7 +31,7 @@ import { AiMessageRouter } from './ws/ai-message-router';
  * 支持多 provider: Anthropic, OpenAI, Zhipu, DashScope
  */
 @Module({
-    imports: [PrismaModule, ConfigModule, WsModule, AgentsModule],
+    imports: [PrismaModule, ConfigModule, WsModule],
     controllers: [AiController],
     providers: [
         RoomService,
@@ -61,6 +60,8 @@ import { AiMessageRouter } from './ws/ai-message-router';
         GraphRegistry,
         RoomOrchestrator,
         AiMessageRouter,
+        ToolDispatcher,
+        ToolRouter,
     ],
 })
 export class AiModule implements OnModuleInit {
