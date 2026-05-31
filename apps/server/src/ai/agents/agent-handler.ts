@@ -36,12 +36,13 @@ export class AgentHandler {
             graphName: 'chat',
         };
 
-        const executor = new AgentExecutor(ctx, {
-            graphRegistry: this.graphRegistry,
-            llmResolver: this.llmResolver,
-            toolDispatcher: this.toolDispatcher,
-            toolRouter: this.toolRouter,
-        });
+        const executor = new AgentExecutor(
+            ctx,
+            this.graphRegistry,
+            this.llmResolver,
+            this.toolDispatcher,
+            this.toolRouter,
+        );
 
         return executor.execute();
     }

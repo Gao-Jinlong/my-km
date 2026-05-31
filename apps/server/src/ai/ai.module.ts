@@ -1,6 +1,7 @@
 import { Logger, Module, OnModuleInit } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PrismaModule } from '../prisma/prisma.module';
+import { PrismaService } from '../prisma/prisma.service';
 import { MessageBus } from '../ws/message-bus';
 import { SocketRegistry } from '../ws/socket-registry';
 import { WsModule } from '../ws/ws.module';
@@ -24,6 +25,9 @@ import type { LLMConfig, LLMProvider } from './llm/provider.types';
 import { ProviderRegistry } from './llm/provider-registry';
 import { ZhipuProvider } from './llm/zhipu.provider';
 import { MessageService } from './message/message.service';
+import { MessageStoreImpl } from './message/message-store.impl';
+import { MESSAGE_STORE_PROVIDER_TOKEN } from './message/providers/message-store-provider.interface';
+import { PrismaMessageStoreProvider } from './message/providers/prisma-message-store.provider';
 import { RoomSessionRegistry } from './session/room-session-registry';
 import { ToolDispatcher } from './tools/tool.dispatcher';
 import { ToolRouter } from './tools/tool-router';
@@ -43,6 +47,25 @@ import { AiMessageRouter } from './ws/ai-message-router';
     providers: [
         RoomService,
         MessageService,
+        // MessageStore — 新架构：业务层 + Provider 工厂
+        MessageStoreImpl,
+        {
+            provide: MESSAGE_STORE_PROVIDER_TOKEN,
+            useFactory: (config: ConfigService, prisma: PrismaService) => {
+                const providerType = config.get<string>('MESSAGE_STORE_PROVIDER', 'prisma');
+                switch (providerType) {
+                    case 'prisma':
+                        return new PrismaMessageStoreProvider(prisma);
+                    // case 'jsonl':
+                    //     return new JsonlMessageStoreProvider({
+                    //         dataDir: config.get<string>('DATA_DIR', './data'),
+                    //     });
+                    default:
+                        throw new Error(`Unknown MESSAGE_STORE_PROVIDER: ${providerType}`);
+                }
+            },
+            inject: [ConfigService, PrismaService],
+        },
         SocketRegistry,
         ToolDispatcher,
         ToolRouter,
@@ -65,6 +88,7 @@ import { AiMessageRouter } from './ws/ai-message-router';
     ],
     exports: [
         MessageService,
+        MessageStoreImpl,
         // New architecture exports
         ProviderRegistry,
         LLMFactory,

@@ -5,16 +5,23 @@ import type { ToolRouter } from '../../tools/tool-router';
 import type { GraphRegistry } from '../../workflow/graph-registry';
 import type { LLMResolver } from '../../workflow/llm-resolver';
 import type { AgentCallbacks } from '../agent.types';
-import { AgentExecutor, type AgentExecutorCtx } from '../agent-executor';
+
+import type { AgentExecutorCtx } from '../agent-executor';
+import { AgentExecutor } from '../agent-executor';
+
+/** Helper: wrap partial state in LangGraph node-keyed format */
+function nodeUpdate(partial: Record<string, unknown>) {
+    return { llm_call: partial };
+}
 
 function makeMocks() {
     const mockCompiledGraph = {
         stream: jest.fn().mockImplementation(async function* () {
-            yield {
+            yield nodeUpdate({
                 lastAssistantMessage: 'Test output from agent',
                 hasToolCalls: false,
                 pendingToolCalls: [],
-            };
+            });
         }),
     };
 
@@ -75,12 +82,13 @@ describe('AgentExecutor', () => {
             abortSignal: new AbortController().signal,
         };
 
-        const executor = new AgentExecutor(ctx, {
-            graphRegistry: mocks.graphRegistry,
-            llmResolver: mocks.llmResolver,
-            toolDispatcher: mocks.toolDispatcher,
-            toolRouter: mocks.toolRouter,
-        });
+        const executor = new AgentExecutor(
+            ctx,
+            mocks.graphRegistry,
+            mocks.llmResolver,
+            mocks.toolDispatcher,
+            mocks.toolRouter,
+        );
 
         const result = await executor.execute();
 
@@ -105,12 +113,13 @@ describe('AgentExecutor', () => {
             abortSignal: controller.signal,
         };
 
-        const executor = new AgentExecutor(ctx, {
-            graphRegistry: mocks.graphRegistry,
-            llmResolver: mocks.llmResolver,
-            toolDispatcher: mocks.toolDispatcher,
-            toolRouter: mocks.toolRouter,
-        });
+        const executor = new AgentExecutor(
+            ctx,
+            mocks.graphRegistry,
+            mocks.llmResolver,
+            mocks.toolDispatcher,
+            mocks.toolRouter,
+        );
 
         const result = await executor.execute();
 
@@ -133,16 +142,17 @@ describe('AgentExecutor', () => {
             llmConfig: { provider: 'anthropic', model: 'claude-sonnet-4-6' },
         };
 
-        const executor = new AgentExecutor(ctx, {
-            graphRegistry: mocks.graphRegistry,
-            llmResolver: mocks.llmResolver,
-            toolDispatcher: mocks.toolDispatcher,
-            toolRouter: mocks.toolRouter,
-        });
+        const executor = new AgentExecutor(
+            ctx,
+            mocks.graphRegistry,
+            mocks.llmResolver,
+            mocks.toolDispatcher,
+            mocks.toolRouter,
+        );
 
         // Consume the generator to trigger llmCaller
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const caller = (executor as any).createLLMCaller(ctx.llmConfig);
+        const caller = (executor as any).createLLMCaller(undefined, ctx.llmConfig);
         const gen = caller([], new AbortController().signal);
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         for await (const _ of gen) {

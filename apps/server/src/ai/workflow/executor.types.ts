@@ -6,7 +6,7 @@
 
 import type { RoomService } from '../conversation/room.service';
 import type { LLMConfig, NodeLLMConfigMap } from '../llm/provider.types';
-import type { MessageService } from '../message/message.service';
+import type { MessageStore } from '../message/message-store.interface';
 import type { ToolDispatcher } from '../tools/tool.dispatcher';
 import type { ToolRouter } from '../tools/tool-router';
 import type { FinishReason } from '../ws/ai-ws-events.types';
@@ -57,7 +57,7 @@ export interface ExecutionCtx {
  * Passed from RequestDispatcher to keep Executor testable without NestJS DI.
  */
 export interface ExecutorDependencies {
-    messageService: MessageService;
+    messageStore: MessageStore;
     roomService: RoomService;
     graphRegistry: GraphRegistry;
     llmResolver: LLMResolver;

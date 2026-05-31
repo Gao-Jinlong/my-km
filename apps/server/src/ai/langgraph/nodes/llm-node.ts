@@ -56,10 +56,6 @@ export function createLLMNode() {
             lastAssistantMessage: assistantText,
             hasToolCalls: toolCalls.length > 0,
             pendingToolCalls: toolCalls,
-            // 追加助手消息到消息历史
-            messages: [
-                { role: 'assistant' as const, content: assistantText || '(tool calls only)' },
-            ],
         };
     };
 }

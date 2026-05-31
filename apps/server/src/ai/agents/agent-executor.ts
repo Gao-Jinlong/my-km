@@ -1,9 +1,17 @@
-import { Logger } from '@nestjs/common';
-import type { LLMMessage } from '../ai.types';
+/**
+ * AgentExecutor — 离线推理模式。
+ *
+ * Phase 5 重构:
+ * - 继承 BaseExecutor 共享 graph 循环逻辑
+ * - 不持久化任何消息（纯内存状态）
+ * - 通过回调一次性返回输出
+ */
+
 import type { GraphConfig, WorkflowState } from '../langgraph';
 import type { LLMConfig } from '../llm/provider.types';
 import type { ToolDispatcher } from '../tools/tool.dispatcher';
 import type { ToolRouter } from '../tools/tool-router';
+import { BaseExecutor } from '../workflow/base-executor';
 import type { GraphRegistry } from '../workflow/graph-registry';
 import type { LLMResolver } from '../workflow/llm-resolver';
 import type { AgentCallbacks } from './agent.types';
@@ -18,35 +26,26 @@ export interface AgentExecutorCtx {
     graphName?: string;
 }
 
-export class AgentExecutor {
-    private readonly logger = new Logger(AgentExecutor.name);
-    private graphCache = new Map<string, unknown>();
-    private readonly maxToolRounds = 10;
+export class AgentExecutor extends BaseExecutor {
+    private agentGraphCache = new Map<string, unknown>();
 
     constructor(
         private ctx: AgentExecutorCtx,
-        private deps: {
-            graphRegistry: GraphRegistry;
-            llmResolver: LLMResolver;
-            toolDispatcher: ToolDispatcher;
-            toolRouter: ToolRouter;
-        },
-    ) {}
+        private graphRegistry: GraphRegistry,
+        llmResolver: LLMResolver,
+        toolDispatcher: ToolDispatcher,
+        toolRouter: ToolRouter,
+    ) {
+        super(llmResolver, toolDispatcher, toolRouter);
+    }
 
     async execute(): Promise<{ output: string }> {
-        const {
-            sessionId,
-            agentId,
-            callbacks,
-            abortSignal,
-            llmConfig,
-            graphName = 'chat',
-        } = this.ctx;
+        const { sessionId, agentId, callbacks, abortSignal, graphName = 'chat' } = this.ctx;
 
-        const graphDef = this.deps.graphRegistry.get(graphName);
-        const graph = this.getOrCreateGraph(graphDef);
-        const llmCaller = this.createLLMCaller(llmConfig);
-        const tools = this.deps.toolDispatcher.getDefinitions() as GraphConfig['tools'];
+        const graphDef = this.graphRegistry.get(graphName);
+        const graph = this.getOrCreateAgentGraph(graphDef);
+        const llmCaller = this.createLLMCaller(undefined, this.ctx.llmConfig);
+        const tools = this.toolDispatcher.getDefinitions() as GraphConfig['tools'];
 
         const configurable: Partial<GraphConfig> = {
             llmCaller,
@@ -68,36 +67,7 @@ export class AgentExecutor {
         };
 
         try {
-            let round = 0;
-            let lastState: Partial<WorkflowState> | null = null;
-
-            while (round < this.maxToolRounds) {
-                round++;
-
-                if (abortSignal.aborted) {
-                    callbacks.onStatus(sessionId, agentId, 'cancelled');
-                    return { output: '' };
-                }
-
-                const stream = await graph.stream(initialState, { configurable });
-                for await (const state of stream) {
-                    lastState = state as Partial<WorkflowState>;
-                    if (abortSignal.aborted) {
-                        callbacks.onStatus(sessionId, agentId, 'cancelled');
-                        return { output: '' };
-                    }
-                }
-
-                if (!lastState?.hasToolCalls || !lastState.pendingToolCalls?.length) {
-                    break;
-                }
-
-                this.logger.warn(
-                    `Agent ${agentId} produced tool calls but agent executor does not support frontend tools.`,
-                );
-                break;
-            }
-
+            const { lastState } = await this.runToolLoop(graph as any, initialState, configurable);
             const output = lastState?.lastAssistantMessage ?? '';
             callbacks.onOutput(sessionId, agentId, output);
             return { output };
@@ -116,22 +86,54 @@ export class AgentExecutor {
         }
     }
 
-    private createLLMCaller(config?: LLMConfig) {
-        return async function* (messages: LLMMessage[], signal?: AbortSignal) {
-            const provider = this.deps.llmResolver.resolve('llm_call', undefined, config);
-            const tools = this.deps.toolDispatcher.getDefinitions();
-            yield* provider.chat(messages, tools, signal);
-        }.bind(this);
-    }
-
+    /**
+     * Agent-specific graph cache — 允许返回 unknown 类型，
+     * 因为 AgentExecutor 的 graphRegistry.get() 可能返回非标准图。
+     */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private getOrCreateGraph(graphDef: { name: string; createGraph: () => any }): any {
+    private getOrCreateAgentGraph(graphDef: { name: string; createGraph: () => any }): any {
         const cacheKey = graphDef.name;
-        if (!this.graphCache.has(cacheKey)) {
+        if (!this.agentGraphCache.has(cacheKey)) {
             const graph = graphDef.createGraph();
-            this.graphCache.set(cacheKey, graph);
+            this.agentGraphCache.set(cacheKey, graph);
             this.logger.debug(`Agent graph compiled: ${cacheKey}`);
         }
-        return this.graphCache.get(cacheKey);
+        return this.agentGraphCache.get(cacheKey);
+    }
+
+    // ========== BaseExecutor 抽象方法实现 ==========
+    // 离线模式：不需要持久化
+
+    protected async persistAssistant(): Promise<void> {
+        // no-op — offline mode
+    }
+
+    protected async persistToolResults(): Promise<void> {
+        // no-op — offline mode
+    }
+
+    protected async persistFinal(): Promise<void> {
+        // no-op — offline mode
+    }
+
+    protected async routeToolCalls(): Promise<void> {
+        this.logger.warn('AgentExecutor: tool calls not supported in offline mode.');
+    }
+
+    protected async waitForToolResults(): Promise<Record<string, unknown> | null> {
+        // 离线模式不支持等待前端工具结果
+        return null;
+    }
+
+    protected isAborted(): boolean {
+        return this.ctx.abortSignal.aborted;
+    }
+
+    protected onAbort(): void {
+        this.ctx.callbacks.onStatus(this.ctx.sessionId, this.ctx.agentId, 'cancelled');
+    }
+
+    protected onTimeout(): void {
+        this.logger.warn('AgentExecutor: tool execution timed out (offline mode, no action)');
     }
 }
