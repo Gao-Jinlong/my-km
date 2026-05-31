@@ -5,7 +5,7 @@
  * 并处理流式输出和工具调用。
  */
 
-import type { GraphConfig, WorkflowMessage, WorkflowState } from '../types/workflow.types';
+import type { GraphConfig, LLMMessage, WorkflowState } from '../types/workflow.types';
 
 export function createLLMNode() {
     return async (
@@ -20,8 +20,8 @@ export function createLLMNode() {
             return { error: 'LLM caller not provided in configurable context' };
         }
 
-        // 构建消息列表（状态中已存 WorkflowMessage，直接使用）
-        const messages: WorkflowMessage[] = state.messages;
+        // 构建消息列表（状态中已存 LLMMessage，直接使用）
+        const messages: LLMMessage[] = state.messages;
 
         // 如果有工具结果，追加 tool_result 消息
         if (state.pendingToolCalls && state.pendingToolCalls.length > 0) {

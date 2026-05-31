@@ -4,6 +4,8 @@
 
 import type { LLMMessage, LLMOutput, ToolDefinition } from '../ai.types';
 
+export type { ToolDefinition } from '../ai.types';
+
 /**
  * 单个 LLM 配置
  */

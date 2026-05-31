@@ -6,6 +6,11 @@
 
 import type { RunnableConfig } from '@langchain/core/runnables';
 import { Annotation } from '@langchain/langgraph';
+import type {
+    LLMMessage as AiLLMMessage,
+    ToolDefinition as AiToolDefinition,
+    LLMOutput,
+} from '../../ai.types';
 
 /**
  * Minimal interface for a compiled workflow graph.
@@ -81,61 +86,17 @@ export interface GraphConfig {
  * 由 server 侧创建并传入 LangGraph 节点
  */
 export type LLMCaller = (
-    messages: WorkflowMessage[],
+    messages: LLMMessage[],
     abortSignal?: AbortSignal,
-) => AsyncIterable<LLMStreamEvent>;
-
-/**
- * LLM 输出流式事件
- */
-export interface LLMStreamEvent {
-    type: 'text_chunk' | 'tool_call' | 'done';
-    content?: string;
-    toolCall?: {
-        id: string;
-        name: string;
-        arguments: Record<string, unknown>;
-    };
-}
-
-/**
- * 工具定义（发送给 LLM 的 JSON Schema）
- */
-export interface ToolDefinition {
-    name: string;
-    description: string;
-    input_schema: Record<string, unknown>;
-}
-
-/**
- * 工作流消息格式
- * 兼容 LLM API 格式，但序列化存储在状态中
- */
-export interface WorkflowMessage {
-    role: 'user' | 'assistant' | 'tool';
-    content:
-        | string
-        | Array<{
-              type: 'text' | 'tool_use' | 'tool_result';
-              text?: string;
-              id?: string;
-              name?: string;
-              input?: Record<string, unknown>;
-              tool_use_id?: string;
-              content?: string;
-          }>;
-}
+) => AsyncIterable<LLMOutput>;
 
 /**
  * 工作流基础状态
  */
 export const WorkflowStateAnnotation = Annotation.Root({
     /** 用户输入消息 */
-    messages: Annotation<WorkflowMessage[]>({
-        reducer: (existing: WorkflowMessage[], update: WorkflowMessage[]) => [
-            ...existing,
-            ...update,
-        ],
+    messages: Annotation<LLMMessage[]>({
+        reducer: (existing: LLMMessage[], update: LLMMessage[]) => [...existing, ...update],
         default: () => [],
     }),
     /** 当前房间 ID */
@@ -168,7 +129,7 @@ export const WorkflowStateAnnotation = Annotation.Root({
 
 export interface WorkflowState {
     /** 用户输入消息 */
-    messages: WorkflowMessage[];
+    messages: LLMMessage[];
     /** 当前房间 ID */
     roomId: string;
     /** 最后一条助手回复 */
@@ -188,6 +149,14 @@ export interface WorkflowState {
     /** 工作流是否完成 */
     isDone: boolean;
 }
+
+/**
+ * 向后兼容别名 — 指向 ai.types.ts 中的统一类型
+ */
+export type LLMMessage = AiLLMMessage;
+export type WorkflowMessage = LLMMessage;
+export type LLMStreamEvent = LLMOutput;
+export type ToolDefinition = AiToolDefinition;
 
 /**
  * LLM 调用结果

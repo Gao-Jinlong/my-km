@@ -29,7 +29,9 @@
             "Bash(Set-Location d:\\\\project\\\\my-km)",
             "Bash(git status *)",
             "Bash(npx vitest *)",
-            "WebSearch"
+            "WebSearch",
+            "Skill(browse)",
+            "Skill(browse:*)"
         ]
     }
 }

@@ -91,7 +91,7 @@ export class DashscopeProvider implements LLMProvider {
                 const tc = delta.tool_calls[0];
                 if (tc.id) {
                     if (currentToolUse?.id && currentToolUse.name) {
-                        let parsedArgs: object = {};
+                        let parsedArgs: Record<string, unknown> = {};
                         try {
                             parsedArgs = currentToolUse.input
                                 ? JSON.parse(currentToolUse.input)
@@ -120,7 +120,7 @@ export class DashscopeProvider implements LLMProvider {
         }
 
         if (currentToolUse?.id && currentToolUse.name) {
-            let parsedArgs: object = {};
+            let parsedArgs: Record<string, unknown> = {};
             try {
                 parsedArgs = currentToolUse.input ? JSON.parse(currentToolUse.input) : {};
             } catch {

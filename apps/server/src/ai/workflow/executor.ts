@@ -15,13 +15,7 @@
 
 import { Logger } from '@nestjs/common';
 import type { LLMMessage } from '../ai.types';
-import type {
-    BaseGraph,
-    CompiledWorkflowGraph,
-    GraphConfig,
-    WorkflowMessage,
-    WorkflowState,
-} from '../langgraph';
+import type { BaseGraph, CompiledWorkflowGraph, GraphConfig, WorkflowState } from '../langgraph';
 import type { ExecutionCtx, ExecutorDependencies } from './executor.types';
 
 export class Executor {
@@ -76,7 +70,7 @@ export class Executor {
         // Initial state for this execution
         // History already contains the just-persisted user message
         const initialState: Partial<WorkflowState> = {
-            messages: [...(history as WorkflowMessage[])],
+            messages: [...history],
             roomId,
             lastAssistantMessage: '',
             hasToolCalls: false,
@@ -180,7 +174,7 @@ export class Executor {
                 // Prepare state for next LLM round — reload full history from DB
                 // to ensure the LLM sees all prior messages including new tool results
                 const refreshedHistory = await this.deps.messageService.buildLLMHistory(roomId);
-                initialState.messages = [...(refreshedHistory as WorkflowMessage[])];
+                initialState.messages = [...refreshedHistory];
                 initialState.pendingToolCalls = [];
                 initialState.hasToolCalls = false;
                 initialState.toolResults = results;

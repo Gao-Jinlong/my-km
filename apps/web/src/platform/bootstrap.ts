@@ -75,7 +75,7 @@ function createServiceContainer(): ServiceContainer {
     container.register(ConditionalService);
 
     // WSClientService（工厂模式创建，registerInstance 注册为单例）
-    const wsUrl = process.env.NEXT_PUBLIC_AI_WS_URL ?? 'http://localhost:3001/ai';
+    const wsUrl = process.env.NEXT_PUBLIC_AI_WS_URL ?? 'http://localhost:3000/ai';
     const wsClient = createWSClientService(wsUrl);
     container.registerInstance(WSClientService.name, wsClient);
 

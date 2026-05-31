@@ -87,7 +87,7 @@ export class OpenAIProvider implements LLMProvider {
                     // 新的 tool call 开始
                     if (currentToolUse?.id && currentToolUse.name) {
                         // 发射上一个 tool call
-                        let parsedArgs: object = {};
+                        let parsedArgs: Record<string, unknown> = {};
                         try {
                             parsedArgs = currentToolUse.input
                                 ? JSON.parse(currentToolUse.input)
@@ -118,7 +118,7 @@ export class OpenAIProvider implements LLMProvider {
 
         // 发射最后一个 tool call（如果有）
         if (currentToolUse?.id && currentToolUse.name) {
-            let parsedArgs: object = {};
+            let parsedArgs: Record<string, unknown> = {};
             try {
                 parsedArgs = currentToolUse.input ? JSON.parse(currentToolUse.input) : {};
             } catch {

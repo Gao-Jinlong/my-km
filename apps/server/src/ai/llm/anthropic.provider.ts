@@ -90,7 +90,7 @@ export class AnthropicProvider implements LLMProvider {
             } else if (chunk.type === 'content_block_stop') {
                 // tool_use 结束，发射完整的 tool_call
                 if (currentToolUse?.id && currentToolUse.name) {
-                    let parsedArgs: object = {};
+                    let parsedArgs: Record<string, unknown> = {};
                     try {
                         parsedArgs = currentToolUse.input ? JSON.parse(currentToolUse.input) : {};
                     } catch {

@@ -11,17 +11,19 @@ export interface LLMOutput {
     toolCall?: {
         id: string;
         name: string;
-        arguments: object;
+        arguments: Record<string, unknown>;
     };
 }
 
 /**
  * 工具定义（发送给 LLM 的 JSON Schema）
+ *
+ * 单一类型定义源，供 llm/ 和 langgraph/ 模块共享使用。
  */
 export interface ToolDefinition {
     name: string;
     description: string;
-    input_schema: object;
+    input_schema: Record<string, unknown>;
 }
 
 /**
@@ -36,7 +38,7 @@ export interface LLMMessage {
               text?: string;
               id?: string;
               name?: string;
-              input?: object;
+              input?: Record<string, unknown>;
               tool_use_id?: string;
               content?: string;
           }>;
@@ -48,6 +50,6 @@ export interface LLMMessage {
 export interface InFlightToolCall {
     id: string;
     name: string;
-    arguments: object;
+    arguments: Record<string, unknown>;
     timestamp: Date;
 }
