@@ -33,13 +33,13 @@ export class EnvironmentVariables {
 
     /**
      * 服务器端口
-     * @default 3001
+     * @default 3000
      */
     @IsInt()
     @Min(1000)
     @Max(65535)
     @Transform(({ value }) => Number.parseInt(value, 10))
-    PORT = 3001;
+    PORT = 3000;
 
     // ============ Database ============
 

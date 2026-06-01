@@ -31,7 +31,8 @@
             "Bash(npx vitest *)",
             "WebSearch",
             "Skill(browse)",
-            "Skill(browse:*)"
+            "Skill(browse:*)",
+            "PowerShell(if \\(Test-Path \"$env:APPDATA\\\\Code\\\\User\\\\keybindings.json\"\\) { Get-Content \"$env:APPDATA\\\\Code\\\\User\\\\keybindings.json\" } else { Write-Output \"keybindings.json not found\" })"
         ]
     }
 }

@@ -41,18 +41,14 @@ services:
       context: ./apps/server
       dockerfile: Dockerfile.dev
     container_name: km-server
+    env_file:
+      - ./apps/server/.env
     ports:
       - "3001:3001"
     environment:
+      # Docker 内部网络覆盖（.env 中的 localhost → 服务名）
       DATABASE_URL: postgresql://kmuser:kmpass@postgres:5432/km_db
       REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_DB: 0
-      CACHE_TTL: 300
-      CACHE_KEY_PREFIX: "my-km:"
-      ZHIPUAI_API_KEY: ${ZHIPUAI_API_KEY}
-      AI_PROVIDER: ${AI_PROVIDER:-zhipu}
-      PORT: 3001
       NODE_ENV: development
       WEB_URL: http://localhost:3000
     depends_on:
@@ -71,10 +67,10 @@ services:
       context: ./apps/web
       dockerfile: Dockerfile.dev
     container_name: km-web
+    env_file:
+      - ./apps/web/.env
     ports:
       - "3000:3000"
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:3001
     depends_on:
       - server
     volumes:
