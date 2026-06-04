@@ -38,7 +38,10 @@
             "Bash(node dist/main.js)",
             "Bash(Select-String \"ai-backup\")",
             "Bash(Measure-Object)",
-            "Bash(Select-Object -ExpandProperty Count)"
+            "Bash(Select-Object -ExpandProperty Count)",
+            "Bash(npm list *)",
+            "Read(//usr/local/**)",
+            "Read(//Users/gaojinlong/**)"
         ]
     }
 }

@@ -16,11 +16,26 @@ import { ConfigService } from '@nestjs/config';
 
 export type CheckpointerBackend = 'memory' | 'postgres';
 
+/**
+ * 动态加载 PostgresSaver — 包可能未安装（仅在 postgres 模式需要）
+ */
+async function loadPostgresSaver(
+    dbUrl: string,
+): Promise<{ saver: BaseCheckpointSaver; end: () => Promise<void> }> {
+    const { PostgresSaver } = await import('@langchain/langgraph-checkpoint-postgres');
+    const saver = PostgresSaver.fromConnString(dbUrl) as unknown as BaseCheckpointSaver;
+    await (saver as any).setup?.();
+    return {
+        saver,
+        end: () => (saver as any).end?.(),
+    };
+}
+
 @Injectable()
 export class CheckpointerProvider implements OnModuleInit, OnModuleDestroy {
     private readonly logger = new Logger(CheckpointerProvider.name);
     private checkpointer?: BaseCheckpointSaver;
-    private postgresSaver?: { end: () => Promise<void> };
+    private postgresSaverEnd?: () => Promise<void>;
 
     constructor(private configService: ConfigService) {}
 
@@ -43,12 +58,9 @@ export class CheckpointerProvider implements OnModuleInit, OnModuleDestroy {
                 }
 
                 try {
-                    const { PostgresSaver } = await import(
-                        '@langchain/langgraph-checkpoint-postgres'
-                    );
-                    this.postgresSaver = PostgresSaver.fromConnString(dbUrl);
-                    await (this.postgresSaver as any).setup?.();
-                    this.checkpointer = this.postgresSaver as unknown as BaseCheckpointSaver;
+                    const { saver, end } = await loadPostgresSaver(dbUrl);
+                    this.checkpointer = saver;
+                    this.postgresSaverEnd = end;
                     this.logger.log('Checkpointer: PostgresSaver');
                 } catch (err) {
                     throw new Error(
@@ -66,9 +78,9 @@ export class CheckpointerProvider implements OnModuleInit, OnModuleDestroy {
     }
 
     async onModuleDestroy() {
-        if (this.postgresSaver) {
-            await this.postgresSaver.end();
-            this.postgresSaver = undefined;
+        if (this.postgresSaverEnd) {
+            await this.postgresSaverEnd();
+            this.postgresSaverEnd = undefined;
         }
     }
 
