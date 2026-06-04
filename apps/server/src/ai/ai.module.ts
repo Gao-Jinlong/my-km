@@ -6,7 +6,6 @@
  */
 
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '../config/config.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AiChatController } from './ai.controller';
 import { AiChatService } from './ai.service';
@@ -20,7 +19,7 @@ import { RunEventStore } from './store/run-event-store';
 import { ThreadService } from './thread/thread.service';
 
 @Module({
-    imports: [ConfigModule, PrismaModule],
+    imports: [PrismaModule],
     controllers: [AiChatController],
     providers: [
         // 基础设施层

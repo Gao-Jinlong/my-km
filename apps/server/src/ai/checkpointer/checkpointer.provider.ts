@@ -1,7 +1,7 @@
 /**
  * CheckpointerProvider — LangGraph Checkpointer 单例工厂
  *
- * 根据 CHECKPOINTER_BACKEND 配置选择实现：
+ * 根据 CHECKPOINTER_BACKEND 环境变量选择实现：
  * - memory (默认): MemorySaver — 进程内存，开发用
  * - postgres: PostgresSaver — PostgreSQL 持久化，生产用
  *
@@ -12,7 +12,7 @@
 import type { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
 import { MemorySaver } from '@langchain/langgraph-checkpoint';
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { EnvConfig } from '../../config/env.config';
 
 export type CheckpointerBackend = 'memory' | 'postgres';
 
@@ -37,11 +37,10 @@ export class CheckpointerProvider implements OnModuleInit, OnModuleDestroy {
     private checkpointer?: BaseCheckpointSaver;
     private postgresSaverEnd?: () => Promise<void>;
 
-    constructor(private configService: ConfigService) {}
+    constructor(private envConfig: EnvConfig) {}
 
     async onModuleInit() {
-        const backend = (this.configService.get<string>('CHECKPOINTER_BACKEND') ||
-            'memory') as CheckpointerBackend;
+        const backend = (process.env.CHECKPOINTER_BACKEND || 'memory') as CheckpointerBackend;
 
         switch (backend) {
             case 'memory':
@@ -50,7 +49,7 @@ export class CheckpointerProvider implements OnModuleInit, OnModuleDestroy {
                 break;
 
             case 'postgres': {
-                const dbUrl = this.configService.get<string>('DATABASE_URL');
+                const dbUrl = this.envConfig.databaseUrl;
                 if (!dbUrl) {
                     throw new Error(
                         'CHECKPOINTER_BACKEND=postgres requires DATABASE_URL to be set',
