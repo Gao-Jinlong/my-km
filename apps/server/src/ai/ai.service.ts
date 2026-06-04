@@ -89,8 +89,8 @@ export class AiChatService {
             await this.handleConcurrency(activeRun, concurrency);
         }
 
-        // 3. 创建 RunRecord
-        const record = this.runManager.createRun(thread.id);
+        // 3. 创建 RunRecord（传入 checkpointer）
+        const record = this.runManager.createRun(thread.id, this.runContext.checkpointer);
         record.setStatus(RunStatus.Running);
 
         // 4. 获取 LLM provider
