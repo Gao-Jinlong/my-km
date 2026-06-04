@@ -1,87 +1,83 @@
 /**
  * AIPanel — AI 聊天 UI 主组件
  *
- * 通过 useAIHarness hook 订阅 AIHarnessService 状态，
+ * 通过 useAIThread hook 订阅 SSE 流式消息，
  * 渲染消息列表和输入区域。
  */
 
 import { Loader2, Send } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import type { AIHarnessService } from '@/features/ai/harness';
-import { useAIHarness } from '@/hooks/use-ai-harness';
-import { getContainer } from '@/platform/bootstrap';
+import { collectEditorContext } from '@/features/ai/sdk/editor-context';
+import type { MessageWire } from '@/features/ai/types/ai.types';
+import { type ChatMessage, useAIThread } from '@/hooks/use-ai-thread';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import { AIHeader } from './ai-header';
 import { ContextBadge } from './context-badge';
 import { ConversationList } from './conversation-list';
 import { MessageBubble } from './message-bubble';
 
+/**
+ * ChatMessage → MessageWire 格式映射
+ *
+ * useAIThread 使用 LangGraph Protocol 的 role 名称（human/ai），
+ * MessageBubble 使用旧的 role 名称（user/assistant）。
+ */
+function toMessageWire(msg: ChatMessage): MessageWire {
+    return {
+        id: msg.id,
+        role: msg.role === 'human' ? 'user' : msg.role === 'ai' ? 'assistant' : msg.role,
+        content: msg.content,
+        toolCalls: msg.toolCalls?.map(tc => ({ id: tc.id, name: tc.name })),
+        toolCallId: msg.toolCallId,
+        createdAt: new Date(msg.timestamp).toISOString(),
+    };
+}
+
 export function AIPanel() {
     const { toggleAIPanel, aiViewMode, setAIPanelViewMode } = useWorkspaceStore();
     const [inputValue, setInputValue] = useState('');
     const [showContextBadge, setShowContextBadge] = useState(true);
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const isInitializedRef = useRef(false);
 
     const {
         messages,
-        isGenerating,
-        isProcessing,
-        isConnected,
-        selectedText,
-        documentTitle,
+        isStreaming,
         error,
+        roomId,
+        interrupt,
         sendMessage,
-        stopGenerating,
-        registerTools,
-    } = useAIHarness();
+        resumeWithToolResult,
+        stop,
+    } = useAIThread();
 
     // Track which room is currently generating
     const [generatingRoomId, setGeneratingRoomId] = useState<string | undefined>();
     const [activeRoomId, setActiveRoomId] = useState<string | undefined>();
 
-    // 初始化：注册工具 + 对话恢复
-    useEffect(() => {
-        if (isInitializedRef.current) return;
-        isInitializedRef.current = true;
-
-        // 注册工具
-        import('./tool-setup').then(({ registerDefaultTools }) => {
-            registerTools(registerDefaultTools);
-        });
-
-        // Room recovery: check localStorage for saved room
-        const harness = getContainer().get<AIHarnessService>('aiHarness');
-        const savedId = (() => {
-            try {
-                return localStorage.getItem('activeRoomId');
-            } catch {
-                return null;
-            }
-        })();
-
-        if (savedId) {
-            // Restore existing room from previous session
-            setActiveRoomId(savedId);
-            harness.restoreRoom(savedId);
-        }
-        // No saved room → show empty panel, wait for user to send first message
-    }, [registerTools]);
+    // 映射消息格式给 MessageBubble
+    const wireMessages = useMemo(() => messages.map(toMessageWire), [messages]);
 
     // Track generating state
     useEffect(() => {
-        if (isGenerating && activeRoomId) {
-            setGeneratingRoomId(activeRoomId);
+        if (isStreaming && roomId) {
+            setGeneratingRoomId(roomId);
         } else {
             setGeneratingRoomId(undefined);
         }
-    }, [isGenerating, activeRoomId]);
+    }, [isStreaming, roomId]);
 
-    // 当 harness 选中文字变化时，重新显示 badge
+    // 自动保存 activeRoomId 到 localStorage
     useEffect(() => {
-        if (selectedText) setShowContextBadge(true);
-    }, [selectedText]);
+        if (roomId) {
+            setActiveRoomId(roomId);
+            try {
+                localStorage.setItem('activeRoomId', roomId);
+            } catch {
+                // ignore
+            }
+        }
+    }, [roomId]);
 
     // 自动滚动到底部
     useEffect(() => {
@@ -90,11 +86,13 @@ export function AIPanel() {
 
     const handleSend = useCallback(async () => {
         const trimmed = inputValue.trim();
-        if (!trimmed || isGenerating || isProcessing) return;
+        if (!trimmed || isStreaming) return;
 
-        await sendMessage(trimmed);
+        // 自动收集编辑器上下文
+        const context = collectEditorContext() ?? undefined;
+        await sendMessage(trimmed, context);
         setInputValue('');
-    }, [inputValue, isGenerating, isProcessing, sendMessage]);
+    }, [inputValue, isStreaming, sendMessage]);
 
     const handleKeyDown = useCallback(
         (e: React.KeyboardEvent) => {
@@ -107,28 +105,48 @@ export function AIPanel() {
     );
 
     const handleStop = useCallback(() => {
-        stopGenerating();
-    }, [stopGenerating]);
-
-    const harness = useAIHarness().harness;
+        stop();
+    }, [stop]);
 
     const handleJoinRoom = useCallback(
         (id: string) => {
             setActiveRoomId(id);
-            harness.joinRoom(id);
             setAIPanelViewMode('chat');
+            // TODO: 实现切换房间逻辑 — 需要用 roomId 发送消息
         },
-        [harness, setAIPanelViewMode],
+        [setAIPanelViewMode],
     );
 
     const handleCreateNewRoom = useCallback(
         (id: string) => {
             setActiveRoomId(id);
-            harness.joinRoom(id);
             setAIPanelViewMode('chat');
         },
-        [harness, setAIPanelViewMode],
+        [setAIPanelViewMode],
     );
+
+    // 工具中断确认处理
+    const handleToolConfirm = useCallback(
+        (toolCallId: string) => {
+            // TODO: Phase 4 — 实际执行前端工具并返回结果
+            resumeWithToolResult(toolCallId, { confirmed: true });
+        },
+        [resumeWithToolResult],
+    );
+
+    // 获取编辑器上下文（用于 ContextBadge 显示）
+    const [selectedText, setSelectedText] = useState<string | null>(null);
+    const [documentTitle, setDocumentTitle] = useState('');
+
+    // 定期收集编辑器选中文本
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const ctx = collectEditorContext();
+            setSelectedText(ctx?.selectedText ?? null);
+            setDocumentTitle(ctx?.documentTitle ?? '');
+        }, 1000);
+        return () => clearInterval(interval);
+    }, []);
 
     return (
         <div className="flex h-full flex-col bg-ws-bg-primary">
@@ -148,15 +166,11 @@ export function AIPanel() {
                 />
             ) : (
                 <>
-                    {/* 连接状态指示 */}
+                    {/* 连接状态指示 — SSE 模式下始终 Ready */}
                     <div className="flex h-6 items-center justify-center border-ws-border border-b px-4">
                         <div className="flex items-center gap-1.5">
-                            <div
-                                className={`h-1.5 w-1.5 rounded-full ${isConnected ? 'bg-green-500' : 'bg-gray-400'}`}
-                            />
-                            <span className="text-[10px] text-ws-fg-muted">
-                                {isConnected ? 'Connected' : 'Ready'}
-                            </span>
+                            <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                            <span className="text-[10px] text-ws-fg-muted">Ready</span>
                         </div>
                     </div>
 
@@ -169,22 +183,47 @@ export function AIPanel() {
 
                     {/* 消息列表 */}
                     <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
-                        {messages.length === 0 && (
+                        {wireMessages.length === 0 && (
                             <div className="flex h-full items-center justify-center">
                                 <div className="text-center">
                                     <h3 className="font-semibold text-sm text-ws-fg-primary">
                                         AI Assistant
                                     </h3>
                                     <p className="mt-1 text-ws-fg-muted text-xs">
-                                        Select text in the editor and send a message
+                                        Send a message to start a conversation
                                     </p>
                                 </div>
                             </div>
                         )}
 
-                        {messages.map(msg => (
+                        {wireMessages.map(msg => (
                             <MessageBubble key={msg.id} message={msg} />
                         ))}
+
+                        {/* 工具中断确认 UI */}
+                        {interrupt && (
+                            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
+                                <div className="mb-2 flex items-center gap-2">
+                                    <div className="h-2 w-2 animate-pulse rounded-full bg-amber-500" />
+                                    <span className="font-mono text-amber-400 text-xs">
+                                        {interrupt.toolName}
+                                    </span>
+                                </div>
+                                <pre className="mb-2 overflow-auto rounded bg-black/20 p-2 text-[11px] text-ws-fg-secondary">
+                                    {JSON.stringify(interrupt.input, null, 2)}
+                                </pre>
+                                <div className="flex gap-2">
+                                    <Button
+                                        size="sm"
+                                        onClick={() => handleToolConfirm(interrupt.toolCallId)}
+                                        className="h-7 px-3 text-xs"
+                                    >
+                                        Confirm
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+
                         <div ref={messagesEndRef} />
                     </div>
 
@@ -199,7 +238,7 @@ export function AIPanel() {
                             />
                         )}
 
-                        {isGenerating && (
+                        {isStreaming && (
                             <div className="flex items-center justify-between px-1">
                                 <div className="flex items-center gap-2 text-ws-fg-muted text-xs">
                                     <Loader2 className="h-3 w-3 animate-spin" />
@@ -222,17 +261,17 @@ export function AIPanel() {
                                 onChange={e => setInputValue(e.target.value)}
                                 onKeyDown={handleKeyDown}
                                 placeholder="Ask AI anything..."
-                                disabled={isGenerating || isProcessing}
+                                disabled={isStreaming || !!interrupt}
                                 rows={1}
                                 className="flex-1 resize-none rounded-md border-0 bg-ws-bg-secondary px-3 py-2 text-[13px] text-ws-fg-primary placeholder:text-ws-fg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ws-accent disabled:cursor-not-allowed disabled:opacity-50"
                             />
                             <Button
                                 size="icon"
                                 onClick={handleSend}
-                                disabled={isGenerating || !inputValue.trim()}
+                                disabled={isStreaming || !inputValue.trim()}
                                 className="h-9 w-9 shrink-0"
                             >
-                                {isGenerating ? (
+                                {isStreaming ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : (
                                     <Send className="h-4 w-4" />

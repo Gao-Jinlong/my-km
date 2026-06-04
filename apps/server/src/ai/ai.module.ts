@@ -1,21 +1,24 @@
+/**
+ * AI 模块 — SSE + LangGraph Protocol 架构
+ *
+ * v2: 使用 SSE 流式协议替代 Socket.io WebSocket。
+ * 保留 Room CRUD 和消息持久化，移除 WS 层。
+ *
+ * 新增:
+ *   - AiChatController: POST /ai/chat SSE 端点
+ *   - SSEExecutor: 轻量 LangGraph 图执行器，直接输出 SSE 事件
+ *
+ * 复用:
+ *   - ProviderRegistry + LLMFactory: LLM Provider 管理
+ *   - RoomService: 对话 CRUD
+ *   - MessageService + MessageStore: 消息持久化
+ */
+
 import { Logger, Module, OnModuleInit } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PrismaService } from '../prisma/prisma.service';
-import { MessageBus } from '../ws/message-bus';
-import { SocketRegistry } from '../ws/socket-registry';
-import { WsModule } from '../ws/ws.module';
-import { AgentHandler } from './agents/agent-handler';
-import { AgentOrchestrator } from './agents/agent-orchestrator';
-import { AgentRegistry } from './agents/agent-registry';
-import { AgentStateStore } from './agents/agent-state-store';
-import { editorAgent } from './agents/agents/editor.agent';
-import { writerAgent } from './agents/agents/writer.agent';
-import { AiController } from './ai.controller';
 import { RoomService } from './conversation/room.service';
-import { AiRateLimiter } from './dispatch/rate-limiter.guard';
-import { RequestDispatcher } from './dispatch/request-dispatcher';
-import { ChatGraph } from './langgraph';
 import { AnthropicProvider } from './llm/anthropic.provider';
 import { DashscopeProvider } from './llm/dashscope.provider';
 import { buildDefaultLlmConfig } from './llm/llm-default-config';
@@ -28,26 +31,15 @@ import { MessageService } from './message/message.service';
 import { MessageStoreImpl } from './message/message-store.impl';
 import { MESSAGE_STORE_PROVIDER_TOKEN } from './message/providers/message-store-provider.interface';
 import { PrismaMessageStoreProvider } from './message/providers/prisma-message-store.provider';
-import { RoomSessionRegistry } from './session/room-session-registry';
-import { ToolDispatcher } from './tools/tool.dispatcher';
-import { ToolRouter } from './tools/tool-router';
-import { GraphRegistry } from './workflow/graph-registry';
-import { LLMResolver } from './workflow/llm-resolver';
-import { RoomOrchestrator } from './workflow/orchestrator';
-import { AiMessageRouter } from './ws/ai-message-router';
-/**
- * AI 模块
- *
- * 初始化 LLM provider 注册表和工作流引擎。
- * 支持多 provider: Anthropic, OpenAI, Zhipu, DashScope
- */
+import { AiChatController } from './platform/ai-chat.controller';
+
 @Module({
-    imports: [PrismaModule, ConfigModule, WsModule],
-    controllers: [AiController],
+    imports: [PrismaModule, ConfigModule],
+    controllers: [AiChatController],
     providers: [
         RoomService,
         MessageService,
-        // MessageStore — 新架构：业务层 + Provider 工厂
+        // MessageStore — 消息持久化层
         MessageStoreImpl,
         {
             provide: MESSAGE_STORE_PROVIDER_TOKEN,
@@ -56,59 +48,25 @@ import { AiMessageRouter } from './ws/ai-message-router';
                 switch (providerType) {
                     case 'prisma':
                         return new PrismaMessageStoreProvider(prisma);
-                    // case 'jsonl':
-                    //     return new JsonlMessageStoreProvider({
-                    //         dataDir: config.get<string>('DATA_DIR', './data'),
-                    //     });
                     default:
                         throw new Error(`Unknown MESSAGE_STORE_PROVIDER: ${providerType}`);
                 }
             },
             inject: [ConfigService, PrismaService],
         },
-        SocketRegistry,
-        ToolDispatcher,
-        ToolRouter,
-        RequestDispatcher,
-        AiRateLimiter,
-        RoomSessionRegistry,
-        // Message routing (self-subscribing)
-        AiMessageRouter,
-        // New architecture
+        // LLM Provider 管理
         ProviderRegistry,
         LLMFactory,
-        LLMResolver,
-        GraphRegistry,
-        RoomOrchestrator,
-        // Agent module
-        AgentRegistry,
-        AgentStateStore,
-        AgentHandler,
-        AgentOrchestrator,
     ],
-    exports: [
-        MessageService,
-        MessageStoreImpl,
-        // New architecture exports
-        ProviderRegistry,
-        LLMFactory,
-        LLMResolver,
-        GraphRegistry,
-        RoomOrchestrator,
-        AiMessageRouter,
-        ToolDispatcher,
-        ToolRouter,
-    ],
+    exports: [MessageService, MessageStoreImpl, RoomService, ProviderRegistry, LLMFactory],
 })
 export class AiModule implements OnModuleInit {
     private readonly logger = new Logger(AiModule.name);
+
     constructor(
         private configService: ConfigService,
         private providerRegistry: ProviderRegistry,
-        private graphRegistry: GraphRegistry,
-        private agentRegistry: AgentRegistry,
-        private messageBus: MessageBus,
-        private agentOrchestrator: AgentOrchestrator,
+        _llmFactory: LLMFactory,
     ) {}
 
     async onModuleInit() {
@@ -127,13 +85,7 @@ export class AiModule implements OnModuleInit {
             this.logger.warn('No LLM API keys found — LLM calls will fail until configured');
         }
 
-        // Register built-in graph definitions
-        this.graphRegistry.register(new ChatGraph());
-
-        // Register agent definitions and wire orchestrator
-        this.agentRegistry.register(editorAgent);
-        this.agentRegistry.register(writerAgent);
-        this.messageBus.subscribe(this.agentOrchestrator);
+        this.logger.log('AI Module initialized (SSE + LangGraph Protocol)');
     }
 
     /**
@@ -145,7 +97,7 @@ export class AiModule implements OnModuleInit {
     ): void {
         const apiKey = this.getApiKeyForProvider(name);
         if (!apiKey) {
-            console.warn(`⚠️  ${name.toUpperCase()}_API_KEY not set — skipping ${name}`);
+            this.logger.warn(`${name.toUpperCase()}_API_KEY not set — skipping ${name}`);
             return;
         }
         this.providerRegistry.register(name, config => {

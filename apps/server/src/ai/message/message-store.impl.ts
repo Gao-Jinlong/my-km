@@ -135,20 +135,31 @@ export class MessageStoreImpl implements MessageStore {
      * 将 MessageRecord 转换为 LLMMessage
      *
      * 处理三种格式：
-     * - tool: tool_result 结构体
+     * - tool: 纯文本 + tool_call_id (OpenAI/DashScope 兼容格式)
      * - user/assistant: 纯文本
      */
     private _toLLMMessage(record: MessageRecord): LLMMessage {
         if (record.role === 'tool' && record.toolResultId) {
             return {
                 role: 'tool' as const,
-                content: [
-                    {
-                        type: 'tool_result' as const,
-                        tool_use_id: record.toolResultId,
-                        content: record.content ?? '',
-                    },
-                ],
+                tool_call_id: record.toolResultId,
+                content: record.content ?? '',
+            } as LLMMessage;
+        }
+
+        // Assistant with tool calls → OpenAI format
+        if (record.role === 'assistant' && record.toolCalls && record.toolCalls.length > 0) {
+            return {
+                role: 'assistant',
+                content: record.content ?? '',
+                tool_calls: record.toolCalls.map(tc => ({
+                    id: tc.id,
+                    name: tc.name,
+                    arguments:
+                        typeof tc.arguments === 'string'
+                            ? tc.arguments
+                            : JSON.stringify(tc.arguments),
+                })),
             };
         }
 

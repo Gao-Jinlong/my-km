@@ -42,6 +42,14 @@ export interface LLMMessage {
               tool_use_id?: string;
               content?: string;
           }>;
+    /** OpenAI 格式：tool 消息关联的 tool_call ID */
+    tool_call_id?: string;
+    /** OpenAI 格式：assistant 消息中的工具调用列表 */
+    tool_calls?: Array<{
+        id: string;
+        name: string;
+        arguments: string;
+    }>;
 }
 
 /**

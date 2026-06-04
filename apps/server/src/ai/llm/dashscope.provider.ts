@@ -35,6 +35,30 @@ export class DashscopeProvider implements LLMProvider {
         abortSignal?: AbortSignal,
     ): AsyncIterable<LLMOutput> {
         const openaiMessages: OpenAI.ChatCompletionMessageParam[] = messages.map(msg => {
+            // Tool 消息：OpenAI 格式需要 tool_call_id + 纯文本 content
+            if (msg.role === 'tool' && msg.tool_call_id) {
+                return {
+                    role: 'tool' as const,
+                    tool_call_id: msg.tool_call_id,
+                    content:
+                        typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
+                } as OpenAI.ChatCompletionToolMessageParam;
+            }
+            // Assistant with tool_calls：OpenAI 格式需要 tool_calls 数组
+            if (msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length > 0) {
+                return {
+                    role: 'assistant' as const,
+                    content: typeof msg.content === 'string' ? msg.content : null,
+                    tool_calls: msg.tool_calls.map(tc => ({
+                        id: tc.id,
+                        type: 'function' as const,
+                        function: {
+                            name: tc.name,
+                            arguments: tc.arguments,
+                        },
+                    })),
+                } as OpenAI.ChatCompletionAssistantMessageParam;
+            }
             if (typeof msg.content === 'string') {
                 return {
                     role: msg.role as 'user' | 'assistant' | 'system',
@@ -79,8 +103,9 @@ export class DashscopeProvider implements LLMProvider {
             if (!delta) continue;
 
             // DashScope reasoning_content（思考过程）
-            if ((delta as any).reasoning_content) {
-                yield { type: 'text_chunk', content: (delta as any).reasoning_content };
+            const reasoning = (delta as { reasoning_content?: string }).reasoning_content;
+            if (reasoning) {
+                yield { type: 'text_chunk', content: reasoning };
             }
 
             if (delta.content) {
