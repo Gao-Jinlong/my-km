@@ -6,7 +6,7 @@
  */
 
 import OpenAI from 'openai';
-import type { LLMMessage, LLMOutput, ToolDefinition } from '../ai.types';
+import type { LLMMessage, LLMOutput, ToolDefinition } from '../types/ai.types';
 import type { LLMConfig, LLMProvider } from './provider.types';
 
 export class DashscopeProvider implements LLMProvider {

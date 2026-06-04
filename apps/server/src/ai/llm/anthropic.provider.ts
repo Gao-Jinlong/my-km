@@ -6,7 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import type { LLMMessage, LLMOutput, ToolDefinition } from '../ai.types';
+import type { LLMMessage, LLMOutput, ToolDefinition } from '../types/ai.types';
 import type { LLMConfig, LLMProvider } from './provider.types';
 
 export class AnthropicProvider implements LLMProvider {

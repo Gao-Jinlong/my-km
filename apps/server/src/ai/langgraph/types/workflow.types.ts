@@ -10,7 +10,7 @@ import type {
     LLMMessage as AiLLMMessage,
     ToolDefinition as AiToolDefinition,
     LLMOutput,
-} from '../../ai.types';
+} from '../../types/ai.types';
 
 /**
  * Minimal interface for a compiled workflow graph.
@@ -56,8 +56,8 @@ export type NodeId = string;
 export interface NodeContext {
     /** 当前节点 ID */
     nodeId: NodeId;
-    /** 房间 ID */
-    roomId: string;
+    /** 当前 thread ID */
+    threadId: string;
     /** 会话 ID */
     sessionId?: string;
     /** 中止信号 */
@@ -99,8 +99,8 @@ export const WorkflowStateAnnotation = Annotation.Root({
         reducer: (existing: LLMMessage[], update: LLMMessage[]) => [...existing, ...update],
         default: () => [],
     }),
-    /** 当前房间 ID */
-    roomId: Annotation<string>,
+    /** 当前 thread ID */
+    threadId: Annotation<string>,
     /** 最后一条助手回复 */
     lastAssistantMessage: Annotation<string>,
     /** 是否包含工具调用 */
@@ -130,8 +130,8 @@ export const WorkflowStateAnnotation = Annotation.Root({
 export interface WorkflowState {
     /** 用户输入消息 */
     messages: LLMMessage[];
-    /** 当前房间 ID */
-    roomId: string;
+    /** 当前 thread ID */
+    threadId: string;
     /** 最后一条助手回复 */
     lastAssistantMessage: string;
     /** 是否包含工具调用 */

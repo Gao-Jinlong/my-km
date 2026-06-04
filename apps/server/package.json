@@ -26,6 +26,8 @@
     "@keyv/redis": "^2.8.5",
     "@langchain/core": "^1.1.48",
     "@langchain/langgraph": "^1.3.3",
+    "@langchain/langgraph-checkpoint": "^1.0.4",
+    "@langchain/langgraph-checkpoint-postgres": "^1.0.2",
     "@langchain/langgraph-sdk": "^1.9.11",
     "@my-km/prisma": "workspace:*",
     "@nestjs-modules/mailer": "^2.0.2",
@@ -45,6 +47,7 @@
     "class-validator": "^0.14.3",
     "dotenv": "^17.2.3",
     "ioredis": "^5.9.1",
+    "lru-cache": "^11.5.1",
     "mailer": "link:@nestjs/modules/mailer",
     "openai": "^6.36.0",
     "passport": "^0.7.0",
@@ -91,8 +94,18 @@
     ],
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/ai-backup/"
+    ],
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "transformIgnorePatterns": [
+      "/node_modules/(?!(uuid|@langchain)/)"
+    ],
+    "moduleNameMapper": {
+      "^@my-km/shared$": "<rootDir>/../__mocks__/@my-km/shared.ts"
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"

@@ -18,7 +18,7 @@ export function buildDefaultLlmConfig(): LLMConfig | undefined {
     const defaultModels: Record<string, string> = {
         anthropic: 'claude-sonnet-4-6-20250514',
         openai: 'gpt-4o',
-        zhipu: 'glm-4',
+        zhipu: 'glm-5',
         dashscope: 'qwen-max',
     };
 

@@ -1,151 +1,172 @@
 /**
- * AI REST Controller
+ * AiChatController — 薄控制器层
  *
- * - POST /ai/chat — 发送 AI 消息（通过 RequestDispatcher 分发）
- * - GET  /ai/rooms — 获取对话列表
- * - POST /ai/rooms — 创建新对话
- * - GET  /ai/rooms/:id/messages — 获取对话消息历史
- * - PATCH /ai/rooms/:id — 更新对话元数据（标题）
- * - DELETE /ai/rooms/:id — 软删除对话
+ * 只负责：
+ * - DTO 校验
+ * - SSE header 设置
+ * - 委托给 AiChatService
+ *
+ * 所有业务逻辑在 Service 中。
  */
 
-import { Body, Controller, Delete, Get, Logger, Param, Patch, Post, Query } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { RoomService } from './conversation/room.service';
-import { RequestDispatcher } from './dispatch/request-dispatcher';
-import { SendMessageDto } from './dto/send-message.dto';
-import type { LLMConfig } from './llm/provider.types';
-import { ProviderRegistry } from './llm/provider-registry';
+import {
+    Body,
+    Controller,
+    Delete,
+    Get,
+    Logger,
+    Param,
+    Patch,
+    Post,
+    Query,
+    Res,
+} from '@nestjs/common';
+import type { Response } from 'express';
+import { AiChatService } from './ai.service';
 import { MessageService } from './message/message.service';
+import { ThreadService } from './thread/thread.service';
+import type { ConcurrencyPolicy } from './types/run.types';
+import type { ThreadStatus } from './types/thread.types';
 
-interface CreateRoomBody {
-    id?: string;
-    title?: string;
+interface ChatRequestDto {
+    content?: string;
+    threadId?: string;
+    context?: Record<string, unknown>;
+    concurrency?: ConcurrencyPolicy;
+    llmConfig?: { provider?: string; model?: string };
 }
 
-interface UpdateRoomBody {
-    title?: string;
+interface ResumeRequestDto {
+    toolCallId: string;
+    result: unknown;
 }
 
-interface ListRoomsQuery {
-    limit?: string;
-    offset?: string;
-    status?: string;
-}
-
-@ApiTags('AI')
 @Controller('ai')
-export class AiController {
-    private readonly logger = new Logger(AiController.name);
+export class AiChatController {
+    private readonly logger = new Logger(AiChatController.name);
 
     constructor(
-        private requestDispatcher: RequestDispatcher,
-        private roomService: RoomService,
-        private messageService: MessageService,
-        private providerRegistry: ProviderRegistry,
+        private readonly aiService: AiChatService,
+        private readonly threadService: ThreadService,
+        private readonly messageService: MessageService,
     ) {}
 
-    @Post('chat')
-    @ApiOperation({ summary: '发送 AI 消息（通过 RequestDispatcher）' })
-    @ApiResponse({ status: 200, description: '消息处理完成' })
-    async sendMessage(@Body() dto: SendMessageDto) {
-        this.logger.log(`Received AI chat request: ${dto.content.slice(0, 50)}...`);
+    // ========== SSE Chat Endpoints ==========
+
+    @Post('threads/:threadId/runs')
+    async startRun(
+        @Param('threadId') threadId: string,
+        @Body() dto: ChatRequestDto,
+        @Res() res: Response,
+    ): Promise<void> {
+        this.setSseHeaders(res);
 
         try {
-            let roomId = dto.roomId;
-            if (!roomId) {
-                const room = await this.roomService.create();
-                roomId = room.id;
-                this.logger.log(`Auto-created room: ${roomId}`);
-            }
-
-            await this.requestDispatcher.dispatch({
-                roomId,
-                clientId: `rest:${Date.now()}`,
-                content: dto.content,
+            const record = await this.aiService.startRun({
+                content: dto.content ?? '',
+                threadId,
                 context: dto.context,
-                llmConfigMap: dto.llmConfig
-                    ? ({
-                          llm_call: {
-                              provider: dto.llmConfig.provider,
-                              ...(dto.llmConfig.model ? { model: dto.llmConfig.model } : {}),
-                          },
-                      } as Record<string, LLMConfig>)
-                    : undefined,
-                defaultConfig: this.providerRegistry.defaultConfig,
+                concurrency: dto.concurrency as ConcurrencyPolicy,
+                llmConfig: dto.llmConfig,
             });
 
-            return { success: true, roomId };
+            await this.aiService.executeRun(record, res);
         } catch (error) {
-            this.logger.error('AI chat failed:', error);
-            throw error;
+            this.sendSseError(res, error);
         }
     }
 
-    @Get('rooms')
-    @ApiOperation({ summary: '获取对话列表' })
-    @ApiResponse({ status: 200, description: '返回对话列表' })
-    async listRooms(@Query() query: ListRoomsQuery) {
-        const limit = query.limit ? parseInt(query.limit, 10) : 50;
-        const offset = query.offset ? parseInt(query.offset, 10) : 0;
-        const status = query.status || 'active';
+    @Post('runs/:runId/resume')
+    async resumeRun(
+        @Param('runId') runId: string,
+        @Body() dto: ResumeRequestDto,
+        @Res() res: Response,
+    ): Promise<void> {
+        this.setSseHeaders(res);
 
-        const rooms = await this.roomService.findAll({
-            limit,
-            offset,
-            status: status as 'active' | 'archived' | 'deleted',
-        });
+        try {
+            const record = await this.aiService.resume({
+                runId,
+                toolCallId: dto.toolCallId,
+                result: dto.result,
+            });
 
-        return { rooms, limit, offset };
+            await this.aiService.executeRun(record, res);
+        } catch (error) {
+            this.sendSseError(res, error);
+        }
     }
 
-    @Post('rooms')
-    @ApiOperation({ summary: '创建新对话' })
-    @ApiResponse({ status: 201, description: '对话已创建' })
-    async createRoom(@Body() body: CreateRoomBody) {
-        const room = await this.roomService.create({
-            id: body.id,
-            title: body.title,
-        });
-
-        return { room };
+    @Post('runs/:runId/cancel')
+    async cancelRun(@Param('runId') runId: string): Promise<{ success: boolean }> {
+        await this.aiService.cancel(runId);
+        return { success: true };
     }
 
-    @Get('rooms/:id/messages')
-    @ApiOperation({ summary: '获取对话消息历史' })
-    @ApiResponse({ status: 200, description: '返回消息列表' })
+    // ========== Thread CRUD ==========
+
+    @Get('threads')
+    async listThreads(
+        @Query('limit') limit?: string,
+        @Query('offset') offset?: string,
+        @Query('status') status?: ThreadStatus,
+    ) {
+        return this.threadService.findAll({
+            limit: limit ? parseInt(limit, 10) : 50,
+            offset: offset ? parseInt(offset, 10) : 0,
+            status,
+        });
+    }
+
+    @Post('threads')
+    async createThread(@Body() body: { id?: string; title?: string }) {
+        return this.threadService.create(body);
+    }
+
+    @Get('threads/:id')
+    async getThread(@Param('id') id: string) {
+        return this.threadService.findById(id);
+    }
+
+    @Get('threads/:id/messages')
     async getMessages(
         @Param('id') id: string,
-        @Query('limit') limitStr?: string,
-        @Query('offset') offsetStr?: string,
+        @Query('limit') limit?: string,
+        @Query('offset') offset?: string,
     ) {
-        const limit = limitStr ? parseInt(limitStr, 10) : 100;
-        const offset = offsetStr ? parseInt(offsetStr, 10) : 0;
-
-        const messages = await this.messageService.findByRoomId(id, {
-            limit,
-            offset,
+        return this.messageService.findByRoomId(id, {
+            limit: limit ? parseInt(limit, 10) : 100,
+            offset: offset ? parseInt(offset, 10) : 0,
         });
-
-        return { messages, limit, offset };
     }
 
-    @Patch('rooms/:id')
-    @ApiOperation({ summary: '更新对话元数据' })
-    @ApiResponse({ status: 200, description: '对话已更新' })
-    async updateRoom(@Param('id') id: string, @Body() body: UpdateRoomBody) {
-        const room = await this.roomService.updateMetadata(id, {
-            title: body.title,
-        });
-
-        return { room };
+    @Patch('threads/:id')
+    async updateThread(@Param('id') id: string, @Body() body: { title?: string }) {
+        return this.threadService.update(id, body);
     }
 
-    @Delete('rooms/:id')
-    @ApiOperation({ summary: '软删除对话' })
-    @ApiResponse({ status: 200, description: '对话已删除' })
-    async deleteRoom(@Param('id') id: string) {
-        await this.roomService.delete(id);
+    @Delete('threads/:id')
+    async deleteThread(@Param('id') id: string) {
+        await this.threadService.delete(id);
         return { success: true };
+    }
+
+    // ========== Private Helpers ==========
+
+    private setSseHeaders(res: Response) {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('X-Accel-Buffering', 'no');
+        res.flushHeaders();
+    }
+
+    private sendSseError(res: Response, error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error(`SSE error: ${message}`);
+        if (!res.writableEnded) {
+            res.write(`event: error\ndata: ${JSON.stringify({ type: 'error', message })}\n\n`);
+            res.end();
+        }
     }
 }

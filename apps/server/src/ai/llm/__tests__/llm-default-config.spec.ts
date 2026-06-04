@@ -52,7 +52,7 @@ describe('buildDefaultLlmConfig', () => {
         const result = buildDefaultLlmConfig();
         expect(result).toEqual({
             provider: 'zhipu',
-            model: 'glm-4',
+            model: 'glm-5',
         });
     });
 

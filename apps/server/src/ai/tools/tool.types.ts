@@ -2,7 +2,7 @@
  * Tool 模块类型定义
  */
 
-import type { ToolDefinition } from '../ai.types';
+import type { ToolDefinition } from '../types/ai.types';
 
 /**
  * Where the tool is executed

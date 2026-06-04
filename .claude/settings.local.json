@@ -35,7 +35,10 @@
             "PowerShell(if \\(Test-Path \"$env:APPDATA\\\\Code\\\\User\\\\keybindings.json\"\\) { Get-Content \"$env:APPDATA\\\\Code\\\\User\\\\keybindings.json\" } else { Write-Output \"keybindings.json not found\" })",
             "WebFetch(domain:github.com)",
             "Bash(npx nest *)",
-            "Bash(node dist/main.js)"
+            "Bash(node dist/main.js)",
+            "Bash(Select-String \"ai-backup\")",
+            "Bash(Measure-Object)",
+            "Bash(Select-Object -ExpandProperty Count)"
         ]
     }
 }

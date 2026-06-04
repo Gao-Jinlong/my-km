@@ -21,12 +21,8 @@ export function createLLMNode() {
         }
 
         // 构建消息列表（状态中已存 LLMMessage，直接使用）
+        // 工具结果由 tool-node 追加到 messages，llm_call 节点直接读取即可
         const messages: LLMMessage[] = state.messages;
-
-        // 如果有工具结果，追加 tool_result 消息
-        if (state.pendingToolCalls && state.pendingToolCalls.length > 0) {
-            // 工具结果已在上一步被添加到 messages 中docs/ai-conversation-flow.md。
-        }
 
         let assistantText = '';
         const toolCalls: Array<{ id: string; name: string; arguments: Record<string, unknown> }> =
