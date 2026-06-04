@@ -8,9 +8,8 @@
  * - 清理已完成的 Run（释放内存）
  */
 
-import type { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
 import { Injectable, Logger } from '@nestjs/common';
-import type { RunEventStore } from '../store/run-event-store';
+import { RunEventStore } from '../store/run-event-store';
 import { RunStatus } from '../types/run.types';
 import { RunRecord } from './run-record';
 
@@ -22,15 +21,15 @@ export class RunManager {
     private readonly runs = new Map<string, RunRecord>();
     private runCounter = 0;
 
-    constructor(
-        private readonly eventStore: RunEventStore,
-        private readonly checkpointer: BaseCheckpointSaver,
-    ) {}
+    constructor(private readonly eventStore: RunEventStore) {}
 
     /**
      * 创建新的 RunRecord
+     *
+     * @param threadId Thread ID
+     * @param checkpointer 从 RunContext 传入（由 AiModule 工厂注入）
      */
-    createRun(threadId: string): RunRecord {
+    createRun(threadId: string, checkpointer: any): RunRecord {
         this.runCounter++;
         const id = `run-${Date.now()}-${this.runCounter}`;
 
@@ -38,7 +37,7 @@ export class RunManager {
             id,
             threadId,
             eventStore: this.eventStore,
-            checkpointer: this.checkpointer,
+            checkpointer,
         });
 
         this.runs.set(id, record);
