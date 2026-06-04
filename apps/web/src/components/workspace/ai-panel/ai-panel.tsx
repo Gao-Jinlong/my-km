@@ -44,40 +44,40 @@ export function AIPanel() {
         messages,
         isStreaming,
         error,
-        roomId,
+        threadId,
         interrupt,
         sendMessage,
         resumeWithToolResult,
         stop,
     } = useAIThread();
 
-    // Track which room is currently generating
-    const [generatingRoomId, setGeneratingRoomId] = useState<string | undefined>();
-    const [activeRoomId, setActiveRoomId] = useState<string | undefined>();
+    // Track which thread is currently generating
+    const [generatingThreadId, setGeneratingThreadId] = useState<string | undefined>();
+    const [activeThreadId, setActiveThreadId] = useState<string | undefined>();
 
     // 映射消息格式给 MessageBubble
     const wireMessages = useMemo(() => messages.map(toMessageWire), [messages]);
 
     // Track generating state
     useEffect(() => {
-        if (isStreaming && roomId) {
-            setGeneratingRoomId(roomId);
+        if (isStreaming && threadId) {
+            setGeneratingThreadId(threadId);
         } else {
-            setGeneratingRoomId(undefined);
+            setGeneratingThreadId(undefined);
         }
-    }, [isStreaming, roomId]);
+    }, [isStreaming, threadId]);
 
-    // 自动保存 activeRoomId 到 localStorage
+    // 自动保存 activeThreadId 到 localStorage
     useEffect(() => {
-        if (roomId) {
-            setActiveRoomId(roomId);
+        if (threadId) {
+            setActiveThreadId(threadId);
             try {
-                localStorage.setItem('activeRoomId', roomId);
+                localStorage.setItem('activeThreadId', threadId);
             } catch {
                 // ignore
             }
         }
-    }, [roomId]);
+    }, [threadId]);
 
     // 自动滚动到底部
     useEffect(() => {
@@ -108,18 +108,18 @@ export function AIPanel() {
         stop();
     }, [stop]);
 
-    const handleJoinRoom = useCallback(
+    const handleJoinThread = useCallback(
         (id: string) => {
-            setActiveRoomId(id);
+            setActiveThreadId(id);
             setAIPanelViewMode('chat');
-            // TODO: 实现切换房间逻辑 — 需要用 roomId 发送消息
+            // TODO: 实现切换 thread 逻辑 — 需要用 threadId 发送消息
         },
         [setAIPanelViewMode],
     );
 
-    const handleCreateNewRoom = useCallback(
+    const handleCreateNewThread = useCallback(
         (id: string) => {
-            setActiveRoomId(id);
+            setActiveThreadId(id);
             setAIPanelViewMode('chat');
         },
         [setAIPanelViewMode],
@@ -159,10 +159,10 @@ export function AIPanel() {
 
             {aiViewMode === 'list' ? (
                 <ConversationList
-                    onJoinRoom={handleJoinRoom}
-                    onCreateNewRoom={handleCreateNewRoom}
-                    activeRoomId={activeRoomId}
-                    generatingRoomId={generatingRoomId}
+                    onJoinThread={handleJoinThread}
+                    onCreateNewThread={handleCreateNewThread}
+                    activeThreadId={activeThreadId}
+                    generatingThreadId={generatingThreadId}
                 />
             ) : (
                 <>

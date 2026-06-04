@@ -9,57 +9,57 @@
 
 import { Loader2, Plus, Search } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { createRoom, listRooms, type RoomRecord } from '@/features/ai/api/conversation-api';
+import { createThread, listThreads, type ThreadRecord } from '@/features/ai/api/conversation-api';
 import { ConversationItem } from './conversation-item';
 
-interface RoomListProps {
-    onJoinRoom: (id: string) => void;
-    onCreateNewRoom: (id: string) => void;
-    activeRoomId?: string;
-    generatingRoomId?: string;
+interface ConversationListProps {
+    onJoinThread: (id: string) => void;
+    onCreateNewThread: (id: string) => void;
+    activeThreadId?: string;
+    generatingThreadId?: string;
 }
 
 export function ConversationList({
-    onJoinRoom,
-    onCreateNewRoom,
-    activeRoomId,
-    generatingRoomId,
-}: RoomListProps) {
-    const [rooms, setRooms] = useState<RoomRecord[]>([]);
+    onJoinThread,
+    onCreateNewThread,
+    activeThreadId,
+    generatingThreadId,
+}: ConversationListProps) {
+    const [threads, setThreads] = useState<ThreadRecord[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const fetchRooms = useCallback(async () => {
+    const fetchThreads = useCallback(async () => {
         try {
             setIsLoading(true);
             setError(null);
-            const list = await listRooms({ limit: 50 });
-            setRooms(list);
+            const list = await listThreads({ limit: 50 });
+            setThreads(list);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to load rooms');
+            setError(err instanceof Error ? err.message : 'Failed to load threads');
         } finally {
             setIsLoading(false);
         }
     }, []);
 
     useEffect(() => {
-        fetchRooms();
-    }, [fetchRooms]);
+        fetchThreads();
+    }, [fetchThreads]);
 
-    const handleNewRoom = useCallback(async () => {
+    const handleNewThread = useCallback(async () => {
         try {
-            const room = await createRoom();
-            onCreateNewRoom(room.id);
+            const thread = await createThread();
+            onCreateNewThread(thread.id);
         } catch (err) {
-            console.error('Failed to create room:', err);
+            console.error('Failed to create thread:', err);
         }
-    }, [onCreateNewRoom]);
+    }, [onCreateNewThread]);
 
     const handleClick = useCallback(
         (id: string) => {
-            onJoinRoom(id);
+            onJoinThread(id);
         },
-        [onJoinRoom],
+        [onJoinThread],
     );
 
     return (
@@ -73,7 +73,7 @@ export function ConversationList({
             <div className="flex items-center gap-2 border-ws-border border-b px-3 py-2">
                 <button
                     type="button"
-                    onClick={handleNewRoom}
+                    onClick={handleNewThread}
                     className="flex flex-1 items-center gap-1.5 rounded-md bg-ws-bg-secondary px-3 py-1.5 font-medium text-[13px] text-ws-accent hover:bg-ws-bg-tertiary"
                 >
                     <Plus className="h-3.5 w-3.5" />
@@ -101,7 +101,7 @@ export function ConversationList({
                         <p className="text-red-400 text-xs">{error}</p>
                         <button
                             type="button"
-                            onClick={fetchRooms}
+                            onClick={fetchThreads}
                             className="mt-2 text-ws-accent text-xs underline"
                         >
                             Retry
@@ -109,12 +109,12 @@ export function ConversationList({
                     </div>
                 )}
 
-                {!isLoading && !error && rooms.length === 0 && (
+                {!isLoading && !error && threads.length === 0 && (
                     <div className="flex h-full flex-col items-center justify-center p-4 text-center">
                         <p className="text-sm text-ws-fg-muted">No conversations yet</p>
                         <button
                             type="button"
-                            onClick={handleNewRoom}
+                            onClick={handleNewThread}
                             className="mt-2 text-ws-accent text-xs underline"
                         >
                             Start a new conversation
@@ -122,14 +122,14 @@ export function ConversationList({
                     </div>
                 )}
 
-                {!isLoading && !error && rooms.length > 0 && (
+                {!isLoading && !error && threads.length > 0 && (
                     <div className="py-1">
-                        {rooms.map(room => (
+                        {threads.map(thread => (
                             <ConversationItem
-                                key={room.id}
-                                room={room}
-                                isActive={room.id === activeRoomId}
-                                isGenerating={room.id === generatingRoomId}
+                                key={thread.id}
+                                thread={thread}
+                                isActive={thread.id === activeThreadId}
+                                isGenerating={thread.id === generatingThreadId}
                                 onClick={handleClick}
                             />
                         ))}

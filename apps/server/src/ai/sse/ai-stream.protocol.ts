@@ -33,7 +33,7 @@ export function encodeSSE(e: StreamEvent): string {
 
 // ========== Lifecycle Events ==========
 
-export function lifecycleStarted(threadId?: string): StreamEvent {
+export function lifecycleStarted(threadId?: string, runId?: string): StreamEvent {
     return {
         event: 'lifecycle',
         data: {
@@ -41,6 +41,7 @@ export function lifecycleStarted(threadId?: string): StreamEvent {
             namespace: [],
             timestamp: Date.now(),
             ...(threadId && { threadId }),
+            ...(runId && { runId }),
         },
     };
 }

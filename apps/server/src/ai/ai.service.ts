@@ -131,7 +131,7 @@ export class AiChatService {
 
         try {
             // 发送 lifecycle:started
-            await record.emitEvent(lifecycleStarted(record.threadId));
+            await record.emitEvent(lifecycleStarted(record.threadId, record.id));
 
             // 获取 graph
             const graph = this.runContext.getCompiledGraph('default');

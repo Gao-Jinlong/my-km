@@ -9,23 +9,28 @@
  */
 
 import { Loader } from 'lucide-react';
-import type { RoomRecord } from '@/features/ai/api/conversation-api';
+import type { ThreadRecord } from '@/features/ai/api/conversation-api';
 
-interface RoomItemProps {
-    room: RoomRecord;
+interface ConversationItemProps {
+    thread: ThreadRecord;
     isActive: boolean;
     isGenerating?: boolean;
     onClick: (id: string) => void;
 }
 
-export function ConversationItem({ room, isActive, isGenerating = false, onClick }: RoomItemProps) {
-    const title = room.title || `Room ${room.id.slice(0, 8)}`;
-    const time = formatRelativeTime(room.updatedAt);
+export function ConversationItem({
+    thread,
+    isActive,
+    isGenerating = false,
+    onClick,
+}: ConversationItemProps) {
+    const title = thread.title || `Thread ${thread.id.slice(0, 8)}`;
+    const time = formatRelativeTime(thread.updatedAt);
 
     return (
         <button
             type="button"
-            onClick={() => onClick(room.id)}
+            onClick={() => onClick(thread.id)}
             className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${
                 isActive ? 'bg-ws-accent text-white' : 'text-ws-fg-primary hover:bg-ws-bg-secondary'
             }`}

@@ -1,17 +1,17 @@
 /**
- * useAIThread — 替代 useAIHarness 的 LangGraph Protocol hook
+ * useAIThread — LangGraph Thread/Run 协议 hook
  *
- * 通过 SSE 协议连接后端，提供消息流式展示、工具中断恢复、停止生成等能力。
- * 替代旧的 Socket.io + AIHarnessService + useSyncExternalStore 体系。
+ * 通过 SSE 协议连接后端 Thread/Run 架构，提供消息流式展示、工具中断恢复、停止生成等能力。
  *
  * 使用方式:
  *   const { messages, isStreaming, sendMessage, stop, interrupt } = useAIThread();
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createThread } from '@/features/ai/api/conversation-api';
 import {
     type ChatRequest,
-    cancelChat,
+    cancelRun,
     type SSEEvent,
     streamChat,
     streamResume,
@@ -41,8 +41,10 @@ export interface UseAIThreadReturn {
     isStreaming: boolean;
     /** 当前错误 */
     error: string | null;
-    /** 当前房间 ID (thread ID) */
-    roomId: string | null;
+    /** 当前 thread ID */
+    threadId: string | null;
+    /** 当前 run ID（用于 resume/cancel） */
+    runId: string | null;
     /** 工具中断信息 (需要前端确认的工具调用) */
     interrupt: ToolInterrupt | null;
 
@@ -61,7 +63,8 @@ interface StreamState {
     currentAiMessageId: string | null;
     currentAiContent: string;
     currentContentBlockIndex: number;
-    roomId: string | null;
+    threadId: string | null;
+    runId: string | null;
     interrupt: ToolInterrupt | null;
 }
 
@@ -75,9 +78,18 @@ function processEvent(state: StreamState, event: SSEEvent): StreamState {
     switch (method) {
         // ---- Lifecycle Events ----
         case 'lifecycle': {
-            const lifecycleData = d as { event: string; error?: string; threadId?: string };
-            if (lifecycleData.event === 'started' && lifecycleData.threadId) {
-                return { ...state, roomId: lifecycleData.threadId };
+            const lifecycleData = d as {
+                event: string;
+                error?: string;
+                threadId?: string;
+                runId?: string;
+            };
+            if (lifecycleData.event === 'started') {
+                return {
+                    ...state,
+                    threadId: lifecycleData.threadId ?? state.threadId,
+                    runId: lifecycleData.runId ?? null,
+                };
             }
             if (lifecycleData.event === 'failed') {
                 return { ...state, interrupt: null };
@@ -189,7 +201,7 @@ function processEvent(state: StreamState, event: SSEEvent): StreamState {
             const valuesData = d as { threadId?: string };
             return {
                 ...state,
-                roomId: valuesData.threadId ?? state.roomId,
+                threadId: valuesData.threadId ?? state.threadId,
             };
         }
 
@@ -211,7 +223,8 @@ export function useAIThread(): UseAIThreadReturn {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isStreaming, setIsStreaming] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [roomId, setRoomId] = useState<string | null>(null);
+    const [threadId, setThreadId] = useState<string | null>(null);
+    const [runId, setRunId] = useState<string | null>(null);
     const [interrupt, setInterrupt] = useState<ToolInterrupt | null>(null);
 
     const abortRef = useRef<AbortController | null>(null);
@@ -220,7 +233,8 @@ export function useAIThread(): UseAIThreadReturn {
         currentAiMessageId: null,
         currentAiContent: '',
         currentContentBlockIndex: 0,
-        roomId: null,
+        threadId: null,
+        runId: null,
         interrupt: null,
     });
 
@@ -251,12 +265,29 @@ export function useAIThread(): UseAIThreadReturn {
                 timestamp: Date.now(),
             };
 
+            // 若没有 threadId，先自动创建一个 thread
+            let tid = stateRef.current.threadId;
+            if (!tid) {
+                try {
+                    const thread = await createThread({
+                        title: content.slice(0, 20) || 'New Chat',
+                    });
+                    tid = thread.id;
+                    setThreadId(tid);
+                } catch (err) {
+                    setError((err as Error).message);
+                    setIsStreaming(false);
+                    return;
+                }
+            }
+
             const initialState: StreamState = {
                 messages: [...stateRef.current.messages, userMsg],
                 currentAiMessageId: null,
                 currentAiContent: '',
                 currentContentBlockIndex: 0,
-                roomId: stateRef.current.roomId,
+                threadId: tid,
+                runId: null,
                 interrupt: null,
             };
 
@@ -265,7 +296,8 @@ export function useAIThread(): UseAIThreadReturn {
 
             try {
                 for await (const event of streamChat(
-                    { content, roomId: stateRef.current.roomId ?? undefined, context },
+                    tid!,
+                    { content, context },
                     controller.signal,
                 )) {
                     if (controller.signal.aborted) break;
@@ -277,21 +309,16 @@ export function useAIThread(): UseAIThreadReturn {
                         continue;
                     }
 
-                    // 处理 lifecycle completed → 提取 roomId
-                    if (event.event === 'lifecycle') {
-                        const ld = event.data as { event: string };
-                        if (ld.event === 'completed') {
-                            // Stream 完成
-                        }
-                    }
-
                     const newState = processEvent(stateRef.current, event);
                     stateRef.current = newState;
 
                     // 同步到 React 状态
                     setMessages([...newState.messages]);
-                    if (newState.roomId !== roomId) {
-                        setRoomId(newState.roomId);
+                    if (newState.threadId !== threadId) {
+                        setThreadId(newState.threadId);
+                    }
+                    if (newState.runId !== runId) {
+                        setRunId(newState.runId);
                     }
                     if (newState.interrupt !== interrupt) {
                         setInterrupt(newState.interrupt);
@@ -306,12 +333,16 @@ export function useAIThread(): UseAIThreadReturn {
                 abortRef.current = null;
             }
         },
-        [roomId, interrupt],
+        [threadId, runId, interrupt],
     );
 
     const resumeWithToolResult = useCallback(
         async (toolCallId: string, result: unknown) => {
-            if (!roomId) return;
+            const currentRunId = stateRef.current.runId;
+            if (!currentRunId) {
+                setError('No active run to resume');
+                return;
+            }
 
             abortRef.current?.abort();
             const controller = new AbortController();
@@ -323,7 +354,7 @@ export function useAIThread(): UseAIThreadReturn {
 
             try {
                 for await (const event of streamResume(
-                    roomId,
+                    currentRunId,
                     toolCallId,
                     result,
                     controller.signal,
@@ -339,6 +370,9 @@ export function useAIThread(): UseAIThreadReturn {
                     const newState = processEvent(stateRef.current, event);
                     stateRef.current = newState;
                     setMessages([...newState.messages]);
+                    if (newState.runId !== runId) {
+                        setRunId(newState.runId);
+                    }
                     if (newState.interrupt !== interrupt) {
                         setInterrupt(newState.interrupt);
                     }
@@ -352,28 +386,40 @@ export function useAIThread(): UseAIThreadReturn {
                 abortRef.current = null;
             }
         },
-        [roomId, interrupt],
+        [runId, interrupt],
     );
 
     const stop = useCallback(() => {
         abortRef.current?.abort();
-        if (roomId) {
-            cancelChat(roomId).catch(() => {});
+        const currentRunId = stateRef.current.runId;
+        if (currentRunId) {
+            cancelRun(currentRunId).catch(() => {});
         }
         setIsStreaming(false);
-    }, [roomId]);
+    }, []);
 
     return useMemo(
         () => ({
             messages,
             isStreaming,
             error,
-            roomId,
+            threadId,
+            runId,
             interrupt,
             sendMessage,
             resumeWithToolResult,
             stop,
         }),
-        [messages, isStreaming, error, roomId, interrupt, sendMessage, resumeWithToolResult, stop],
+        [
+            messages,
+            isStreaming,
+            error,
+            threadId,
+            runId,
+            interrupt,
+            sendMessage,
+            resumeWithToolResult,
+            stop,
+        ],
     );
 }

@@ -1,26 +1,28 @@
 /**
  * NestSSETransport — 自定义 Transport 对接 NestJS SSE 端点
  *
- * 实现 FetchStreamTransport 兼容的接口，让 @langchain/langgraph-sdk
- * 的 useStream hook 能连接到我们的 NestJS 后端。
+ * 实现 FetchStreamTransport 兼容的接口，连接 Thread/Run 架构的后端。
  *
- * FetchStreamTransport 期望:
- *   - POST 请求发送到 apiUrl
- *   - 响应为 SSE 流 (text/event-stream)
- *   - 每个事件格式: event: <method>\ndata: <JSON>\n\n
- *   - 返回 AsyncGenerator<{ event: string, data: unknown }>
+ * SSE 事件格式: event: <method>\ndata: <JSON>\n\n
+ * 返回 AsyncGenerator<{ event: string, data: unknown }>
  */
 
 const API_URL = process.env.NEXT_PUBLIC_AI_API_URL ?? 'http://localhost:3001';
 
 /**
- * SSE 端点路径 — 后端使用 NestJS 版本控制: /api/v1 前缀
+ * 动态 URL 构建 — 对齐后端 Thread/Run 路由
  */
-const SSE_ENDPOINTS = {
-    chat: '/api/v1/ai/chat',
-    resume: '/api/v1/ai/chat/resume',
-    cancel: '/api/v1/ai/chat/cancel',
-} as const;
+function runUrl(threadId: string): string {
+    return `${API_URL}/api/v1/ai/threads/${threadId}/runs`;
+}
+
+function resumeUrl(runId: string): string {
+    return `${API_URL}/api/v1/ai/runs/${runId}/resume`;
+}
+
+function cancelUrl(runId: string): string {
+    return `${API_URL}/api/v1/ai/runs/${runId}/cancel`;
+}
 
 export interface SSEEvent {
     event: string;
@@ -83,7 +85,6 @@ async function* parseSSEStream(
 
 export interface ChatRequest {
     content?: string;
-    roomId?: string;
     context?: {
         documentId?: string;
         documentTitle?: string;
@@ -93,22 +94,21 @@ export interface ChatRequest {
         cursorPosition?: unknown;
         formatState?: unknown;
     };
-    command?: {
-        resume?: {
-            toolCallId: string;
-            result: unknown;
-        };
-    };
+    concurrency?: 'rejected' | 'interrupt' | 'rollback';
+    llmConfig?: { provider?: string; model?: string };
 }
 
 /**
  * 发送聊天消息并返回 SSE 事件流
+ *
+ * threadId 放入 URL 路径，body 只包含 content/context/concurrency/llmConfig。
  */
 export async function* streamChat(
+    threadId: string,
     request: ChatRequest,
     signal?: AbortSignal,
 ): AsyncGenerator<SSEEvent> {
-    const response = await fetch(`${API_URL}${SSE_ENDPOINTS.chat}`, {
+    const response = await fetch(runUrl(threadId), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request),
@@ -129,17 +129,19 @@ export async function* streamChat(
 
 /**
  * 发送工具恢复请求并返回 SSE 事件流
+ *
+ * runId 放入 URL 路径，body 只包含 toolCallId 和 result。
  */
 export async function* streamResume(
-    roomId: string,
+    runId: string,
     toolCallId: string,
     result: unknown,
     signal?: AbortSignal,
 ): AsyncGenerator<SSEEvent> {
-    const response = await fetch(`${API_URL}${SSE_ENDPOINTS.resume}`, {
+    const response = await fetch(resumeUrl(runId), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roomId, toolCallId, result }),
+        body: JSON.stringify({ toolCallId, result }),
         signal,
     });
 
@@ -156,12 +158,14 @@ export async function* streamResume(
 }
 
 /**
- * 取消生成
+ * 取消正在进行的 Run
  */
-export async function cancelChat(roomId: string): Promise<void> {
-    await fetch(`${API_URL}${SSE_ENDPOINTS.cancel}`, {
+export async function cancelRun(runId: string): Promise<void> {
+    await fetch(cancelUrl(runId), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roomId }),
     });
 }
+
+/** @deprecated Use cancelRun instead */
+export const cancelChat = cancelRun;
