@@ -11,7 +11,6 @@
 
 import type { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
 import { MemorySaver } from '@langchain/langgraph-checkpoint';
-import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
@@ -21,7 +20,7 @@ export type CheckpointerBackend = 'memory' | 'postgres';
 export class CheckpointerProvider implements OnModuleInit, OnModuleDestroy {
     private readonly logger = new Logger(CheckpointerProvider.name);
     private checkpointer?: BaseCheckpointSaver;
-    private postgresSaver?: PostgresSaver;
+    private postgresSaver?: { end: () => Promise<void> };
 
     constructor(private configService: ConfigService) {}
 
@@ -42,10 +41,20 @@ export class CheckpointerProvider implements OnModuleInit, OnModuleDestroy {
                         'CHECKPOINTER_BACKEND=postgres requires DATABASE_URL to be set',
                     );
                 }
-                this.postgresSaver = PostgresSaver.fromConnString(dbUrl);
-                await this.postgresSaver.setup();
-                this.checkpointer = this.postgresSaver;
-                this.logger.log('Checkpointer: PostgresSaver');
+
+                try {
+                    const { PostgresSaver } = await import(
+                        '@langchain/langgraph-checkpoint-postgres'
+                    );
+                    this.postgresSaver = PostgresSaver.fromConnString(dbUrl);
+                    await (this.postgresSaver as any).setup?.();
+                    this.checkpointer = this.postgresSaver as unknown as BaseCheckpointSaver;
+                    this.logger.log('Checkpointer: PostgresSaver');
+                } catch (err) {
+                    throw new Error(
+                        `Failed to initialize PostgresSaver. Is @langchain/langgraph-checkpoint-postgres installed? ${(err as Error).message}`,
+                    );
+                }
                 break;
             }
 

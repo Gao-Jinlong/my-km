@@ -18,6 +18,7 @@
 
 import type { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
 import { Logger } from '@nestjs/common';
+import type { LLMProvider } from '../llm/provider.types';
 import type { RunEventStore } from '../store/run-event-store';
 import type { TokenUsage } from '../types/ai.types';
 import { RunStatus } from '../types/run.types';
@@ -50,6 +51,13 @@ export class RunRecord {
 
     /** SSE response writer（由 controller 设置） */
     private sseWriter?: (event: { event: string; data: unknown }) => void;
+
+    /** LLM provider（由 AiChatService.startRun 设置） */
+    _llmProvider?: LLMProvider;
+    /** 用户消息内容（由 AiChatService.startRun 设置） */
+    _content?: string;
+    /** 上下文数据（由 AiChatService.startRun 设置） */
+    _context?: Record<string, unknown>;
 
     constructor(opts: RunRecordOpts) {
         this.id = opts.id;

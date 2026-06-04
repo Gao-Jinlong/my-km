@@ -96,7 +96,7 @@ export class AiChatService {
         // 4. 获取 LLM provider
         const defaultConfig = this.providerRegistry.defaultConfig;
         const providerConfig = opts.llmConfig
-            ? { ...defaultConfig, ...opts.llmConfig }
+            ? ({ ...defaultConfig, ...opts.llmConfig } as import('./llm/provider.types').LLMConfig)
             : defaultConfig;
 
         if (!providerConfig) {
