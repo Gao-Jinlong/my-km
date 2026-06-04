@@ -36,8 +36,12 @@ import { ThreadService } from './thread/thread.service';
         RunManager,
         {
             provide: 'RunContext',
-            useFactory: (checkpointerProvider: CheckpointerProvider, eventStore: RunEventStore) => {
-                return new RunContext(checkpointerProvider.getCheckpointer(), eventStore);
+            useFactory: async (
+                checkpointerProvider: CheckpointerProvider,
+                eventStore: RunEventStore,
+            ) => {
+                const checkpointer = await checkpointerProvider.getCheckpointer();
+                return new RunContext(checkpointer, eventStore);
             },
             inject: [CheckpointerProvider, RunEventStore],
         },

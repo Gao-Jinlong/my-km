@@ -5,13 +5,12 @@
  * - memory (默认): MemorySaver — 进程内存，开发用
  * - postgres: PostgresSaver — PostgreSQL 持久化，生产用
  *
- * Checkpointer 是单例，所有 Thread/Run 共享同一个实例，
- * 避免每次对话都创建数据库连接。
+ * 支持懒初始化：getCheckpointer() 在首次调用时自动初始化。
  */
 
 import type { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
 import { MemorySaver } from '@langchain/langgraph-checkpoint';
-import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import { EnvConfig } from '../../config/env.config';
 
 export type CheckpointerBackend = 'memory' | 'postgres';
@@ -24,22 +23,39 @@ async function loadPostgresSaver(
 ): Promise<{ saver: BaseCheckpointSaver; end: () => Promise<void> }> {
     const { PostgresSaver } = await import('@langchain/langgraph-checkpoint-postgres');
     const saver = PostgresSaver.fromConnString(dbUrl) as unknown as BaseCheckpointSaver;
+    // biome-ignore lint/suspicious/noExplicitAny: PostgresSaver setup is dynamic
     await (saver as any).setup?.();
     return {
         saver,
+        // biome-ignore lint/suspicious/noExplicitAny: PostgresSaver end is dynamic
         end: () => (saver as any).end?.(),
     };
 }
 
 @Injectable()
-export class CheckpointerProvider implements OnModuleInit, OnModuleDestroy {
+export class CheckpointerProvider implements OnModuleDestroy {
     private readonly logger = new Logger(CheckpointerProvider.name);
     private checkpointer?: BaseCheckpointSaver;
     private postgresSaverEnd?: () => Promise<void>;
+    private initPromise?: Promise<void>;
 
     constructor(private envConfig: EnvConfig) {}
 
-    async onModuleInit() {
+    /**
+     * 确保已初始化（幂等，可安全多次调用）
+     */
+    async ensureInitialized(): Promise<void> {
+        if (this.checkpointer) return;
+        if (this.initPromise) {
+            await this.initPromise;
+            return;
+        }
+
+        this.initPromise = this.doInit();
+        await this.initPromise;
+    }
+
+    private async doInit(): Promise<void> {
         const backend = (process.env.CHECKPOINTER_BACKEND || 'memory') as CheckpointerBackend;
 
         switch (backend) {
@@ -84,11 +100,12 @@ export class CheckpointerProvider implements OnModuleInit, OnModuleDestroy {
     }
 
     /**
-     * 获取 checkpointer 单例
+     * 获取 checkpointer 单例（懒初始化）
      */
-    getCheckpointer(): BaseCheckpointSaver {
+    async getCheckpointer(): Promise<BaseCheckpointSaver> {
+        await this.ensureInitialized();
         if (!this.checkpointer) {
-            throw new Error('CheckpointerProvider not initialized — call onModuleInit() first');
+            throw new Error('CheckpointerProvider initialization failed');
         }
         return this.checkpointer;
     }
