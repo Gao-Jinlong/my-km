@@ -13,9 +13,9 @@
 
 import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { Response } from 'express';
-import type { LLMFactory } from './llm/llm-factory';
+import { LLMFactory } from './llm/llm-factory';
 import type { LLMProvider } from './llm/provider.types';
-import type { ProviderRegistry } from './llm/provider-registry';
+import { ProviderRegistry } from './llm/provider-registry';
 import type { RunContext } from './run/run-context';
 import { RunManager } from './run/run-manager';
 import { RunRecord } from './run/run-record';
@@ -62,8 +62,8 @@ export class AiChatService {
         private readonly threadService: ThreadService,
         private readonly runManager: RunManager,
         @Inject('RunContext') private readonly runContext: RunContext,
-        @Inject('ProviderRegistry') private readonly providerRegistry: ProviderRegistry,
-        @Inject('LLMFactory') private readonly llmFactory: LLMFactory,
+        private readonly providerRegistry: ProviderRegistry,
+        private readonly llmFactory: LLMFactory,
     ) {}
 
     /**
