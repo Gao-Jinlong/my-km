@@ -8,7 +8,7 @@
 import { Injectable } from '@nestjs/common';
 import { CheckpointerProvider } from '../checkpointer/checkpointer.provider';
 import type { LLMConfig } from '../llm/provider.types';
-import type { RunEventStore } from '../store/run-event-store';
+import { RunEventStore } from '../store/run-event-store';
 import { RunContext, type RunContextOpts } from './run-context';
 
 export interface CreateRunContextOpts {
