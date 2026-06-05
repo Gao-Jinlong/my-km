@@ -66,7 +66,7 @@ export class AiChatController {
                 content: dto.content ?? '',
                 threadId,
                 context: dto.context,
-                concurrency: dto.concurrency as ConcurrencyPolicy,
+                concurrency: dto.concurrency,
                 llmConfig: dto.llmConfig,
             });
 

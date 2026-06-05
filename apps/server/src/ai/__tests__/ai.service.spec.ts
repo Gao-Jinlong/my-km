@@ -3,14 +3,14 @@ import { ConflictException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { AiChatService } from '../ai.service';
 import { LLMFactory } from '../llm/llm-factory';
+import type { LLMConfig } from '../llm/provider.types';
 import { ProviderRegistry } from '../llm/provider-registry';
+import type { RunContext } from '../run/run-context';
+import { RunContextFactory } from '../run/run-context-factory';
 import { RunManager } from '../run/run-manager';
 import type { RunEventStore } from '../store/run-event-store';
 import { ThreadService } from '../thread/thread.service';
 import { ConcurrencyPolicy, RunStatus } from '../types/run.types';
-
-// Ensure ProviderRegistry and LLMFactory are resolved by NestJS
-// We provide them as string tokens matching @Inject() decorators
 
 // Mock langgraph ESM modules to prevent uuid ESM error in Jest
 jest.mock('@langchain/langgraph', () => ({
@@ -38,34 +38,41 @@ jest.mock('../langgraph/graphs/chat-graph', () => ({
     })),
 }));
 
-// Mock RunContext to avoid langgraph import chain
-jest.mock('../run/run-context', () => ({
-    RunContext: jest.fn().mockImplementation(() => ({
-        checkpointer: { type: 'memory' },
-        eventStore: { append: jest.fn() },
-        getCompiledGraph: jest.fn().mockReturnValue({
-            stream: jest.fn().mockResolvedValue((async function* () {})()),
-        }),
-    })),
-}));
-
 describe('AiChatService', () => {
     let service: AiChatService;
     let threadService: ThreadService;
     let runManager: RunManager;
-    let mockCheckpointer: { type: string };
-    let mockEventStore: { append: jest.Mock };
-    let mockProviderRegistry: { defaultConfig: any; register: jest.Mock };
+    let mockProviderRegistry: ProviderRegistry;
+    let mockRunContextFactory: RunContextFactory;
+    let defaultLlmConfig: LLMConfig;
 
     beforeEach(async () => {
-        mockCheckpointer = { type: 'memory' };
-        mockEventStore = { append: jest.fn().mockResolvedValue({}) };
-        mockProviderRegistry = {
-            defaultConfig: { provider: 'zhipu', model: 'glm-5' },
-            register: jest.fn(),
+        defaultLlmConfig = { provider: 'zhipu', model: 'glm-5' };
+
+        // Create a fresh mock RunContext for each factory.create() call
+        const mockRunContextFactoryInstance = {
+            create: jest.fn().mockImplementation(async (opts: any) => {
+                return {
+                    checkpointer: { type: 'memory' } as unknown as BaseCheckpointSaver,
+                    eventStore: {
+                        append: jest.fn().mockResolvedValue({}),
+                    } as unknown as RunEventStore,
+                    llmConfig: { ...opts.llmConfig },
+                    requestContext: opts.requestContext ? { ...opts.requestContext } : undefined,
+                } as RunContext;
+            }),
         };
 
-        const runContext = new (jest.requireMock('../run/run-context').RunContext)();
+        const mockRegistry = {
+            defaultConfig: defaultLlmConfig,
+            register: jest.fn(),
+            isRegistered: jest.fn().mockReturnValue(true),
+            registeredProviders: ['zhipu', 'openai'],
+        };
+
+        const mockLLM = {
+            getOrCreate: jest.fn().mockReturnValue({ chat: jest.fn() }),
+        };
 
         const module: TestingModule = await Test.createTestingModule({
             providers: [
@@ -82,39 +89,24 @@ describe('AiChatService', () => {
                         incrementMessageCount: jest.fn().mockResolvedValue({}),
                     },
                 },
-                {
-                    provide: RunManager,
-                    useFactory: () => {
-                        const es = mockEventStore as unknown as RunEventStore;
-                        const cp = mockCheckpointer as unknown as BaseCheckpointSaver;
-                        return new RunManager(es, cp);
-                    },
-                },
-                {
-                    provide: 'RunContext',
-                    useValue: runContext,
-                },
-                {
-                    provide: 'ProviderRegistry',
-                    useValue: mockProviderRegistry,
-                },
-                {
-                    provide: 'LLMFactory',
-                    useValue: { getOrCreate: jest.fn().mockReturnValue({ chat: jest.fn() }) },
-                },
+                { provide: RunManager, useClass: RunManager },
+                { provide: RunContextFactory, useValue: mockRunContextFactoryInstance },
+                { provide: ProviderRegistry, useValue: mockRegistry },
+                { provide: 'ProviderRegistry', useValue: mockRegistry },
+                { provide: LLMFactory, useValue: mockLLM },
             ],
         }).compile();
 
         service = module.get<AiChatService>(AiChatService);
         threadService = module.get<ThreadService>(ThreadService);
         runManager = module.get<RunManager>(RunManager);
+        mockRunContextFactory = module.get<RunContextFactory>(RunContextFactory);
+        mockProviderRegistry = module.get<ProviderRegistry>(ProviderRegistry);
     });
 
     describe('startRun', () => {
         it('should create a thread and run when no threadId', async () => {
-            const result = await service.startRun({
-                content: 'Hello',
-            });
+            const result = await service.startRun({ content: 'Hello' });
             expect(result).toBeDefined();
             expect(result.threadId).toBe('thread-1');
             expect(result.status).toBe(RunStatus.Running);
@@ -128,16 +120,92 @@ describe('AiChatService', () => {
             expect(threadService.findOrCreate).toHaveBeenCalledWith('thread-1', expect.anything());
             expect(result).toBeDefined();
         });
-    });
 
-    describe('concurrency control', () => {
-        it('should reject when active run exists and policy is rejected', async () => {
+        it('should call RunContextFactory.create() after concurrency check', async () => {
+            await service.startRun({ content: 'Hello' });
+            expect(mockRunContextFactory.create).toHaveBeenCalledTimes(1);
+        });
+
+        it('should create per-run RunContext with merged llmConfig', async () => {
+            await service.startRun({
+                content: 'Hello',
+                llmConfig: { provider: 'openai', model: 'gpt-4' },
+            });
+
+            expect(mockRunContextFactory.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    llmConfig: expect.objectContaining({ provider: 'openai', model: 'gpt-4' }),
+                }),
+            );
+        });
+
+        it('should throw if no default LLM config is set', async () => {
+            (mockProviderRegistry as any).defaultConfig = undefined;
+
+            await expect(service.startRun({ content: 'Hello' })).rejects.toThrow(
+                'No LLM provider configured',
+            );
+        });
+
+        it('should not create RunContext when concurrency is rejected', async () => {
             // Create first run
             await service.startRun({ content: 'First', threadId: 't1' });
             const activeRun = runManager.getActiveRunForThread('t1');
             if (activeRun) activeRun.setStatus(RunStatus.Running);
 
+            // Reset call count
+            (mockRunContextFactory.create as jest.Mock).mockClear();
+
             // Second run with rejected policy
+            await expect(
+                service.startRun({
+                    content: 'Second',
+                    threadId: 't1',
+                    concurrency: ConcurrencyPolicy.Rejected,
+                }),
+            ).rejects.toThrow(ConflictException);
+
+            // Factory should not have been called for the rejected run
+            expect(mockRunContextFactory.create).not.toHaveBeenCalled();
+        });
+
+        it('should give two runs different RunContext instances', async () => {
+            const r1 = await service.startRun({ content: 'First', threadId: 't1' });
+            // Complete first run so second can proceed
+            r1.setStatus(RunStatus.Completed);
+
+            const r2 = await service.startRun({ content: 'Second', threadId: 't1' });
+
+            expect(r1.runContext).not.toBe(r2.runContext);
+        });
+
+        it('should preserve llmConfig snapshot — changing defaultConfig after startRun does not affect run', async () => {
+            const record = await service.startRun({ content: 'Hello' });
+            const snapshotProvider = record.runContext.llmConfig.provider;
+
+            // Change default config
+            (mockProviderRegistry as any).defaultConfig = { provider: 'openai', model: 'gpt-4' };
+
+            // Original run should still have zhipu
+            expect(record.runContext.llmConfig.provider).toBe(snapshotProvider);
+        });
+
+        it('should pass requestContext to RunContextFactory', async () => {
+            const ctx = { userId: 'u1' };
+            await service.startRun({ content: 'Hello', context: ctx });
+
+            expect(mockRunContextFactory.create).toHaveBeenCalledWith(
+                expect.objectContaining({ requestContext: ctx }),
+            );
+        });
+    });
+
+    describe('concurrency control', () => {
+        it('should reject when active run exists and policy is rejected', async () => {
+            await service.startRun({ content: 'First', threadId: 't1' });
+            const activeRun = runManager.getActiveRunForThread('t1');
+            if (activeRun) activeRun.setStatus(RunStatus.Running);
+
             await expect(
                 service.startRun({
                     content: 'Second',
@@ -153,6 +221,36 @@ describe('AiChatService', () => {
             await expect(
                 service.resume({ runId: 'nonexistent', toolCallId: 'tc-1', result: {} }),
             ).rejects.toThrow(/not found/);
+        });
+
+        it('should return same RunRecord without calling factory again', async () => {
+            const record = await service.startRun({ content: 'test', threadId: 't1' });
+            record.setStatus(RunStatus.Interrupted);
+
+            (mockRunContextFactory.create as jest.Mock).mockClear();
+
+            const resumed = await service.resume({
+                runId: record.id,
+                toolCallId: 'tc-1',
+                result: {},
+            });
+
+            expect(resumed).toBe(record);
+            expect(mockRunContextFactory.create).not.toHaveBeenCalled();
+        });
+
+        it('should preserve original runContext after resume', async () => {
+            const record = await service.startRun({ content: 'test', threadId: 't1' });
+            const originalContext = record.runContext;
+            record.setStatus(RunStatus.Interrupted);
+
+            const resumed = await service.resume({
+                runId: record.id,
+                toolCallId: 'tc-1',
+                result: {},
+            });
+
+            expect(resumed.runContext).toBe(originalContext);
         });
     });
 

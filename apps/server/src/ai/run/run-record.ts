@@ -4,6 +4,8 @@
  * 持有：
  * - run ID、thread ID
  * - 运行状态（pending → running → completed/interrupted/failed/cancelled）
+ * - RunContext（创建时的上下文快照）
+ * - RunExecutionSnapshot（执行输入的显式、类型化快照）
  * - token 用量累计
  * - abort controller
  * - SSE 事件发射（写入 Response + EventStore）
@@ -16,18 +18,24 @@
  * 4. abort 处理
  */
 
-import type { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
 import { Logger } from '@nestjs/common';
-import type { LLMProvider } from '../llm/provider.types';
-import type { RunEventStore } from '../store/run-event-store';
 import type { TokenUsage } from '../types/ai.types';
 import { RunStatus } from '../types/run.types';
+import type { RunContext } from './run-context';
+
+/**
+ * 执行输入快照 — 显式、类型化、可测试
+ */
+export interface RunExecutionSnapshot {
+    readonly content: string;
+    readonly requestContext?: Readonly<Record<string, unknown>>;
+}
 
 export interface RunRecordOpts {
     id: string;
     threadId: string;
-    eventStore: RunEventStore;
-    checkpointer: BaseCheckpointSaver;
+    runContext: RunContext;
+    snapshot: RunExecutionSnapshot;
 }
 
 export class RunRecord {
@@ -35,6 +43,8 @@ export class RunRecord {
 
     readonly id: string;
     readonly threadId: string;
+    readonly runContext: RunContext;
+    readonly snapshot: RunExecutionSnapshot;
     readonly abortController = new AbortController();
     readonly abortSignal: AbortSignal;
 
@@ -46,24 +56,15 @@ export class RunRecord {
     };
 
     private seq = 0;
-    private readonly eventStore: RunEventStore;
-    private readonly checkpointer: BaseCheckpointSaver;
 
     /** SSE response writer（由 controller 设置） */
     private sseWriter?: (event: { event: string; data: unknown }) => void;
 
-    /** LLM provider（由 AiChatService.startRun 设置） */
-    _llmProvider?: LLMProvider;
-    /** 用户消息内容（由 AiChatService.startRun 设置） */
-    _content?: string;
-    /** 上下文数据（由 AiChatService.startRun 设置） */
-    _context?: Record<string, unknown>;
-
     constructor(opts: RunRecordOpts) {
         this.id = opts.id;
         this.threadId = opts.threadId;
-        this.eventStore = opts.eventStore;
-        this.checkpointer = opts.checkpointer;
+        this.runContext = opts.runContext;
+        this.snapshot = opts.snapshot;
         this.abortSignal = this.abortController.signal;
     }
 
@@ -111,6 +112,8 @@ export class RunRecord {
 
     /**
      * 发射事件：同时写入 SSE response + EventStore
+     *
+     * EventStore 通过 runContext.eventStore 统一来源
      */
     async emitEvent(event: { event: string; data: unknown }) {
         // 写 SSE
@@ -118,9 +121,9 @@ export class RunRecord {
             this.sseWriter(event);
         }
 
-        // 写 EventStore
+        // 写 EventStore（通过 runContext.eventStore 统一来源）
         try {
-            await this.eventStore.append(this.id, this.threadId, {
+            await this.runContext.eventStore.append(this.id, this.threadId, {
                 seq: this.seq++,
                 eventType: event.event,
                 // biome-ignore lint/suspicious/noExplicitAny: LangGraph stream event data is untyped

@@ -11,12 +11,14 @@
  * 所有业务逻辑都在这里。
  */
 
-import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { Response } from 'express';
+import { ChatGraph } from './langgraph/graphs/chat-graph';
 import { LLMFactory } from './llm/llm-factory';
-import type { LLMProvider } from './llm/provider.types';
+import type { LLMConfig } from './llm/provider.types';
 import { ProviderRegistry } from './llm/provider-registry';
 import type { RunContext } from './run/run-context';
+import { RunContextFactory } from './run/run-context-factory';
 import { RunManager } from './run/run-manager';
 import { RunRecord } from './run/run-record';
 import {
@@ -61,7 +63,7 @@ export class AiChatService {
     constructor(
         private readonly threadService: ThreadService,
         private readonly runManager: RunManager,
-        @Inject('RunContext') private readonly runContext: RunContext,
+        private readonly runContextFactory: RunContextFactory,
         private readonly providerRegistry: ProviderRegistry,
         private readonly llmFactory: LLMFactory,
     ) {}
@@ -71,9 +73,9 @@ export class AiChatService {
      *
      * 1. findOrCreate thread
      * 2. 并发控制检查
-     * 3. 创建 RunRecord
-     * 4. 执行 graph 流式调用
-     * 5. 写 SSE 事件
+     * 3. resolve + validate llmConfig
+     * 4. 创建 per-run RunContext
+     * 5. 创建 typed RunRecord
      */
     async startRun(opts: StartRunOpts): Promise<RunRecord> {
         const { content, threadId, concurrency = ConcurrencyPolicy.Rejected } = opts;
@@ -83,34 +85,27 @@ export class AiChatService {
             title: content.slice(0, 20) || 'New Chat',
         });
 
-        // 2. 并发控制
+        // 2. 并发控制（在创建 RunContext 之前处理）
         const activeRun = this.runManager.getActiveRunForThread(thread.id);
         if (activeRun) {
             await this.handleConcurrency(activeRun, concurrency);
         }
 
-        // 3. 创建 RunRecord（传入 checkpointer）
-        const record = this.runManager.createRun(thread.id, this.runContext.checkpointer);
+        // 3. resolve + validate llmConfig
+        const llmConfig = this.resolveLlmConfig(opts.llmConfig);
+
+        // 4. 创建 per-run RunContext（llmConfig/requestContext 会被深克隆冻结）
+        const runContext = await this.runContextFactory.create({
+            llmConfig,
+            requestContext: opts.context,
+        });
+
+        // 5. 创建 typed RunRecord
+        const record = this.runManager.createRun(thread.id, runContext, {
+            content,
+            requestContext: opts.context,
+        });
         record.setStatus(RunStatus.Running);
-
-        // 4. 获取 LLM provider
-        const defaultConfig = this.providerRegistry.defaultConfig;
-        const providerConfig = opts.llmConfig
-            ? ({ ...defaultConfig, ...opts.llmConfig } as import('./llm/provider.types').LLMConfig)
-            : defaultConfig;
-
-        if (!providerConfig) {
-            record.setStatus(RunStatus.Failed);
-            throw new Error('No LLM provider configured');
-        }
-
-        const llmProvider = this.llmFactory.getOrCreate(providerConfig);
-
-        // Return the record — the controller will set the SSE writer
-        // and call executeRun() to stream events
-        record._llmProvider = llmProvider;
-        record._content = content;
-        record._context = opts.context;
 
         return record;
     }
@@ -119,6 +114,7 @@ export class AiChatService {
      * 执行 Run（由 Controller 调用，传入 SSE response）
      *
      * 这一步在 controller 中调用是因为需要 access to Response 对象。
+     * 基于 record.runContext 编译 graph 和创建 provider。
      */
     async executeRun(record: RunRecord, res: Response): Promise<void> {
         const send = (event: { event: string; data: unknown }) => {
@@ -133,12 +129,12 @@ export class AiChatService {
             // 发送 lifecycle:started
             await record.emitEvent(lifecycleStarted(record.threadId, record.id));
 
-            // 获取 graph
-            const graph = this.runContext.getCompiledGraph('default');
+            // 基于 record.runContext 编译 graph
+            const graph = this.compileGraph(record.runContext);
 
-            // 获取 LLM provider 和 content（由 startRun 设置）
-            const llmProvider = (record as any)._llmProvider;
-            const content = (record as any)._content || '';
+            // 使用 record.runContext.llmConfig 创建 provider
+            const llmProvider = this.llmFactory.getOrCreate(record.runContext.llmConfig);
+            const content = record.snapshot.content;
             const tools = frontendToolDefinitions;
 
             // 构建 LLM caller
@@ -252,6 +248,8 @@ export class AiChatService {
 
     /**
      * 恢复中断的 Run
+     *
+     * 返回原 RunRecord（持有原始 RunContext），不重新创建 context。
      */
     async resume(opts: ResumeOpts): Promise<RunRecord> {
         const { runId } = opts;
@@ -282,6 +280,58 @@ export class AiChatService {
         this.runManager.cancelRun(runId);
     }
 
+    // ========== Private Helpers ==========
+
+    /**
+     * 解析并校验 llmConfig
+     *
+     * 1. 读取 ProviderRegistry.defaultConfig
+     * 2. 与 opts.llmConfig 合并
+     * 3. 校验 provider/model 必填
+     * 4. 校验 provider 已注册
+     *
+     * 后续 executeRun() 只使用快照，不再读取默认配置。
+     */
+    private resolveLlmConfig(override?: { provider?: string; model?: string }): LLMConfig {
+        const defaultConfig = this.providerRegistry.defaultConfig;
+        if (!defaultConfig) {
+            throw new Error('No LLM provider configured');
+        }
+
+        const merged: LLMConfig = override
+            ? { ...defaultConfig, ...override }
+            : { ...defaultConfig };
+
+        // 校验
+        if (!merged.provider) {
+            throw new Error('LLM config: provider is required');
+        }
+        if (!merged.model) {
+            throw new Error('LLM config: model is required');
+        }
+        if (!this.providerRegistry.isRegistered(merged.provider)) {
+            const available = this.providerRegistry.registeredProviders;
+            throw new Error(
+                `Unknown provider "${merged.provider}". Available: ${available.join(', ') || 'none'}`,
+            );
+        }
+
+        return merged;
+    }
+
+    /**
+     * 基于 RunContext 编译 ChatGraph
+     *
+     * graph 编译是执行流程的一部分，不是 context 快照本身。
+     * 每次执行都重新编译（未来可按 profiling 引入 GraphCompiler cache）。
+     */
+    // biome-ignore lint/suspicious/noExplicitAny: compiled graph type varies by StateGraph generic params
+    private compileGraph(context: RunContext): any {
+        const chatGraph = new ChatGraph();
+        const graph = chatGraph.createGraph();
+        return graph.compile({ checkpointer: context.checkpointer });
+    }
+
     /**
      * 并发控制处理
      */
@@ -302,7 +352,7 @@ export class AiChatService {
             case ConcurrencyPolicy.Rollback:
                 activeRun.abort();
                 await new Promise(resolve => setTimeout(resolve, 100));
-                // rollback checkpointer 状态由 RunContext 处理
+                // rollback checkpoint 语义待实现（当前阶段 TODO）
                 break;
         }
     }

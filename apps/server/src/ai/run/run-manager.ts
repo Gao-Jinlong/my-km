@@ -6,12 +6,15 @@
  * - 按 thread 查找活跃 Run（用于并发控制）
  * - 取消 Run
  * - 清理已完成的 Run（释放内存）
+ *
+ * 不再注入 RunEventStore / CheckpointerProvider —
+ * 这些 singleton infra 通过 per-run RunContext 传入 RunRecord。
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { RunEventStore } from '../store/run-event-store';
 import { RunStatus } from '../types/run.types';
-import { RunRecord } from './run-record';
+import type { RunContext } from './run-context';
+import { type RunExecutionSnapshot, RunRecord } from './run-record';
 
 const ACTIVE_STATUSES: RunStatus[] = [RunStatus.Pending, RunStatus.Running, RunStatus.Interrupted];
 
@@ -21,23 +24,22 @@ export class RunManager {
     private readonly runs = new Map<string, RunRecord>();
     private runCounter = 0;
 
-    constructor(private readonly eventStore: RunEventStore) {}
-
     /**
      * 创建新的 RunRecord
      *
      * @param threadId Thread ID
-     * @param checkpointer 从 RunContext 传入（由 AiModule 工厂注入）
+     * @param runContext per-run 上下文快照
+     * @param snapshot 执行输入快照
      */
-    createRun(threadId: string, checkpointer: any): RunRecord {
+    createRun(threadId: string, runContext: RunContext, snapshot: RunExecutionSnapshot): RunRecord {
         this.runCounter++;
         const id = `run-${Date.now()}-${this.runCounter}`;
 
         const record = new RunRecord({
             id,
             threadId,
-            eventStore: this.eventStore,
-            checkpointer,
+            runContext,
+            snapshot,
         });
 
         this.runs.set(id, record);

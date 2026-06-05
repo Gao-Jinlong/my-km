@@ -13,7 +13,7 @@ import { CheckpointerProvider } from './checkpointer/checkpointer.provider';
 import { LLMFactory } from './llm/llm-factory';
 import { ProviderRegistry } from './llm/provider-registry';
 import { MessageService } from './message/message.service';
-import { RunContext } from './run/run-context';
+import { RunContextFactory } from './run/run-context-factory';
 import { RunManager } from './run/run-manager';
 import { RunEventStore } from './store/run-event-store';
 import { ThreadService } from './thread/thread.service';
@@ -34,17 +34,7 @@ import { ThreadService } from './thread/thread.service';
 
         // Run 层
         RunManager,
-        {
-            provide: 'RunContext',
-            useFactory: async (
-                checkpointerProvider: CheckpointerProvider,
-                eventStore: RunEventStore,
-            ) => {
-                const checkpointer = await checkpointerProvider.getCheckpointer();
-                return new RunContext(checkpointer, eventStore);
-            },
-            inject: [CheckpointerProvider, RunEventStore],
-        },
+        RunContextFactory,
 
         // 业务逻辑层
         AiChatService,

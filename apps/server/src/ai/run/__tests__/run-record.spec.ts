@@ -1,22 +1,40 @@
 import type { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
 import type { RunEventStore } from '../../store/run-event-store';
 import { RunStatus } from '../../types/run.types';
+import type { RunContext } from '../run-context';
 import { RunRecord } from '../run-record';
+
+/**
+ * 创建一个用于测试的 mock RunContext
+ */
+function createMockRunContext(overrides?: {
+    eventStore?: { append: jest.Mock };
+    checkpointer?: { type: string };
+}): RunContext {
+    const mockES = overrides?.eventStore ?? { append: jest.fn().mockResolvedValue({}) };
+    const mockCP = overrides?.checkpointer ?? { type: 'memory' };
+
+    return {
+        checkpointer: mockCP as unknown as BaseCheckpointSaver,
+        eventStore: mockES as unknown as RunEventStore,
+        llmConfig: { provider: 'zhipu', model: 'glm-5' },
+        requestContext: undefined,
+    } as RunContext;
+}
 
 describe('RunRecord', () => {
     let record: RunRecord;
     let mockEventStore: { append: jest.Mock };
-    let mockCheckpointer: { type: string };
 
     beforeEach(() => {
         mockEventStore = { append: jest.fn().mockResolvedValue({}) };
-        mockCheckpointer = { type: 'memory' };
+        const runContext = createMockRunContext({ eventStore: mockEventStore });
 
         record = new RunRecord({
             id: 'run-1',
             threadId: 'thread-1',
-            eventStore: mockEventStore as unknown as RunEventStore,
-            checkpointer: mockCheckpointer as unknown as BaseCheckpointSaver,
+            runContext,
+            snapshot: { content: 'Hello' },
         });
     });
 
@@ -36,6 +54,36 @@ describe('RunRecord', () => {
         });
     });
 
+    describe('runContext and snapshot', () => {
+        it('should hold runContext', () => {
+            expect(record.runContext).toBeDefined();
+            expect(record.runContext.eventStore).toBe(mockEventStore);
+        });
+
+        it('should hold typed snapshot', () => {
+            expect(record.snapshot).toBeDefined();
+            expect(record.snapshot.content).toBe('Hello');
+        });
+
+        it('should not have hidden _llmProvider/_content/_context fields', () => {
+            expect((record as unknown as Record<string, unknown>)._llmProvider).toBeUndefined();
+            expect((record as unknown as Record<string, unknown>)._content).toBeUndefined();
+            expect((record as unknown as Record<string, unknown>)._context).toBeUndefined();
+        });
+
+        it('should hold snapshot with requestContext', () => {
+            const ctx = createMockRunContext();
+            const rec = new RunRecord({
+                id: 'run-2',
+                threadId: 'thread-1',
+                runContext: ctx,
+                snapshot: { content: 'Hi', requestContext: { userId: 'u1' } },
+            });
+
+            expect(rec.snapshot.requestContext).toEqual({ userId: 'u1' });
+        });
+    });
+
     describe('abort', () => {
         it('should set status to cancelled', () => {
             record.abort();
@@ -49,7 +97,7 @@ describe('RunRecord', () => {
     });
 
     describe('emitEvent', () => {
-        it('should append event to event store', async () => {
+        it('should append event to eventStore via runContext', async () => {
             const event = { event: 'lifecycle', data: { status: 'started' } };
             await record.emitEvent(event);
             expect(mockEventStore.append).toHaveBeenCalledWith(

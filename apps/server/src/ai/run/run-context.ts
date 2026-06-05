@@ -1,50 +1,48 @@
 /**
- * RunContext — Run 执行的依赖注入容器
+ * RunContext — 单次 Run 创建时的执行上下文快照
  *
- * 在模块初始化时创建一次，所有 Run 共享。
- * 包含：
- * - checkpointer: LangGraph BaseCheckpointSaver 单例
- * - eventStore: Run 事件流存储器
- * - getCompiledGraph(): LRU 缓存的 graph 编译
+ * 每个 run 在创建时持有自己的 RunContext 实例。
+ * RunContext 是该 run 创建瞬间的上下文快照：
+ * - 默认模型、动态配置、request context 的后续变化不影响这个 run
+ * - eventStore、checkpointer 等 singleton infra 通过 RunContext 统一传递
+ *
+ * 本阶段只保证进程内 resume：
+ * - 同进程内的 interrupted run 可以 resume，并复用原 RunContext
+ * - 服务重启后，RunRecord 和 RunContext 快照不存在
+ *
+ * graph 编译不属于 RunContext，应移动到 executeRun() 流程中。
  */
 
 import type { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
-import { Logger } from '@nestjs/common';
-import { LRUCache } from 'lru-cache';
-import { ChatGraph } from '../langgraph/graphs/chat-graph';
+import type { LLMConfig } from '../llm/provider.types';
 import type { RunEventStore } from '../store/run-event-store';
+import { snapshotValue } from '../utils/snapshot';
 
-// biome-ignore lint/suspicious/noExplicitAny: StateGraph compile() returns untyped CompiledStateGraph
-type CompiledGraph = any;
+export interface RunContextOpts {
+    /** LangGraph checkpointer 单例 */
+    checkpointer: BaseCheckpointSaver;
+    /** Run 事件流存储器 */
+    eventStore: RunEventStore;
+    /** LLM 配置快照（run 创建时冻结） */
+    llmConfig: LLMConfig;
+    /** 请求上下文快照（run 创建时冻结） */
+    requestContext?: Record<string, unknown>;
+}
 
 export class RunContext {
-    private readonly logger = new Logger(RunContext.name);
-    private graphCache = new LRUCache<string, CompiledGraph>({ max: 10 });
+    /** LangGraph checkpointer 单例 */
+    readonly checkpointer: BaseCheckpointSaver;
+    /** Run 事件流存储器 */
+    readonly eventStore: RunEventStore;
+    /** LLM 配置快照（run 创建时冻结，后续不可修改） */
+    readonly llmConfig: Readonly<LLMConfig>;
+    /** 请求上下文快照（run 创建时冻结，后续不可修改） */
+    readonly requestContext: Readonly<Record<string, unknown>> | undefined;
 
-    constructor(
-        /** LangGraph checkpointer 单例 */
-        readonly checkpointer: BaseCheckpointSaver,
-        /** Run 事件流存储器 */
-        readonly eventStore: RunEventStore,
-    ) {}
-
-    /**
-     * 获取编译后的 graph（LRU 缓存）
-     *
-     * @param configKey 配置键（用于区分不同 graph 配置）
-     * @returns 编译后的 graph 实例
-     */
-    // biome-ignore lint/suspicious/noExplicitAny: compiled graph type varies by StateGraph generic params
-    getCompiledGraph(configKey: string = 'default'): any {
-        const cached = this.graphCache.get(configKey);
-        if (cached) return cached;
-
-        const chatGraph = new ChatGraph();
-        const graph = chatGraph.createGraph();
-        const compiled = graph.compile({ checkpointer: this.checkpointer });
-
-        this.graphCache.set(configKey, compiled);
-        this.logger.log(`Graph compiled and cached: ${configKey}`);
-        return compiled;
+    constructor(opts: RunContextOpts) {
+        this.checkpointer = opts.checkpointer;
+        this.eventStore = opts.eventStore;
+        this.llmConfig = snapshotValue(opts.llmConfig);
+        this.requestContext = opts.requestContext ? snapshotValue(opts.requestContext) : undefined;
     }
 }
