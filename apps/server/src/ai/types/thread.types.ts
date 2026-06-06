@@ -38,7 +38,6 @@ export interface ThreadDto {
     status: ThreadStatus;
     model: string | null;
     provider: string | null;
-    messageCount: number;
     createdAt: string;
     updatedAt: string;
 }

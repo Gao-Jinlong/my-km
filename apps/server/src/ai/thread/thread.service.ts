@@ -87,7 +87,6 @@ export class ThreadService {
                 status: true,
                 model: true,
                 provider: true,
-                messageCount: true,
                 createdAt: true,
                 updatedAt: true,
             },
@@ -140,16 +139,6 @@ export class ThreadService {
         return this.prisma.thread.update({
             where: { id },
             data: { status: 'deleted' },
-        });
-    }
-
-    /**
-     * 自增消息计数
-     */
-    async incrementMessageCount(id: string) {
-        return this.prisma.thread.update({
-            where: { id },
-            data: { messageCount: { increment: 1 } },
         });
     }
 

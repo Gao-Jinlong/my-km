@@ -14,6 +14,7 @@
 import { Logger, Module, type OnModuleInit } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AiChatService } from './ai.service';
+import { CheckpointReaderService } from './checkpointer/checkpoint-reader.service';
 import { CheckpointerProvider } from './checkpointer/checkpointer.provider';
 import { ThreadsController } from './langgraph/threads.controller';
 import { AnthropicProvider } from './llm/anthropic.provider';
@@ -23,21 +24,21 @@ import { LLMFactory } from './llm/llm-factory';
 import { OpenAIProvider } from './llm/openai.provider';
 import { ProviderRegistry } from './llm/provider-registry';
 import { ZhipuProvider } from './llm/zhipu.provider';
-import { MessageService } from './message/message.service';
 import { RunContextFactory } from './run/run-context-factory';
 import { RunManager } from './run/run-manager';
+import { RunsController } from './run/runs.controller';
 import { RunEventStore } from './store/run-event-store';
 import { ThreadService } from './thread/thread.service';
 
 @Module({
     imports: [PrismaModule],
-    controllers: [ThreadsController],
+    controllers: [ThreadsController, RunsController],
     providers: [
         // 基础设施层
         ThreadService,
-        MessageService,
         RunEventStore,
         CheckpointerProvider,
+        CheckpointReaderService,
 
         // LLM 层
         ProviderRegistry,

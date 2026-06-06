@@ -35,7 +35,7 @@ import {
 import type { Response } from 'express';
 import { SkipResponseWrap } from '../../common/decorators/skip-response-wrap.decorator';
 import { AiChatService } from '../ai.service';
-import { MessageService } from '../message/message.service';
+import { CheckpointReaderService } from '../checkpointer/checkpoint-reader.service';
 import { ThreadService } from '../thread/thread.service';
 import type { MultitaskStrategy } from '../types/run.types';
 
@@ -111,7 +111,7 @@ export class ThreadsController {
     constructor(
         private readonly aiService: AiChatService,
         private readonly threadService: ThreadService,
-        private readonly messageService: MessageService,
+        private readonly checkpointReader: CheckpointReaderService,
     ) {}
 
     // ========== Thread CRUD ==========
@@ -186,32 +186,11 @@ export class ThreadsController {
      *
      * 返回 LangGraph ThreadState 格式：{ values: { messages: [...] }, ... }
      *
-     * 当前实现：从 messages 表读取消息列表。
-     * 未来：从 LangGraph checkpointer 读取完整 graph 状态。
+     * 从 LangGraph PostgresSaver checkpoint 中提取消息。
      */
     @Get(':threadId/state')
     async getThreadState(@Param('threadId') threadId: string) {
-        const messages = await this.messageService.findByRoomId(threadId, { limit: 1000 });
-
-        const langChainMessages = messages.map(m => ({
-            type: m.role === 'user' ? 'human' : 'ai',
-            content: m.content,
-            id: m.id,
-        }));
-
-        return {
-            values: { messages: langChainMessages },
-            next: [],
-            checkpoint: {
-                thread_id: threadId,
-                checkpoint_id: '',
-                checkpoint_ns: '',
-            },
-            metadata: {},
-            created_at: new Date().toISOString(),
-            parent_checkpoint: null,
-            tasks: [],
-        };
+        return this.checkpointReader.getThreadState(threadId);
     }
 
     // ========== Run Streaming ==========
@@ -331,7 +310,6 @@ export class ThreadsController {
         status: string;
         model: string | null;
         provider: string | null;
-        messageCount: number;
         createdAt: Date;
         updatedAt: Date;
     }): LangGraphThread {
@@ -346,7 +324,6 @@ export class ThreadsController {
                 title: thread.title,
                 model: thread.model,
                 provider: thread.provider,
-                message_count: thread.messageCount,
             },
             created_at: thread.createdAt.toISOString(),
             updated_at: thread.updatedAt.toISOString(),

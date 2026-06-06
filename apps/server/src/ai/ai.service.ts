@@ -85,12 +85,12 @@ export class AiChatService {
             requestContext: opts.context,
         });
 
-        // 5. 创建 typed RunRecord
-        const record = this.runManager.createRun(thread.id, runContext, {
+        // 5. 创建 typed RunRecord（同步写 DB）
+        const record = await this.runManager.createRun(thread.id, runContext, {
             content,
             requestContext: opts.context,
         });
-        record.setStatus(RunStatus.Running);
+        await this.runManager.setStatus(record.id, RunStatus.Running);
 
         return record;
     }
@@ -123,6 +123,7 @@ export class AiChatService {
         );
 
         record.setStatus(RunStatus.Running);
+        await this.runManager.setStatus(record.id, RunStatus.Running);
         return record;
     }
 
@@ -218,13 +219,15 @@ export class AiChatService {
 
             if (record.abortSignal.aborted) {
                 record.setStatus(RunStatus.Cancelled);
+                await this.runManager.setStatus(record.id, RunStatus.Cancelled);
             } else if (toolCalls.length > 0) {
                 // tool interrupt — run 保持 interrupted 状态等待 resume
                 // SDK 通过 values 事件中的 ai message tool_calls 字段感知中断
                 record.setStatus(RunStatus.Interrupted);
+                await this.runManager.setStatus(record.id, RunStatus.Interrupted);
             } else {
                 record.setStatus(RunStatus.Completed);
-                this.threadService.incrementMessageCount(record.threadId).catch(() => {});
+                await this.runManager.setStatus(record.id, RunStatus.Completed);
             }
 
             // 6. 发送 end 事件结束流
@@ -232,9 +235,10 @@ export class AiChatService {
         } catch (error) {
             this.logger.error(`Run ${record.id} failed: ${error}`, (error as Error).stack);
             record.setStatus(RunStatus.Failed);
+            await this.runManager.setStatus(record.id, RunStatus.Failed);
             writeError(res, 'execution_error', (error as Error).message);
         } finally {
-            record.finalize();
+            await this.runManager.finalize(record.id);
             if (!res.writableEnded) {
                 res.end();
             }
@@ -249,7 +253,7 @@ export class AiChatService {
         if (!record) {
             throw new NotFoundException(`Run not found: ${runId}`);
         }
-        this.runManager.cancelRun(runId);
+        await this.runManager.cancelRun(runId);
     }
 
     // ========== Private Helpers ==========

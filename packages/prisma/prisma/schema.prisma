@@ -90,32 +90,6 @@ model PasswordReset {
   @@index([token])
 }
 
-model Message {
-  id             String   @id @default(cuid())
-  threadId      String
-  role           String // 'user' | 'assistant' | 'tool' | 'system'
-  content        String?  @db.Text
-
-  // Tool call 相关
-  toolCalls      Json?    // [{ id, name }] - assistant 消息的工具调用摘要
-  toolResultId   String?  // role === 'tool' 时关联的 tool call id
-
-  // Token 统计
-  tokenCount     Int?
-  finishReason   String?  // 'stop' | 'tool_calls' | 'length' | 'error'
-
-  // 元数据
-  metadata       Json?    // 扩展字段：model used, latency, etc.
-
-  createdAt      DateTime @default(now())
-
-  thread Thread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-
-  @@index([threadId])
-  @@index([createdAt])
-  @@index([role])
-}
-
 model Thread {
   id        String   @id @default(cuid())
   userId    String?  // 关联用户
@@ -126,13 +100,9 @@ model Thread {
   model     String?
   provider  String?
 
-  // 统计
-  messageCount Int   @default(0)
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  messages Message[]
   runs     Run[]
 
   @@index([userId])
@@ -141,7 +111,7 @@ model Thread {
 }
 
 model Run {
-  id             String    @id @default(cuid())
+  id             String    @id
   threadId       String
   status         String    @default("pending") // pending | running | interrupted | completed | failed | cancelled
 
