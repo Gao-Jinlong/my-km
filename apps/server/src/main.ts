@@ -1,4 +1,4 @@
-import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory, Reflector } from '@nestjs/core';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -45,12 +45,6 @@ async function bootstrap() {
 
     // 配置全局前缀
     app.setGlobalPrefix('api');
-
-    // 配置 API 版本控制（可选）
-    app.enableVersioning({
-        type: VersioningType.URI,
-        defaultVersion: '1',
-    });
 
     // 配置 Swagger
     const config = new DocumentBuilder()

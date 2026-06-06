@@ -1,0 +1,357 @@
+/**
+ * ThreadsController — LangGraph Platform 协议兼容控制器
+ *
+ * 实现 @langchain/langgraph-sdk Client 期望的 REST API 接口：
+ *   POST   /api/threads                              → createThread
+ *   POST   /api/threads/search                       → searchThreads
+ *   GET    /api/threads/:id                          → getThread
+ *   PATCH  /api/threads/:id                          → updateThread
+ *   DELETE /api/threads/:id                          → deleteThread
+ *   GET    /api/threads/:id/state                    → getThreadState
+ *   POST   /api/threads/:tid/runs/stream             → streamRun (SSE)
+ *   POST   /api/threads/:tid/runs/:rid/cancel        → cancelRun
+ *   GET    /api/threads/:tid/runs/:rid/stream        → joinStream (501，后续实现)
+ *
+ * 关键设计：
+ * - `@Controller('threads')` + 全局前缀 `/api` → 路由为 `/api/threads/...`
+ * - `@SkipResponseWrap()` 跳过 TransformInterceptor，返回 SDK 期望的裸 JSON
+ * - SSE 端点用 `@Res() res: Response` 直接写入流
+ * - `streamRun` 同时处理新 run 和 resume（通过 body.command.resume 区分）
+ * - multitask_strategy 直接透传给 AiChatService，不再做枚举映射
+ */
+
+import {
+    Body,
+    Controller,
+    Delete,
+    Get,
+    Logger,
+    NotFoundException,
+    Param,
+    Patch,
+    Post,
+    Res,
+} from '@nestjs/common';
+import type { Response } from 'express';
+import { SkipResponseWrap } from '../../common/decorators/skip-response-wrap.decorator';
+import { AiChatService } from '../ai.service';
+import { MessageService } from '../message/message.service';
+import { ThreadService } from '../thread/thread.service';
+import type { MultitaskStrategy } from '../types/run.types';
+
+// ========== LangGraph SDK 请求/响应类型 ==========
+
+/**
+ * LangGraph SDK threads.create() 请求体
+ *
+ * SDK 发送：{ metadata?, thread_id?, if_exists? }
+ */
+interface CreateThreadBody {
+    metadata?: Record<string, unknown>;
+    thread_id?: string;
+    if_exists?: 'raise' | 'do_nothing';
+}
+
+/**
+ * LangGraph SDK threads.search() 请求体
+ *
+ * SDK 发送：{ metadata?, limit?, offset?, status?, ... }
+ */
+interface SearchThreadsBody {
+    metadata?: Record<string, unknown>;
+    limit?: number;
+    offset?: number;
+    status?: 'idle' | 'busy' | 'interrupted' | 'error';
+}
+
+/**
+ * LangGraph SDK threads.update() 请求体
+ */
+interface UpdateThreadBody {
+    metadata?: Record<string, unknown>;
+}
+
+/**
+ * LangGraph SDK runs.stream() 请求体
+ *
+ * SDK 发送：
+ *   新 run: { input: {messages: [...]}, assistant_id, stream_mode, config?, context? }
+ *   resume: { input: null, command: { resume: {...} }, assistant_id, stream_mode }
+ */
+interface RunsStreamBody {
+    input?: { messages?: Array<{ type: string; content: string; id?: string }> } | null;
+    command?: { resume?: unknown } | null;
+    assistant_id?: string;
+    stream_mode?: string | string[];
+    config?: { configurable?: Record<string, unknown> };
+    context?: Record<string, unknown>;
+    metadata?: Record<string, unknown>;
+    multitask_strategy?: MultitaskStrategy;
+}
+
+/**
+ * LangGraph SDK 期望的 Thread 响应格式
+ *
+ * 区别于内部 ThreadDto：使用 thread_id / metadata / values 字段名。
+ */
+interface LangGraphThread {
+    thread_id: string;
+    metadata: Record<string, unknown>;
+    created_at: string;
+    updated_at: string;
+    status: 'idle' | 'busy' | 'interrupted' | 'error';
+    values: Record<string, unknown>;
+}
+
+@Controller('threads')
+@SkipResponseWrap()
+export class ThreadsController {
+    private readonly logger = new Logger(ThreadsController.name);
+
+    constructor(
+        private readonly aiService: AiChatService,
+        private readonly threadService: ThreadService,
+        private readonly messageService: MessageService,
+    ) {}
+
+    // ========== Thread CRUD ==========
+
+    /**
+     * POST /api/threads — 创建 Thread
+     *
+     * 接受 LangGraph SDK 格式：{ metadata, thread_id, if_exists }
+     * 转换为内部 ThreadService.create() 格式。
+     */
+    @Post()
+    async createThread(@Body() body: CreateThreadBody): Promise<LangGraphThread> {
+        const title = typeof body.metadata?.title === 'string' ? body.metadata.title : undefined;
+        const thread = await this.threadService.create({
+            id: body.thread_id,
+            title,
+        });
+
+        return this.toLangGraphThread(thread);
+    }
+
+    /**
+     * POST /api/threads/search — 搜索/列出 Threads
+     *
+     * SDK 期望 POST + body（区别于内部 GET 风格的列表）。
+     */
+    @Post('search')
+    async searchThreads(@Body() body: SearchThreadsBody): Promise<LangGraphThread[]> {
+        const threads = await this.threadService.findAll({
+            limit: body.limit ?? 10,
+            offset: body.offset ?? 0,
+        });
+
+        return threads.map(t => this.toLangGraphThread(t));
+    }
+
+    /**
+     * GET /api/threads/:threadId — 获取单个 Thread
+     */
+    @Get(':threadId')
+    async getThread(@Param('threadId') threadId: string): Promise<LangGraphThread> {
+        const thread = await this.threadService.findById(threadId);
+        if (!thread) {
+            throw new NotFoundException(`Thread not found: ${threadId}`);
+        }
+        return this.toLangGraphThread(thread);
+    }
+
+    /**
+     * PATCH /api/threads/:threadId — 更新 Thread metadata
+     */
+    @Patch(':threadId')
+    async updateThread(
+        @Param('threadId') threadId: string,
+        @Body() body: UpdateThreadBody,
+    ): Promise<LangGraphThread> {
+        const title = typeof body.metadata?.title === 'string' ? body.metadata.title : undefined;
+        const updated = await this.threadService.update(threadId, { title });
+        return this.toLangGraphThread(updated);
+    }
+
+    /**
+     * DELETE /api/threads/:threadId — 软删除 Thread
+     */
+    @Delete(':threadId')
+    async deleteThread(@Param('threadId') threadId: string): Promise<void> {
+        await this.threadService.delete(threadId);
+    }
+
+    /**
+     * GET /api/threads/:threadId/state — 获取 Thread 当前状态
+     *
+     * 返回 LangGraph ThreadState 格式：{ values: { messages: [...] }, ... }
+     *
+     * 当前实现：从 messages 表读取消息列表。
+     * 未来：从 LangGraph checkpointer 读取完整 graph 状态。
+     */
+    @Get(':threadId/state')
+    async getThreadState(@Param('threadId') threadId: string) {
+        const messages = await this.messageService.findByRoomId(threadId, { limit: 1000 });
+
+        const langChainMessages = messages.map(m => ({
+            type: m.role === 'user' ? 'human' : 'ai',
+            content: m.content,
+            id: m.id,
+        }));
+
+        return {
+            values: { messages: langChainMessages },
+            next: [],
+            checkpoint: {
+                thread_id: threadId,
+                checkpoint_id: '',
+                checkpoint_ns: '',
+            },
+            metadata: {},
+            created_at: new Date().toISOString(),
+            parent_checkpoint: null,
+            tasks: [],
+        };
+    }
+
+    // ========== Run Streaming ==========
+
+    /**
+     * POST /api/threads/:threadId/runs/stream — 启动或恢复 streaming run
+     *
+     * 处理两种请求：
+     * - 新 run: body.input.messages 包含 user message
+     * - resume: body.command.resume 包含工具结果
+     *
+     * SSE 事件流：metadata → values → end（或 error）
+     */
+    @Post(':threadId/runs/stream')
+    async streamRun(
+        @Param('threadId') threadId: string,
+        @Body() body: RunsStreamBody,
+        @Res() res: Response,
+    ): Promise<void> {
+        this.setSseHeaders(res);
+
+        try {
+            if (body.command?.resume !== undefined) {
+                // Resume 路径：从活跃 run 中恢复
+                const record = await this.aiService.resumeFromCommand(threadId, body.command);
+                await this.aiService.executeRunProtocol(record, res);
+            } else {
+                // 新 run 路径：从 input.messages 中提取用户消息
+                const content = this.extractLastUserMessage(body.input?.messages ?? []);
+                if (!content) {
+                    this.sendProtocolError(res, 'invalid_input', 'No user message in input');
+                    return;
+                }
+
+                const record = await this.aiService.startRun({
+                    content,
+                    threadId,
+                    context: body.context,
+                    // multitask_strategy 直接透传，AiChatService 内统一处理
+                    multitaskStrategy: body.multitask_strategy ?? 'reject',
+                });
+
+                await this.aiService.executeRunProtocol(record, res);
+            }
+        } catch (error) {
+            this.logger.error(`streamRun failed: ${(error as Error).message}`);
+            this.sendProtocolError(
+                res,
+                'execution_error',
+                error instanceof Error ? error.message : 'Unknown error',
+            );
+        }
+    }
+
+    /**
+     * POST /api/threads/:threadId/runs/:runId/cancel — 取消活跃 run
+     */
+    @Post(':threadId/runs/:runId/cancel')
+    async cancelRun(
+        @Param('threadId') _threadId: string,
+        @Param('runId') runId: string,
+    ): Promise<void> {
+        await this.aiService.cancel(runId);
+    }
+
+    /**
+     * GET /api/threads/:threadId/runs/:runId/stream — 重新加入正在进行的 run
+     *
+     * 当前未实现（流重连功能延后）。返回 501 Not Implemented。
+     */
+    @Get(':threadId/runs/:runId/stream')
+    joinStream(@Res() res: Response): void {
+        res.status(501).json({
+            error: 'not_implemented',
+            message: 'Stream rejoin is not yet supported',
+        });
+    }
+
+    // ========== Private Helpers ==========
+
+    private setSseHeaders(res: Response): void {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('X-Accel-Buffering', 'no');
+        res.flushHeaders();
+    }
+
+    private sendProtocolError(res: Response, code: string, message: string): void {
+        if (!res.writableEnded) {
+            res.write(`event: error\ndata: ${JSON.stringify({ error: code, message })}\n\n`);
+            res.end();
+        }
+    }
+
+    /**
+     * 从 LangChain messages 数组中提取最后一条 human message 的 content
+     */
+    private extractLastUserMessage(
+        messages: Array<{ type: string; content: string }>,
+    ): string | null {
+        for (let i = messages.length - 1; i >= 0; i--) {
+            const msg = messages[i];
+            if (msg.type === 'human') {
+                return msg.content;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 将内部 Thread 模型转换为 LangGraph SDK 期望的格式
+     */
+    private toLangGraphThread(thread: {
+        id: string;
+        title: string | null;
+        status: string;
+        model: string | null;
+        provider: string | null;
+        messageCount: number;
+        createdAt: Date;
+        updatedAt: Date;
+    }): LangGraphThread {
+        // LangGraph status 枚举：idle | busy | interrupted | error
+        // 内部 status：active | archived | deleted
+        // 映射：active → idle，其他 → idle（archived/deleted 不会出现在活跃查询中）
+        const status: LangGraphThread['status'] = 'idle';
+
+        return {
+            thread_id: thread.id,
+            metadata: {
+                title: thread.title,
+                model: thread.model,
+                provider: thread.provider,
+                message_count: thread.messageCount,
+            },
+            created_at: thread.createdAt.toISOString(),
+            updated_at: thread.updatedAt.toISOString(),
+            status,
+            values: {},
+        };
+    }
+}

@@ -128,8 +128,8 @@ const result = await this._toolRegistry.execute(msg.name, {});
 
 **当前**:
 ```typescript
-const wsUrl = process.env.NEXT_PUBLIC_AI_WS_URL ?? 'http://localhost:3001/ai';
-const apiUrl = process.env.NEXT_PUBLIC_AI_API_URL ?? 'http://localhost:3001';
+const wsUrl = process.env.NEXT_PUBLIC_AI_WS_URL ?? 'http://localhost:3000/ai';
+const apiUrl = process.env.NEXT_PUBLIC_AI_API_URL ?? 'http://localhost:3000';
 ```
 
 **改为**:

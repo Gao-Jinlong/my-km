@@ -31,7 +31,7 @@ pnpm dev
 ### 访问
 
 - **前端**: http://localhost:4000
-- **后端 API**: http://localhost:3001
+- **后端 API**: http://localhost:3000
 
 ### 打开项目
 

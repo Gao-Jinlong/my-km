@@ -1,6 +1,7 @@
 import type { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
+import type { Response } from 'express';
 import { AiChatService } from '../ai.service';
 import { LLMFactory } from '../llm/llm-factory';
 import type { LLMConfig } from '../llm/provider.types';
@@ -10,7 +11,7 @@ import { RunContextFactory } from '../run/run-context-factory';
 import { RunManager } from '../run/run-manager';
 import type { RunEventStore } from '../store/run-event-store';
 import { ThreadService } from '../thread/thread.service';
-import { ConcurrencyPolicy, RunStatus } from '../types/run.types';
+import { RunStatus } from '../types/run.types';
 
 // Mock langgraph ESM modules to prevent uuid ESM error in Jest
 jest.mock('@langchain/langgraph', () => ({
@@ -29,14 +30,55 @@ jest.mock('@langchain/langgraph-checkpoint', () => ({
     MemorySaver: jest.fn().mockImplementation(() => ({ type: 'MemorySaver' })),
 }));
 
+// Configurable graph stream mock — each test can override via mockStreamImpl
+let mockStreamImpl: () => AsyncIterable<unknown> = () => ({
+    async *[Symbol.asyncIterator]() {
+        yield { lastAssistantMessage: 'hello world' };
+    },
+});
+
 jest.mock('../langgraph/graphs/chat-graph', () => ({
     ChatGraph: jest.fn().mockImplementation(() => ({
         name: 'chat',
         createGraph: jest.fn().mockReturnValue({
-            compile: jest.fn().mockReturnValue({ type: 'compiled-graph', stream: jest.fn() }),
+            compile: jest.fn().mockReturnValue({
+                stream: jest.fn().mockImplementation(() => mockStreamImpl()),
+            }),
         }),
     })),
 }));
+
+/**
+ * 构造 mock Express Response 以捕获 SSE 写入
+ */
+function createMockResponse(): {
+    res: Response;
+    writes: string[];
+    ended: boolean;
+} {
+    const writes: string[] = [];
+    let ended = false;
+    const res = {
+        writableEnded: false,
+        write: jest.fn((chunk: string) => {
+            writes.push(chunk);
+            return true;
+        }),
+        end: jest.fn(() => {
+            ended = true;
+            (res as { writableEnded: boolean }).writableEnded = true;
+        }),
+        setHeader: jest.fn(),
+        flushHeaders: jest.fn(),
+    } as unknown as Response;
+    return {
+        res,
+        writes,
+        get ended() {
+            return ended;
+        },
+    } as { res: Response; writes: string[]; ended: boolean };
+}
 
 describe('AiChatService', () => {
     let service: AiChatService;
@@ -71,7 +113,11 @@ describe('AiChatService', () => {
         };
 
         const mockLLM = {
-            getOrCreate: jest.fn().mockReturnValue({ chat: jest.fn() }),
+            getOrCreate: jest.fn().mockReturnValue({
+                chat: jest.fn().mockImplementation(async function* () {
+                    yield { type: 'text', text: 'hello' };
+                }),
+            }),
         };
 
         const module: TestingModule = await Test.createTestingModule({
@@ -102,6 +148,13 @@ describe('AiChatService', () => {
         runManager = module.get<RunManager>(RunManager);
         mockRunContextFactory = module.get<RunContextFactory>(RunContextFactory);
         mockProviderRegistry = module.get<ProviderRegistry>(ProviderRegistry);
+
+        // 默认 stream 实现：yield 一个 assistant message 然后结束
+        mockStreamImpl = () => ({
+            async *[Symbol.asyncIterator]() {
+                yield { lastAssistantMessage: 'hello world' };
+            },
+        });
     });
 
     describe('startRun', () => {
@@ -161,7 +214,7 @@ describe('AiChatService', () => {
                 service.startRun({
                     content: 'Second',
                     threadId: 't1',
-                    concurrency: ConcurrencyPolicy.Rejected,
+                    multitaskStrategy: 'reject',
                 }),
             ).rejects.toThrow(ConflictException);
 
@@ -200,8 +253,8 @@ describe('AiChatService', () => {
         });
     });
 
-    describe('concurrency control', () => {
-        it('should reject when active run exists and policy is rejected', async () => {
+    describe('multitask_strategy (concurrency control)', () => {
+        it('should reject when active run exists and strategy is "reject"', async () => {
             await service.startRun({ content: 'First', threadId: 't1' });
             const activeRun = runManager.getActiveRunForThread('t1');
             if (activeRun) activeRun.setStatus(RunStatus.Running);
@@ -210,47 +263,171 @@ describe('AiChatService', () => {
                 service.startRun({
                     content: 'Second',
                     threadId: 't1',
-                    concurrency: ConcurrencyPolicy.Rejected,
+                    multitaskStrategy: 'reject',
                 }),
             ).rejects.toThrow(ConflictException);
         });
-    });
 
-    describe('resume', () => {
-        it('should throw when run not found', async () => {
-            await expect(
-                service.resume({ runId: 'nonexistent', toolCallId: 'tc-1', result: {} }),
-            ).rejects.toThrow(/not found/);
+        it('should default to "reject" when multitaskStrategy omitted', async () => {
+            await service.startRun({ content: 'First', threadId: 't1' });
+            const activeRun = runManager.getActiveRunForThread('t1');
+            if (activeRun) activeRun.setStatus(RunStatus.Running);
+
+            await expect(service.startRun({ content: 'Second', threadId: 't1' })).rejects.toThrow(
+                ConflictException,
+            );
         });
 
-        it('should return same RunRecord without calling factory again', async () => {
+        it('should fall back to reject and emit warn for "enqueue"', async () => {
+            const loggerSpy = jest
+                .spyOn((service as unknown as { logger: { warn: jest.Mock } }).logger, 'warn')
+                .mockImplementation(() => undefined);
+
+            await service.startRun({ content: 'First', threadId: 't1' });
+            const activeRun = runManager.getActiveRunForThread('t1');
+            if (activeRun) activeRun.setStatus(RunStatus.Running);
+
+            await expect(
+                service.startRun({
+                    content: 'Second',
+                    threadId: 't1',
+                    multitaskStrategy: 'enqueue',
+                }),
+            ).rejects.toThrow(ConflictException);
+
+            expect(loggerSpy).toHaveBeenCalledWith(
+                expect.stringContaining("'enqueue' not yet supported"),
+            );
+        });
+
+        it('should abort active run for "interrupt" strategy', async () => {
+            const r1 = await service.startRun({ content: 'First', threadId: 't1' });
+            r1.setStatus(RunStatus.Running);
+            const abortSpy = jest.spyOn(r1, 'abort');
+
+            // Second run with interrupt should succeed (abort first)
+            const r2 = await service.startRun({
+                content: 'Second',
+                threadId: 't1',
+                multitaskStrategy: 'interrupt',
+            });
+
+            expect(abortSpy).toHaveBeenCalled();
+            expect(r2).toBeDefined();
+            expect(r2.id).not.toBe(r1.id);
+        });
+    });
+
+    describe('resumeFromCommand', () => {
+        it('should throw NotFoundException when no active run for thread', async () => {
+            await expect(
+                service.resumeFromCommand('nonexistent-thread', { resume: { foo: 'bar' } }),
+            ).rejects.toThrow(NotFoundException);
+        });
+
+        it('should throw ConflictException when run is not interrupted', async () => {
+            // ThreadService.findOrCreate mock 始终返回 { id: 'thread-1' }，
+            // 所以 startRun({threadId: 't1'}) 创建的 record.threadId 仍是 'thread-1'。
+            const record = await service.startRun({ content: 'test', threadId: 't1' });
+            // status is Running, not Interrupted
+            expect(record.status).toBe(RunStatus.Running);
+
+            await expect(
+                service.resumeFromCommand('thread-1', { resume: { ok: true } }),
+            ).rejects.toThrow(ConflictException);
+        });
+
+        it('should set status to Running and return record when resume succeeds', async () => {
             const record = await service.startRun({ content: 'test', threadId: 't1' });
             record.setStatus(RunStatus.Interrupted);
 
-            (mockRunContextFactory.create as jest.Mock).mockClear();
-
-            const resumed = await service.resume({
-                runId: record.id,
-                toolCallId: 'tc-1',
-                result: {},
+            const resumed = await service.resumeFromCommand('thread-1', {
+                resume: { tool_call_id: 'tc-1', tool_result: 'ok' },
             });
 
             expect(resumed).toBe(record);
-            expect(mockRunContextFactory.create).not.toHaveBeenCalled();
+            expect(resumed.status).toBe(RunStatus.Running);
         });
+    });
 
-        it('should preserve original runContext after resume', async () => {
-            const record = await service.startRun({ content: 'test', threadId: 't1' });
-            const originalContext = record.runContext;
-            record.setStatus(RunStatus.Interrupted);
+    describe('executeRunProtocol', () => {
+        it('should emit metadata → values → end on happy path', async () => {
+            const record = await service.startRun({ content: 'Hi', threadId: 't1' });
+            const { res, writes } = createMockResponse();
 
-            const resumed = await service.resume({
-                runId: record.id,
-                toolCallId: 'tc-1',
-                result: {},
+            await service.executeRunProtocol(record, res);
+
+            // 验证事件序列：metadata 在前，end 在后，values 在中间
+            const events = writes.map(w => {
+                const match = w.match(/event: (\w+)/);
+                return match ? match[1] : 'unknown';
             });
 
-            expect(resumed.runContext).toBe(originalContext);
+            expect(events[0]).toBe('metadata');
+            expect(events).toContain('values');
+            expect(events[events.length - 1]).toBe('end');
+            expect(record.status).toBe(RunStatus.Completed);
+        });
+
+        it('should include run_id and thread_id in metadata event', async () => {
+            const record = await service.startRun({ content: 'Hi', threadId: 't1' });
+            const { res, writes } = createMockResponse();
+
+            await service.executeRunProtocol(record, res);
+
+            const metadataWrite = writes.find(w => w.startsWith('event: metadata'));
+            expect(metadataWrite).toBeDefined();
+            const dataMatch = metadataWrite?.match(/data: (.+)\n\n/);
+            expect(dataMatch).toBeTruthy();
+            const payload = JSON.parse(dataMatch?.[1] ?? '{}');
+            expect(payload.run_id).toBe(record.id);
+            expect(payload.thread_id).toBe(record.threadId);
+        });
+
+        it('should emit error event and set status Failed when graph throws', async () => {
+            // 覆写 stream 让它抛出
+            mockStreamImpl = () => ({
+                async *[Symbol.asyncIterator]() {
+                    yield { error: 'simulated graph failure' };
+                },
+            });
+
+            const record = await service.startRun({ content: 'Hi', threadId: 't1' });
+            const { res, writes } = createMockResponse();
+
+            await service.executeRunProtocol(record, res);
+
+            const errorWrite = writes.find(w => w.startsWith('event: error'));
+            expect(errorWrite).toBeDefined();
+            expect(record.status).toBe(RunStatus.Failed);
+        });
+
+        it('should set status Interrupted when tool calls pending', async () => {
+            mockStreamImpl = () => ({
+                async *[Symbol.asyncIterator]() {
+                    yield {
+                        pendingToolCalls: [{ id: 'tc-1', name: 'tool_x', arguments: {} }],
+                    };
+                },
+            });
+
+            const record = await service.startRun({ content: 'Hi', threadId: 't1' });
+            const { res } = createMockResponse();
+
+            await service.executeRunProtocol(record, res);
+
+            expect(record.status).toBe(RunStatus.Interrupted);
+        });
+
+        it('should set status Cancelled when aborted mid-stream', async () => {
+            const record = await service.startRun({ content: 'Hi', threadId: 't1' });
+            // Abort 在 stream 开始前
+            record.abort();
+
+            const { res } = createMockResponse();
+            await service.executeRunProtocol(record, res);
+
+            expect(record.status).toBe(RunStatus.Cancelled);
         });
     });
 
@@ -262,8 +439,8 @@ describe('AiChatService', () => {
             expect(found?.status).toBe(RunStatus.Cancelled);
         });
 
-        it('should throw when run not found', async () => {
-            await expect(service.cancel('nonexistent')).rejects.toThrow(/not found/);
+        it('should throw NotFoundException when run not found', async () => {
+            await expect(service.cancel('nonexistent')).rejects.toThrow(NotFoundException);
         });
     });
 });

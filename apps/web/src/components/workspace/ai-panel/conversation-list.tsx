@@ -1,15 +1,15 @@
 /**
  * ConversationList — 对话列表面板
  *
- * 渲染对话列表，支持：
- * - 新建对话
- * - 切换对话
- * - 加载中 / 空状态 / 错误状态
+ * 通过 @langchain/langgraph-sdk 的 Client 查询 thread 列表，
+ * 支持新建/切换对话。
  */
 
+import type { Thread } from '@langchain/langgraph-sdk';
 import { Loader2, Plus, Search } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { createThread, listThreads, type ThreadRecord } from '@/features/ai/api/conversation-api';
+import { langgraphClient } from '@/features/ai/sdk/langgraph-client';
+import type { ThreadRecord } from '@/features/ai/types/thread.types';
 import { ConversationItem } from './conversation-item';
 
 interface ConversationListProps {
@@ -17,6 +17,31 @@ interface ConversationListProps {
     onCreateNewThread: (id: string) => void;
     activeThreadId?: string;
     generatingThreadId?: string;
+}
+
+/**
+ * 将 SDK Thread 转换为 ConversationItem 期望的 ThreadRecord 形态。
+ *
+ * SDK 使用 thread_id / metadata，内部组件使用 id / title。
+ */
+function toThreadRecord(thread: Thread): ThreadRecord {
+    const metadata = (thread.metadata ?? {}) as Record<string, unknown>;
+    const title = typeof metadata.title === 'string' ? metadata.title : null;
+    const model = typeof metadata.model === 'string' ? metadata.model : null;
+    const provider = typeof metadata.provider === 'string' ? metadata.provider : null;
+    const messageCount = typeof metadata.message_count === 'number' ? metadata.message_count : 0;
+
+    return {
+        id: thread.thread_id,
+        userId: null,
+        title,
+        status: 'active',
+        model,
+        provider,
+        messageCount,
+        createdAt: thread.created_at,
+        updatedAt: thread.updated_at,
+    };
 }
 
 export function ConversationList({
@@ -33,8 +58,9 @@ export function ConversationList({
         try {
             setIsLoading(true);
             setError(null);
-            const list = await listThreads({ limit: 50 });
-            setThreads(list);
+            // SDK: threads.search() — POST /api/threads/search
+            const list = await langgraphClient.threads.search({ limit: 50 });
+            setThreads(list.map(toThreadRecord));
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load threads');
         } finally {
@@ -48,12 +74,15 @@ export function ConversationList({
 
     const handleNewThread = useCallback(async () => {
         try {
-            const thread = await createThread();
-            onCreateNewThread(thread.id);
+            // SDK: threads.create() — POST /api/threads
+            const thread = await langgraphClient.threads.create();
+            onCreateNewThread(thread.thread_id);
+            // 重新加载列表以包含新 thread
+            fetchThreads();
         } catch (err) {
             console.error('Failed to create thread:', err);
         }
-    }, [onCreateNewThread]);
+    }, [onCreateNewThread, fetchThreads]);
 
     const handleClick = useCallback(
         (id: string) => {

@@ -1,8 +1,8 @@
 /**
  * AIPanel — AI 聊天 UI 主组件
  *
- * 通过 useAIThread hook 订阅 SSE 流式消息，
- * 渲染消息列表和输入区域。
+ * 通过 useLangGraphStream hook（基于 @langchain/langgraph-sdk 的 useStream）
+ * 订阅 LangGraph Platform 协议 SSE 流，渲染消息列表和输入区域。
  */
 
 import { Loader2, Send } from 'lucide-react';
@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { collectEditorContext } from '@/features/ai/sdk/editor-context';
 import type { MessageWire } from '@/features/ai/types/ai.types';
-import { type ChatMessage, useAIThread } from '@/hooks/use-ai-thread';
+import { type ChatMessage, useLangGraphStream } from '@/hooks/use-langgraph-stream';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import { AIHeader } from './ai-header';
 import { ContextBadge } from './context-badge';
@@ -20,7 +20,7 @@ import { MessageBubble } from './message-bubble';
 /**
  * ChatMessage → MessageWire 格式映射
  *
- * useAIThread 使用 LangGraph Protocol 的 role 名称（human/ai），
+ * useLangGraphStream 使用 LangGraph SDK 的 role 名称（human/ai），
  * MessageBubble 使用旧的 role 名称（user/assistant）。
  */
 function toMessageWire(msg: ChatMessage): MessageWire {
@@ -30,7 +30,7 @@ function toMessageWire(msg: ChatMessage): MessageWire {
         content: msg.content,
         toolCalls: msg.toolCalls?.map(tc => ({ id: tc.id, name: tc.name })),
         toolCallId: msg.toolCallId,
-        createdAt: new Date(msg.timestamp).toISOString(),
+        createdAt: new Date(msg.timestamp ?? Date.now()).toISOString(),
     };
 }
 
@@ -49,7 +49,7 @@ export function AIPanel() {
         sendMessage,
         resumeWithToolResult,
         stop,
-    } = useAIThread();
+    } = useLangGraphStream();
 
     // Track which thread is currently generating
     const [generatingThreadId, setGeneratingThreadId] = useState<string | undefined>();
@@ -88,8 +88,9 @@ export function AIPanel() {
         const trimmed = inputValue.trim();
         if (!trimmed || isStreaming) return;
 
-        // 自动收集编辑器上下文
-        const context = collectEditorContext() ?? undefined;
+        // 自动收集编辑器上下文 — 转为 Record 形式传给 SDK 的 context 参数
+        const ctx = collectEditorContext();
+        const context = ctx ? (ctx as unknown as Record<string, unknown>) : undefined;
         await sendMessage(trimmed, context);
         setInputValue('');
     }, [inputValue, isStreaming, sendMessage]);

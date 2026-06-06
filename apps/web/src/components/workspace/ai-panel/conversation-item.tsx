@@ -9,7 +9,7 @@
  */
 
 import { Loader } from 'lucide-react';
-import type { ThreadRecord } from '@/features/ai/api/conversation-api';
+import type { ThreadRecord } from '@/features/ai/types/thread.types';
 
 interface ConversationItemProps {
     thread: ThreadRecord;

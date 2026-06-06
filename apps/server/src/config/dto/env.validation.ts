@@ -143,7 +143,7 @@ export class EnvironmentVariables {
 
     /**
      * 允许的跨域来源
-     * @example http://localhost:3000,http://localhost:3001
+     * @example http://localhost:3000
      */
     @IsString()
     @IsOptional()

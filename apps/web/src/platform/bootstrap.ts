@@ -7,10 +7,6 @@
 // reflect-metadata 必须在所有装饰器被求值前加载
 import 'reflect-metadata';
 
-import {
-    type AIHarnessService,
-    createAIHarnessService,
-} from '../features/ai/harness/ai-harness.service';
 import { CommandService } from './command/service';
 import { registerConditionEvaluators } from './conditional/evaluators';
 import { ConditionalService } from './conditional/service';
@@ -28,10 +24,12 @@ import { MessageChannelService } from './message-channel/service';
 import { MonitorService } from './monitor/service';
 import { IndexedDBWriter } from './monitor/writers/indexeddb';
 import { PanelService } from './panel/service';
-import { createWSClientService, WSClientService } from './ws-client';
 
 /**
  * 应用服务容器类型
+ *
+ * 注意：AI 相关的 SSE 通信通过 @langchain/langgraph-sdk 直接管理（见
+ * features/ai/sdk/langgraph-client.ts），不再通过 DI 容器注册。
  */
 export interface AppServices {
     monitorService: MonitorService;
@@ -48,8 +46,6 @@ export interface AppServices {
     keyboardShortcutService: KeyboardShortcutService;
     panelService: PanelService;
     conditionalService: ConditionalService;
-    wsClient: WSClientService;
-    aiHarness: AIHarnessService;
 }
 
 /**
@@ -73,15 +69,6 @@ function createServiceContainer(): ServiceContainer {
     container.register(KeyboardShortcutService);
     container.register(PanelService);
     container.register(ConditionalService);
-
-    // WSClientService（工厂模式创建，registerInstance 注册为单例）
-    const wsUrl = process.env.NEXT_PUBLIC_AI_WS_URL ?? 'http://localhost:3001/ai';
-    const wsClient = createWSClientService(wsUrl);
-    container.registerInstance(WSClientService.name, wsClient);
-
-    // AI Harness（使用注入的 WSClientService）
-    const aiHarness = createAIHarnessService(wsClient);
-    container.registerInstance('aiHarness', aiHarness);
 
     return container;
 }

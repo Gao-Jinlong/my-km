@@ -497,7 +497,7 @@ import { NestSSETransport } from '@/features/ai/sdk/nest-transport';
 import { collectEditorContext } from '@/features/ai/sdk/editor-context';
 import { useCallback, useMemo } from 'react';
 
-const API_URL = process.env.NEXT_PUBLIC_AI_API_URL ?? 'http://localhost:3001';
+const API_URL = process.env.NEXT_PUBLIC_AI_API_URL ?? 'http://localhost:3000';
 const transport = new NestSSETransport(API_URL);
 
 export function useAIThread() {

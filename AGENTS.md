@@ -56,8 +56,8 @@ pnpm dev
 ```
 
 - 前端：http://localhost:4000
-- 后端：http://localhost:3001
-- Swagger：http://localhost:3001/api-docs
+- 后端：http://localhost:3000
+- Swagger：http://localhost:3000/api-docs
 
 ## 注意事项
 
