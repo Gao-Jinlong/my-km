@@ -12,15 +12,9 @@
  */
 
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import type { Response } from 'express';
+import { CheckpointReaderService } from './checkpointer/checkpoint-reader.service';
 import { ChatGraph } from './langgraph/graphs/chat-graph';
-import {
-    toLangChainMessages,
-    writeEnd,
-    writeError,
-    writeMetadata,
-    writeValues,
-} from './langgraph/langgraph-protocol';
+import { toLangChainMessages } from './langgraph/langgraph-protocol';
 import { LLMFactory } from './llm/llm-factory';
 import type { LLMConfig } from './llm/provider.types';
 import { ProviderRegistry } from './llm/provider-registry';
@@ -51,6 +45,7 @@ export class AiChatService {
         private readonly runContextFactory: RunContextFactory,
         private readonly providerRegistry: ProviderRegistry,
         private readonly llmFactory: LLMFactory,
+        private readonly checkpointReader: CheckpointReaderService,
     ) {}
 
     /**
@@ -132,17 +127,21 @@ export class AiChatService {
      *
      * 事件流：
      *   1. metadata {run_id, thread_id}     — run 开始
-     *   2. values   {messages: [...]}        — 完整状态快照（每轮 LLM 响应后）
+     *   2. values   {messages: [...]}        — 完整状态快照（含全部历史）
      *   3. end      {}                       — 流结束
      *   或
      *   3. error    {error, message}         — 失败
      *
-     * 供 @langchain/langgraph-sdk 的 useStream 消费。
+     * 所有事件通过 record.emitEvent() 发射，同时写入 SSE Response + EventStore。
+     * SSE writer 由 controller 在调用前通过 record.setSseWriter() 设置。
      */
-    async executeRunProtocol(record: RunRecord, res: Response): Promise<void> {
+    async executeRunProtocol(record: RunRecord): Promise<void> {
         try {
             // 1. 发送 metadata 事件（SDK 用此获取 run_id 和 thread_id）
-            writeMetadata(res, record.id, record.threadId);
+            await record.emitEvent({
+                event: 'metadata',
+                data: { run_id: record.id, thread_id: record.threadId },
+            });
 
             // 2. 编译 graph 并创建 LLM provider
             const graph = this.compileGraph(record.runContext);
@@ -206,16 +205,31 @@ export class AiChatService {
                 }
             }
 
-            // 5. 根据执行结果发送 values 事件
-            const accumulatedMessages: Array<{ role: string; content: string }> = [
-                { role: 'human', content },
-            ];
-            if (assistantText) {
-                accumulatedMessages.push({ role: 'ai', content: assistantText });
-            }
+            // 5. 从 checkpoint 读取完整历史消息
+            // llm_call 节点会将 AI 回复写入 state.messages，
+            // checkpoint 自然累积完整对话历史（human + ai + tool ...）。
+            const checkpointMessages = await this.checkpointReader.getMessages(record.threadId);
 
-            // 发送 values 快照（SDK 用此更新 messages 列表）
-            writeValues(res, toLangChainMessages(accumulatedMessages));
+            // 映射为 toLangChainMessages 期望的格式
+            const allMessages: Array<{ role: string; content: string; id?: string }> =
+                checkpointMessages.length > 0
+                    ? checkpointMessages.map(msg => ({
+                          role: msg.type,
+                          content: msg.content,
+                          id: msg.id,
+                      }))
+                    : [
+                          { role: 'human', content },
+                          ...(assistantText
+                              ? [{ role: 'ai' as const, content: assistantText }]
+                              : []),
+                      ];
+
+            // 发送 values 快照（包含完整历史，SDK 用此更新 messages 列表）
+            await record.emitEvent({
+                event: 'values',
+                data: { messages: toLangChainMessages(allMessages) },
+            });
 
             if (record.abortSignal.aborted) {
                 record.setStatus(RunStatus.Cancelled);
@@ -231,17 +245,19 @@ export class AiChatService {
             }
 
             // 6. 发送 end 事件结束流
-            writeEnd(res);
+            await record.emitEvent({ event: 'end', data: {} });
         } catch (error) {
             this.logger.error(`Run ${record.id} failed: ${error}`, (error as Error).stack);
             record.setStatus(RunStatus.Failed);
             await this.runManager.setStatus(record.id, RunStatus.Failed);
-            writeError(res, 'execution_error', (error as Error).message);
+            await record.emitEvent({
+                event: 'error',
+                data: { error: 'execution_error', message: (error as Error).message },
+            });
         } finally {
             await this.runManager.finalize(record.id);
-            if (!res.writableEnded) {
-                res.end();
-            }
+            // 将缓冲的事件批量写入 DB
+            await record.runContext.eventStore.flushRun(record.id);
         }
     }
 

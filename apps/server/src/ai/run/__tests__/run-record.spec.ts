@@ -109,6 +109,40 @@ describe('RunRecord', () => {
                 }),
             );
         });
+
+        it('should call sseWriter when set', async () => {
+            const capturedEvents: Array<{ event: string; data: unknown }> = [];
+            record.setSseWriter(e => {
+                capturedEvents.push(e);
+            });
+
+            await record.emitEvent({ event: 'metadata', data: { run_id: 'run-1' } });
+            await record.emitEvent({ event: 'values', data: { messages: [] } });
+
+            expect(capturedEvents).toHaveLength(2);
+            expect(capturedEvents[0].event).toBe('metadata');
+            expect(capturedEvents[1].event).toBe('values');
+        });
+
+        it('should write to both sseWriter and eventStore', async () => {
+            const capturedEvents: Array<{ event: string; data: unknown }> = [];
+            record.setSseWriter(e => {
+                capturedEvents.push(e);
+            });
+
+            await record.emitEvent({ event: 'end', data: {} });
+
+            // sseWriter called
+            expect(capturedEvents).toHaveLength(1);
+            expect(capturedEvents[0].event).toBe('end');
+
+            // eventStore.append called
+            expect(mockEventStore.append).toHaveBeenCalledWith(
+                'run-1',
+                'thread-1',
+                expect.objectContaining({ eventType: 'end' }),
+            );
+        });
     });
 
     describe('finalize', () => {

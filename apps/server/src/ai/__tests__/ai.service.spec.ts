@@ -1,14 +1,15 @@
 import type { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
-import type { Response } from 'express';
 import { AiChatService } from '../ai.service';
+import { CheckpointReaderService } from '../checkpointer/checkpoint-reader.service';
 import { LLMFactory } from '../llm/llm-factory';
 import type { LLMConfig } from '../llm/provider.types';
 import { ProviderRegistry } from '../llm/provider-registry';
 import type { RunContext } from '../run/run-context';
 import { RunContextFactory } from '../run/run-context-factory';
 import { RunManager } from '../run/run-manager';
+import { RunRecord } from '../run/run-record';
 import type { RunEventStore } from '../store/run-event-store';
 import { ThreadService } from '../thread/thread.service';
 import { RunStatus } from '../types/run.types';
@@ -49,35 +50,16 @@ jest.mock('../langgraph/graphs/chat-graph', () => ({
 }));
 
 /**
- * 构造 mock Express Response 以捕获 SSE 写入
+ * 捕获 emitEvent 产生的事件（替代之前的 mock Response）
  */
-function createMockResponse(): {
-    res: Response;
-    writes: string[];
-    ended: boolean;
-} {
-    const writes: string[] = [];
-    let ended = false;
-    const res = {
-        writableEnded: false,
-        write: jest.fn((chunk: string) => {
-            writes.push(chunk);
-            return true;
-        }),
-        end: jest.fn(() => {
-            ended = true;
-            (res as { writableEnded: boolean }).writableEnded = true;
-        }),
-        setHeader: jest.fn(),
-        flushHeaders: jest.fn(),
-    } as unknown as Response;
+function createEventCapture() {
+    const events: Array<{ event: string; data: unknown }> = [];
     return {
-        res,
-        writes,
-        get ended() {
-            return ended;
+        events,
+        sseWriter: (e: { event: string; data: unknown }) => {
+            events.push(e);
         },
-    } as { res: Response; writes: string[]; ended: boolean };
+    };
 }
 
 describe('AiChatService', () => {
@@ -98,6 +80,7 @@ describe('AiChatService', () => {
                     checkpointer: { type: 'memory' } as unknown as BaseCheckpointSaver,
                     eventStore: {
                         append: jest.fn().mockResolvedValue({}),
+                        flushRun: jest.fn().mockResolvedValue(undefined),
                     } as unknown as RunEventStore,
                     llmConfig: { ...opts.llmConfig },
                     requestContext: opts.requestContext ? { ...opts.requestContext } : undefined,
@@ -120,6 +103,47 @@ describe('AiChatService', () => {
             }),
         };
 
+        // Functional mock RunManager — stores runs in-memory like the real one
+        const runStore = new Map<string, RunRecord>();
+        const mockRunManager = {
+            createRun: jest
+                .fn()
+                .mockImplementation(
+                    async (threadId: string, runContext: RunContext, snapshot: any) => {
+                        const record = new RunRecord({
+                            id: `run-${runStore.size + 1}`,
+                            threadId,
+                            runContext,
+                            snapshot,
+                        });
+                        runStore.set(record.id, record);
+                        return record;
+                    },
+                ),
+            setStatus: jest.fn().mockImplementation((_runId: string, status: RunStatus) => {
+                const r = runStore.get(_runId);
+                if (r) r.setStatus(status);
+            }),
+            finalize: jest.fn(),
+            getRun: jest.fn().mockImplementation((id: string) => runStore.get(id)),
+            getActiveRunForThread: jest.fn().mockImplementation((threadId: string) => {
+                for (const r of runStore.values()) {
+                    if (
+                        r.threadId === threadId &&
+                        ['pending', 'running', 'interrupted'].includes(r.status)
+                    ) {
+                        return r;
+                    }
+                }
+                return undefined;
+            }),
+            cancelRun: jest.fn().mockImplementation(async (id: string) => {
+                const r = runStore.get(id);
+                if (r) r.abort();
+            }),
+            cleanup: jest.fn(),
+        };
+
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 AiChatService,
@@ -135,11 +159,24 @@ describe('AiChatService', () => {
                         incrementMessageCount: jest.fn().mockResolvedValue({}),
                     },
                 },
-                { provide: RunManager, useClass: RunManager },
+                { provide: RunManager, useValue: mockRunManager },
                 { provide: RunContextFactory, useValue: mockRunContextFactoryInstance },
                 { provide: ProviderRegistry, useValue: mockRegistry },
                 { provide: 'ProviderRegistry', useValue: mockRegistry },
                 { provide: LLMFactory, useValue: mockLLM },
+                {
+                    provide: CheckpointReaderService,
+                    useValue: {
+                        getMessages: jest.fn().mockResolvedValue([
+                            // llm_call 节点将 AI 回复写入 state.messages，
+                            // checkpoint 包含完整对话历史
+                            { type: 'human', content: 'prev question', id: 'msg-prev-1' },
+                            { type: 'ai', content: 'prev answer', id: 'msg-prev-2' },
+                            { type: 'human', content: 'Hi', id: 'msg-prev-3' },
+                            { type: 'ai', content: 'hello world', id: 'msg-prev-4' },
+                        ]),
+                    },
+                },
             ],
         }).compile();
 
@@ -353,39 +390,52 @@ describe('AiChatService', () => {
     describe('executeRunProtocol', () => {
         it('should emit metadata → values → end on happy path', async () => {
             const record = await service.startRun({ content: 'Hi', threadId: 't1' });
-            const { res, writes } = createMockResponse();
+            const capture = createEventCapture();
+            record.setSseWriter(capture.sseWriter);
 
-            await service.executeRunProtocol(record, res);
+            await service.executeRunProtocol(record);
 
-            // 验证事件序列：metadata 在前，end 在后，values 在中间
-            const events = writes.map(w => {
-                const match = w.match(/event: (\w+)/);
-                return match ? match[1] : 'unknown';
-            });
-
-            expect(events[0]).toBe('metadata');
-            expect(events).toContain('values');
-            expect(events[events.length - 1]).toBe('end');
+            const eventTypes = capture.events.map(e => e.event);
+            expect(eventTypes[0]).toBe('metadata');
+            expect(eventTypes).toContain('values');
+            expect(eventTypes[eventTypes.length - 1]).toBe('end');
             expect(record.status).toBe(RunStatus.Completed);
         });
 
         it('should include run_id and thread_id in metadata event', async () => {
             const record = await service.startRun({ content: 'Hi', threadId: 't1' });
-            const { res, writes } = createMockResponse();
+            const capture = createEventCapture();
+            record.setSseWriter(capture.sseWriter);
 
-            await service.executeRunProtocol(record, res);
+            await service.executeRunProtocol(record);
 
-            const metadataWrite = writes.find(w => w.startsWith('event: metadata'));
-            expect(metadataWrite).toBeDefined();
-            const dataMatch = metadataWrite?.match(/data: (.+)\n\n/);
-            expect(dataMatch).toBeTruthy();
-            const payload = JSON.parse(dataMatch?.[1] ?? '{}');
-            expect(payload.run_id).toBe(record.id);
-            expect(payload.thread_id).toBe(record.threadId);
+            const metadata = capture.events.find(e => e.event === 'metadata');
+            expect(metadata).toBeDefined();
+            expect((metadata?.data as Record<string, unknown>).run_id).toBe(record.id);
+            expect((metadata?.data as Record<string, unknown>).thread_id).toBe(record.threadId);
+        });
+
+        it('should include full thread history in values event', async () => {
+            const record = await service.startRun({ content: 'Hi', threadId: 't1' });
+            const capture = createEventCapture();
+            record.setSseWriter(capture.sseWriter);
+
+            await service.executeRunProtocol(record);
+
+            const valuesEvent = capture.events.find(e => e.event === 'values');
+            expect(valuesEvent).toBeDefined();
+            const messages = (valuesEvent?.data as Record<string, unknown>).messages as Array<
+                Record<string, unknown>
+            >;
+            // Checkpoint 返回完整历史（llm_call 写入 AI 消息到 state.messages）
+            // mock 返回 4 条：prev question, prev answer, Hi, hello world
+            expect(messages.length).toBe(4);
+            expect(messages.some(m => m.content === 'prev question')).toBe(true);
+            expect(messages.some(m => m.content === 'prev answer')).toBe(true);
+            expect(messages.some(m => m.content === 'hello world')).toBe(true);
         });
 
         it('should emit error event and set status Failed when graph throws', async () => {
-            // 覆写 stream 让它抛出
             mockStreamImpl = () => ({
                 async *[Symbol.asyncIterator]() {
                     yield { error: 'simulated graph failure' };
@@ -393,12 +443,13 @@ describe('AiChatService', () => {
             });
 
             const record = await service.startRun({ content: 'Hi', threadId: 't1' });
-            const { res, writes } = createMockResponse();
+            const capture = createEventCapture();
+            record.setSseWriter(capture.sseWriter);
 
-            await service.executeRunProtocol(record, res);
+            await service.executeRunProtocol(record);
 
-            const errorWrite = writes.find(w => w.startsWith('event: error'));
-            expect(errorWrite).toBeDefined();
+            const errorEvent = capture.events.find(e => e.event === 'error');
+            expect(errorEvent).toBeDefined();
             expect(record.status).toBe(RunStatus.Failed);
         });
 
@@ -412,22 +463,44 @@ describe('AiChatService', () => {
             });
 
             const record = await service.startRun({ content: 'Hi', threadId: 't1' });
-            const { res } = createMockResponse();
+            const capture = createEventCapture();
+            record.setSseWriter(capture.sseWriter);
 
-            await service.executeRunProtocol(record, res);
+            await service.executeRunProtocol(record);
 
             expect(record.status).toBe(RunStatus.Interrupted);
         });
 
         it('should set status Cancelled when aborted mid-stream', async () => {
             const record = await service.startRun({ content: 'Hi', threadId: 't1' });
-            // Abort 在 stream 开始前
             record.abort();
+            const capture = createEventCapture();
+            record.setSseWriter(capture.sseWriter);
 
-            const { res } = createMockResponse();
-            await service.executeRunProtocol(record, res);
+            await service.executeRunProtocol(record);
 
             expect(record.status).toBe(RunStatus.Cancelled);
+        });
+
+        it('should write all events to EventStore via emitEvent', async () => {
+            const record = await service.startRun({ content: 'Hi', threadId: 't1' });
+            const capture = createEventCapture();
+            record.setSseWriter(capture.sseWriter);
+
+            await service.executeRunProtocol(record);
+
+            // eventStore.append should have been called for each event
+            const appendSpy = record.runContext.eventStore.append as jest.Mock;
+            // At minimum: metadata + values + end = 3 calls
+            expect(appendSpy.mock.calls.length).toBeGreaterThanOrEqual(3);
+
+            // Verify event types
+            const eventTypes = appendSpy.mock.calls.map(
+                (call: [string, string, { eventType: string }]) => call[2].eventType,
+            );
+            expect(eventTypes).toContain('metadata');
+            expect(eventTypes).toContain('values');
+            expect(eventTypes).toContain('end');
         });
     });
 

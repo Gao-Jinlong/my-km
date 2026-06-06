@@ -88,9 +88,8 @@ export function AIPanel() {
         const trimmed = inputValue.trim();
         if (!trimmed || isStreaming) return;
 
-        // 自动收集编辑器上下文 — 转为 Record 形式传给 SDK 的 context 参数
-        const ctx = collectEditorContext();
-        const context = ctx ? (ctx as unknown as Record<string, unknown>) : undefined;
+        // 自动收集编辑器上下文
+        const context = collectEditorContext() ?? undefined;
         await sendMessage(trimmed, context);
         setInputValue('');
     }, [inputValue, isStreaming, sendMessage]);

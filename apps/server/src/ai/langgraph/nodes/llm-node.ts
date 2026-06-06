@@ -48,7 +48,26 @@ export function createLLMNode() {
             return { error: error instanceof Error ? error.message : 'LLM call failed' };
         }
 
+        // 将 AI 回复追加到 state.messages，使 checkpoint 累积完整对话历史
+        const aiMessage: LLMMessage = {
+            role: 'assistant',
+            content: assistantText,
+            ...(toolCalls.length > 0
+                ? {
+                      tool_calls: toolCalls.map(tc => ({
+                          id: tc.id,
+                          name: tc.name,
+                          arguments:
+                              typeof tc.arguments === 'string'
+                                  ? tc.arguments
+                                  : JSON.stringify(tc.arguments),
+                      })),
+                  }
+                : {}),
+        };
+
         return {
+            messages: [aiMessage],
             lastAssistantMessage: assistantText,
             hasToolCalls: toolCalls.length > 0,
             pendingToolCalls: toolCalls,

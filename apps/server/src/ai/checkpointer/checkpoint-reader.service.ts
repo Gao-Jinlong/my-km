@@ -133,8 +133,11 @@ export class CheckpointReaderService {
         const m = msg as Record<string, unknown>;
 
         // LangChain Message 实例有 _getType() 方法或 type 属性
+        // LLMMessage（plain object）使用 role 属性（如 'assistant'）
         const rawType =
-            typeof m._getType === 'function' ? m._getType() : ((m.type as string) ?? 'human');
+            typeof m._getType === 'function'
+                ? m._getType()
+                : ((m.type as string) ?? (m.role as string) ?? 'human');
 
         // 归一化 type
         const type = this.normalizeType(rawType);

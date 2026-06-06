@@ -36,6 +36,8 @@ import type { Response } from 'express';
 import { SkipResponseWrap } from '../../common/decorators/skip-response-wrap.decorator';
 import { AiChatService } from '../ai.service';
 import { CheckpointReaderService } from '../checkpointer/checkpoint-reader.service';
+import { writeSSE } from '../langgraph/langgraph-protocol';
+import { RunRecord } from '../run/run-record';
 import { ThreadService } from '../thread/thread.service';
 import type { MultitaskStrategy } from '../types/run.types';
 
@@ -213,10 +215,10 @@ export class ThreadsController {
         this.setSseHeaders(res);
 
         try {
+            let record: RunRecord;
             if (body.command?.resume !== undefined) {
                 // Resume 路径：从活跃 run 中恢复
-                const record = await this.aiService.resumeFromCommand(threadId, body.command);
-                await this.aiService.executeRunProtocol(record, res);
+                record = await this.aiService.resumeFromCommand(threadId, body.command);
             } else {
                 // 新 run 路径：从 input.messages 中提取用户消息
                 const content = this.extractLastUserMessage(body.input?.messages ?? []);
@@ -225,16 +227,21 @@ export class ThreadsController {
                     return;
                 }
 
-                const record = await this.aiService.startRun({
+                record = await this.aiService.startRun({
                     content,
                     threadId,
                     context: body.context,
                     // multitask_strategy 直接透传，AiChatService 内统一处理
                     multitaskStrategy: body.multitask_strategy ?? 'reject',
                 });
-
-                await this.aiService.executeRunProtocol(record, res);
             }
+
+            // 桥接 writeSSE → record.emitEvent，使 SSE 事件同时写入 EventStore
+            record.setSseWriter(event => {
+                writeSSE(res, event.event, event.data);
+            });
+
+            await this.aiService.executeRunProtocol(record);
         } catch (error) {
             this.logger.error(`streamRun failed: ${(error as Error).message}`);
             this.sendProtocolError(
@@ -242,6 +249,10 @@ export class ThreadsController {
                 'execution_error',
                 error instanceof Error ? error.message : 'Unknown error',
             );
+        } finally {
+            if (!res.writableEnded) {
+                res.end();
+            }
         }
     }
 

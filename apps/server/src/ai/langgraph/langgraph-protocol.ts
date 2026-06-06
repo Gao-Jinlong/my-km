@@ -22,7 +22,7 @@ import type { Response } from 'express';
 /**
  * 将事件编码为 SSE 文本格式并写入 Response
  */
-function writeSSE(res: Response, event: string, data: unknown): void {
+export function writeSSE(res: Response, event: string, data: unknown): void {
     if (!res.writableEnded) {
         res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     }
@@ -82,11 +82,11 @@ export function writeError(res: Response, code: string, message: string): void {
  *   { type: 'human' | 'ai', content: string, id: string }
  */
 export function toLangChainMessages(
-    internalMessages: Array<{ role: string; content: string }>,
+    internalMessages: Array<{ role: string; content: string; id?: string }>,
 ): Array<Record<string, unknown>> {
-    return internalMessages.map((msg, idx) => ({
+    return internalMessages.map(msg => ({
         type: msg.role === 'user' || msg.role === 'human' ? 'human' : 'ai',
         content: msg.content,
-        id: `msg-${Date.now()}-${idx}`,
+        id: msg.id ?? crypto.randomUUID(),
     }));
 }
