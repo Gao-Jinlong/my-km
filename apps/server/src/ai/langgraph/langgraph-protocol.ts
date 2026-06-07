@@ -9,10 +9,11 @@
  *   data: <JSON>\n\n
  *
  * 支持的事件类型:
- *   metadata  — run 开始时发送一次 {run_id, thread_id}
- *   values    — 完整状态快照 {messages: [...]}
- *   error     — 错误 {error: string, message: string}
- *   end       — 流结束 {}
+ *   metadata         — run 开始时发送一次 {run_id, thread_id}
+ *   messages/partial — 增量 token（LLM 逐 chunk 推送）
+ *   values           — 完整状态快照 {messages: [...]}
+ *   error            — 错误 {error: string, message: string}
+ *   end              — 流结束 {}
  */
 
 import type { Response } from 'express';
@@ -36,6 +37,32 @@ export function writeSSE(res: Response, event: string, data: unknown): void {
  */
 export function writeMetadata(res: Response, runId: string, threadId: string): void {
     writeSSE(res, 'metadata', { run_id: runId, thread_id: threadId });
+}
+
+// ========== Messages Partial Events ==========
+
+/**
+ * 发送 messages/partial 事件（增量 token）。
+ *
+ * SDK 的 useStream 通过 matchEventType("messages", ...) 匹配此事件，
+ * MessageTupleManager 通过消息 id 拼接同组 chunk 为完整消息。
+ *
+ * data 格式：元组 [serialized_message, metadata]
+ *   serialized_message: { type: "AIMessageChunk", content: "token", id: "msg-xxx" }
+ *   metadata:           { langgraph_node: "llm_call" }
+ *
+ * 同一 AI 回复的所有 chunk 必须共享相同 id。
+ */
+export function writeMessagesPartial(
+    res: Response,
+    content: string,
+    messageId: string,
+    nodeName: string = 'llm_call',
+): void {
+    writeSSE(res, 'messages/partial', [
+        { type: 'AIMessageChunk', content, id: messageId },
+        { langgraph_node: nodeName },
+    ]);
 }
 
 // ========== Values Events ==========

@@ -2,6 +2,7 @@
  * MessageBubble — 单条消息渲染组件
  *
  * 支持用户消息、助手消息（含流式文本）、工具调用指示。
+ * streaming 模式下在文本末尾显示闪烁光标 ▊。
  */
 
 import type { MessageWire } from '@/features/ai/types/ai.types';
@@ -9,9 +10,11 @@ import { cn } from '@/lib/utils';
 
 interface MessageBubbleProps {
     message: MessageWire;
+    /** AI 正在流式生成此消息（显示打字光标） */
+    isStreaming?: boolean;
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
     const isUser = message.role === 'user';
     const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
 
@@ -29,10 +32,13 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                 {/* 助手消息 */}
                 {!isUser && (
                     <div className="space-y-2">
-                        {/* 文本内容 */}
+                        {/* 文本内容 + 流式打字光标 */}
                         {message.content && (
                             <div className="whitespace-pre-wrap break-words text-sm">
                                 {message.content}
+                                {isStreaming && (
+                                    <span className="animate-pulse text-ws-accent">▊</span>
+                                )}
                             </div>
                         )}
 

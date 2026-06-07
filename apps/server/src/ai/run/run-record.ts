@@ -137,6 +137,17 @@ export class RunRecord {
     }
 
     /**
+     * 仅写 SSE，不持久化到 EventStore。
+     * 用于 messages/partial 等高频流式事件（量大，不应写入 DB）。
+     */
+    emitSSEOnly(event: { event: string; data: unknown }) {
+        if (this.sseWriter) {
+            this.sseWriter(event);
+        }
+        // 不写 EventStore — 不调用 this.runContext.eventStore.append
+    }
+
+    /**
      * 完成运行，返回 token 用量快照
      */
     finalize(): TokenUsage {

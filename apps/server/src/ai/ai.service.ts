@@ -167,6 +167,9 @@ export class AiChatService {
                 arguments: Record<string, unknown>;
             }> = [];
 
+            // 稳定消息 ID：SDK MessageTupleManager 通过 id 拼接同组 chunk
+            const streamingMsgId = crypto.randomUUID();
+
             const stream = await graph.stream(
                 { messages: [userMessage] },
                 {
@@ -176,7 +179,16 @@ export class AiChatService {
                         tools,
                         abortSignal: record.abortSignal,
                         onChunk: (chunk: string) => {
+                            if (record.abortSignal.aborted) return;
                             assistantText += chunk;
+                            // 逐 token 推送 messages/partial SSE 事件到前端
+                            record.emitSSEOnly({
+                                event: 'messages/partial',
+                                data: [
+                                    { type: 'AIMessageChunk', content: chunk, id: streamingMsgId },
+                                    { langgraph_node: 'llm_call' },
+                                ],
+                            });
                         },
                     },
                 },

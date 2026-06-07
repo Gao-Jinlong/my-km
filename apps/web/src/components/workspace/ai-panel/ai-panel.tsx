@@ -43,6 +43,7 @@ export function AIPanel() {
     const {
         messages,
         isStreaming,
+        isLastMessageStreaming,
         error,
         threadId,
         interrupt,
@@ -196,8 +197,16 @@ export function AIPanel() {
                             </div>
                         )}
 
-                        {wireMessages.map(msg => (
-                            <MessageBubble key={msg.id} message={msg} />
+                        {wireMessages.map((msg, idx) => (
+                            <MessageBubble
+                                key={msg.id}
+                                message={msg}
+                                isStreaming={
+                                    isLastMessageStreaming &&
+                                    idx === wireMessages.length - 1 &&
+                                    msg.role === 'assistant'
+                                }
+                            />
                         ))}
 
                         {/* 工具中断确认 UI */}
@@ -242,7 +251,11 @@ export function AIPanel() {
                             <div className="flex items-center justify-between px-1">
                                 <div className="flex items-center gap-2 text-ws-fg-muted text-xs">
                                     <Loader2 className="h-3 w-3 animate-spin" />
-                                    <span>AI is thinking...</span>
+                                    <span>
+                                        {isLastMessageStreaming
+                                            ? 'AI is typing...'
+                                            : 'AI is thinking...'}
+                                    </span>
                                 </div>
                                 <Button
                                     variant="ghost"

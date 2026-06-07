@@ -9,12 +9,12 @@
  *     resume:    { input: null, command: { resume: ... }, assistant_id: 'default' }
  *
  * SSE 事件流：
- *   metadata → values → end（或 error）
+ *   metadata → messages/partial*(逐 token) → values → end（或 error）
  */
 
 import type { Message } from '@langchain/langgraph-sdk';
 import { useStream } from '@langchain/langgraph-sdk/react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { langgraphClient } from '@/features/ai/sdk/langgraph-client';
 
 /**
@@ -47,6 +47,8 @@ export interface ToolInterrupt {
 export interface UseLangGraphStreamReturn {
     messages: ChatMessage[];
     isStreaming: boolean;
+    /** AI 正在流式生成（最后一条消息仍在追加 token） */
+    isLastMessageStreaming: boolean;
     error: string | null;
     threadId: string | null;
     runId: string | null;
@@ -131,17 +133,46 @@ export function useLangGraphStream(): UseLangGraphStreamReturn {
         },
     });
 
-    // 从 stream 中提取消息
-    const messages: ChatMessage[] = useMemo(
-        () => (stream.messages ?? []).map(toChatMessage),
-        [stream.messages],
-    );
+    // ========== rAF 节流 ==========
+    // SDK 每次 messages/partial 事件都更新 stream.messages，
+    // 直接 useMemo 会导致 20-50 次/秒 re-render。
+    // 用 rAF 批量更新，每帧最多触发一次 React state 更新（~60fps）。
+
+    const [displayMessages, setDisplayMessages] = useState<ChatMessage[]>([]);
+    const pendingRef = useRef<ChatMessage[]>([]);
+    const rafIdRef = useRef(0);
+
+    useEffect(() => {
+        // 缓存最新计算结果
+        pendingRef.current = (stream.messages ?? []).map(toChatMessage);
+
+        // 安排下一帧刷新（如果尚未安排）
+        if (!rafIdRef.current) {
+            rafIdRef.current = requestAnimationFrame(() => {
+                setDisplayMessages(pendingRef.current);
+                rafIdRef.current = 0;
+            });
+        }
+
+        return () => {
+            if (rafIdRef.current) {
+                cancelAnimationFrame(rafIdRef.current);
+                rafIdRef.current = 0;
+            }
+        };
+    }, [stream.messages]);
+
+    const messages = displayMessages;
 
     // 从 stream 中提取中断信息
     const interrupt: ToolInterrupt | null = useMemo(
         () => extractInterrupt(stream.interrupt),
         [stream.interrupt],
     );
+
+    // AI 正在流式生成：isLoading + 最后一条消息是 AI
+    const isLastMessageStreaming =
+        stream.isLoading && messages.length > 0 && messages[messages.length - 1].role === 'ai';
 
     const sendMessage = useCallback(
         async (content: string, context?: Record<string, unknown>) => {
@@ -187,6 +218,7 @@ export function useLangGraphStream(): UseLangGraphStreamReturn {
         () => ({
             messages,
             isStreaming: stream.isLoading,
+            isLastMessageStreaming,
             error: stream.error ? String(stream.error) : null,
             threadId,
             runId,
@@ -198,6 +230,7 @@ export function useLangGraphStream(): UseLangGraphStreamReturn {
         [
             messages,
             stream.isLoading,
+            isLastMessageStreaming,
             stream.error,
             threadId,
             runId,
