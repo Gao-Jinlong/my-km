@@ -32,9 +32,18 @@ jest.mock('@langchain/langgraph-checkpoint', () => ({
 }));
 
 // Configurable graph stream mock — each test can override via mockStreamImpl
+// A1: streamMode ['messages', 'values'] → chunks are [mode, payload] tuples
 let mockStreamImpl: () => AsyncIterable<unknown> = () => ({
     async *[Symbol.asyncIterator]() {
-        yield { lastAssistantMessage: 'hello world' };
+        yield [
+            'values',
+            {
+                messages: [
+                    { type: 'human', content: 'Hi', id: 'msg-1' },
+                    { type: 'ai', content: 'hello world', id: 'msg-2' },
+                ],
+            },
+        ];
     },
 });
 
@@ -95,10 +104,13 @@ describe('AiChatService', () => {
             registeredProviders: ['zhipu', 'openai'],
         };
 
+        // A1: LLMProvider 暴露 BaseChatModel via getChatModel()
         const mockLLM = {
             getOrCreate: jest.fn().mockReturnValue({
-                chat: jest.fn().mockImplementation(async function* () {
-                    yield { type: 'text', text: 'hello' };
+                getChatModel: jest.fn().mockReturnValue({
+                    bindTools: jest.fn().mockReturnThis(),
+                    invoke: jest.fn(),
+                    stream: jest.fn(),
                 }),
             }),
         };
@@ -167,14 +179,14 @@ describe('AiChatService', () => {
                 {
                     provide: CheckpointReaderService,
                     useValue: {
-                        getMessages: jest.fn().mockResolvedValue([
-                            // llm_call 节点将 AI 回复写入 state.messages，
-                            // checkpoint 包含完整对话历史
-                            { type: 'human', content: 'prev question', id: 'msg-prev-1' },
-                            { type: 'ai', content: 'prev answer', id: 'msg-prev-2' },
-                            { type: 'human', content: 'Hi', id: 'msg-prev-3' },
-                            { type: 'ai', content: 'hello world', id: 'msg-prev-4' },
-                        ]),
+                        // 保留 mock 以满足 DI，A1 service 不再读取历史消息
+                        getMessages: jest.fn().mockResolvedValue([]),
+                        getThreadState: jest.fn().mockResolvedValue({
+                            values: { messages: [] },
+                            next: [],
+                            checkpoint: { thread_id: 'thread-1' },
+                            tasks: [],
+                        }),
                     },
                 },
             ],
@@ -186,10 +198,18 @@ describe('AiChatService', () => {
         mockRunContextFactory = module.get<RunContextFactory>(RunContextFactory);
         mockProviderRegistry = module.get<ProviderRegistry>(ProviderRegistry);
 
-        // 默认 stream 实现：yield 一个 assistant message 然后结束
+        // A1 默认 stream: yield [mode, payload] tuple — values 模式带 messages
         mockStreamImpl = () => ({
             async *[Symbol.asyncIterator]() {
-                yield { lastAssistantMessage: 'hello world' };
+                yield [
+                    'values',
+                    {
+                        messages: [
+                            { type: 'human', content: 'Hi', id: 'msg-1' },
+                            { type: 'ai', content: 'hello world', id: 'msg-2' },
+                        ],
+                    },
+                ];
             },
         });
     });
@@ -415,7 +435,7 @@ describe('AiChatService', () => {
             expect((metadata?.data as Record<string, unknown>).thread_id).toBe(record.threadId);
         });
 
-        it('should include full thread history in values event', async () => {
+        it('should include messages in values event from stream payload', async () => {
             const record = await service.startRun({ content: 'Hi', threadId: 't1' });
             const capture = createEventCapture();
             record.setSseWriter(capture.sseWriter);
@@ -427,18 +447,19 @@ describe('AiChatService', () => {
             const messages = (valuesEvent?.data as Record<string, unknown>).messages as Array<
                 Record<string, unknown>
             >;
-            // Checkpoint 返回完整历史（llm_call 写入 AI 消息到 state.messages）
-            // mock 返回 4 条：prev question, prev answer, Hi, hello world
-            expect(messages.length).toBe(4);
-            expect(messages.some(m => m.content === 'prev question')).toBe(true);
-            expect(messages.some(m => m.content === 'prev answer')).toBe(true);
+            // A1: values payload 直接来自 graph stream 的 values 模式
+            // 默认 mock yield messages: [Hi, hello world]
+            expect(messages.length).toBe(2);
+            expect(messages.some(m => m.content === 'Hi')).toBe(true);
             expect(messages.some(m => m.content === 'hello world')).toBe(true);
         });
 
         it('should emit error event and set status Failed when graph throws', async () => {
             mockStreamImpl = () => ({
                 async *[Symbol.asyncIterator]() {
-                    yield { error: 'simulated graph failure' };
+                    throw new Error('simulated graph failure');
+                    // biome-ignore lint/correctness/noUnreachable: required to satisfy AsyncIterable signature
+                    yield;
                 },
             });
 
@@ -453,12 +474,16 @@ describe('AiChatService', () => {
             expect(record.status).toBe(RunStatus.Failed);
         });
 
-        it('should set status Interrupted when tool calls pending', async () => {
+        it('should set status Interrupted when __interrupt__ present in values', async () => {
             mockStreamImpl = () => ({
                 async *[Symbol.asyncIterator]() {
-                    yield {
-                        pendingToolCalls: [{ id: 'tc-1', name: 'tool_x', arguments: {} }],
-                    };
+                    yield [
+                        'values',
+                        {
+                            messages: [{ type: 'ai', content: 'need tool', id: 'm1' }],
+                            __interrupt__: [{ value: { tool_call_id: 'tc-1' } }],
+                        },
+                    ];
                 },
             });
 

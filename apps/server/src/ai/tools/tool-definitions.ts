@@ -1,22 +1,28 @@
 /**
- * ToolDefinitions — 从共享 schema 转换为后端 ToolDefinition 格式
+ * ToolDefinitions — 共享 schema 转 LangChain Tool 实例
  *
- * 将 packages/shared 中的工具 schema 转换为 LLM Provider 期望的
- * { name, description, input_schema } 格式。
+ * 重构(Plan A1):
+ * 这些"前端工具"在后端不真正执行,所以 tool function 永远不会被调用
+ * (`tool-node.ts` 通过 LangGraph `interrupt()` 暂停 graph,
+ *  等待前端通过 SDK `command.resume` 提供结果)。
  *
- * 这些定义会注入 SSEExecutor，发送给 LLM 作为 tool call 协议的一部分。
+ * `tool()` 工厂在这里只是为了:
+ *   1. 给 ChatModel.bindTools() 提供 LangChain Tool 实例
+ *   2. 把 JSON Schema(zod-compatible)挂载到工具上,
+ *      让 LLM 知道工具签名
  */
 
+import { type StructuredToolInterface, tool } from '@langchain/core/tools';
 import {
     getDocumentContentTool,
     getFileTreeTool,
     insertTextTool,
     replaceTextTool,
 } from '@my-km/shared';
-import type { ToolDefinition } from '../types/ai.types';
+import { z } from 'zod';
 
 /**
- * 前端工具名称集合 — 这些工具需要前端执行，触发 interrupt
+ * 前端工具名称集合 — 这些工具需要前端执行,触发 interrupt
  */
 export const FRONTEND_TOOLS = new Set([
     'get_document_content',
@@ -26,32 +32,44 @@ export const FRONTEND_TOOLS = new Set([
 ]);
 
 /**
- * 将共享 schema 的 inputSchema 字段映射为后端的 input_schema 字段
+ * 把 JSON Schema 包装成最宽松的 zod schema(`z.any()`)
+ *
+ * 我们不需要真正校验入参(LLM 输出由 ChatModel 自身按工具 schema 校验);
+ * 这里只是把工具签名暴露给 bindTools()。
  */
-function toToolDefinition(tool: {
+function makeFrontendTool(def: {
     name: string;
     description: string;
     inputSchema: Record<string, unknown>;
-}): ToolDefinition {
-    return {
-        name: tool.name,
-        description: tool.description,
-        input_schema: tool.inputSchema as Record<string, unknown>,
-    };
+}): StructuredToolInterface {
+    return tool(
+        async () => {
+            // 永远不会执行:tool-node 在 LLM 决定调用前端工具时
+            // 通过 interrupt() 暂停 graph,等待前端 resume
+            throw new Error(
+                `Frontend tool "${def.name}" should be executed by client via LangGraph interrupt/resume, not invoked server-side`,
+            );
+        },
+        {
+            name: def.name,
+            description: def.description,
+            schema: z.any(),
+        },
+    );
 }
 
 /**
- * 所有前端工具定义 — 发送给 LLM
+ * 所有前端工具 — 供 ChatModel.bindTools() 使用
  */
-export const frontendToolDefinitions: ToolDefinition[] = [
-    toToolDefinition(getDocumentContentTool),
-    toToolDefinition(getFileTreeTool),
-    toToolDefinition(insertTextTool),
-    toToolDefinition(replaceTextTool),
+export const frontendTools: StructuredToolInterface[] = [
+    makeFrontendTool(getDocumentContentTool),
+    makeFrontendTool(getFileTreeTool),
+    makeFrontendTool(insertTextTool),
+    makeFrontendTool(replaceTextTool),
 ];
 
 /**
- * 检查工具是否为前端工具（需要 interrupt）
+ * 检查工具是否为前端工具(需要 interrupt)
  */
 export function isFrontendTool(toolName: string): boolean {
     return FRONTEND_TOOLS.has(toolName);

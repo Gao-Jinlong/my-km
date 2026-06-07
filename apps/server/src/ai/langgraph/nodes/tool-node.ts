@@ -1,43 +1,61 @@
 /**
  * 工具执行节点
  *
- * 将工具结果追加到消息历史中，清空 pendingToolCalls。
- * 实际的工具调用等待由 WorkflowExecutor 处理（暂停/恢复循环）。
+ * 重构(Plan A1):
+ * 前端工具(FRONTEND_TOOLS)通过 LangGraph `interrupt()` 暂停 graph,
+ * 等待 SDK 端通过 `command: { resume: { tool_call_id, tool_result } }` 恢复。
+ *
+ * 行为:
+ * 1. 读取最后一条 AIMessage 的 tool_calls 列表
+ * 2. 对每个 tool_call 触发 interrupt({ tool_call_id, tool_name, args })
+ *    — interrupt() 在首次执行时抛出 GraphInterrupt,
+ *      恢复时返回 SDK 传入的 resume 值
+ * 3. 将 resume 值包装为 ToolMessage,append 到 state.messages
  */
 
-import type { LLMMessage, WorkflowState } from '../types/workflow.types';
+import { AIMessage, type BaseMessage, ToolMessage } from '@langchain/core/messages';
+import { interrupt } from '@langchain/langgraph';
+import type { WorkflowState } from '../types/workflow.types';
 
 export function createToolNode() {
     return async (state: WorkflowState): Promise<Partial<WorkflowState>> => {
-        if (!state.pendingToolCalls || state.pendingToolCalls.length === 0) {
-            return { hasToolCalls: false };
+        const lastMessage = state.messages[state.messages.length - 1];
+        if (!(lastMessage instanceof AIMessage) || !lastMessage.tool_calls?.length) {
+            return {};
         }
 
-        // 构建 tool_result 消息（LLMMessage 格式）
-        const toolResultMessages: LLMMessage[] = [];
+        const toolMessages: BaseMessage[] = [];
 
-        for (const [toolId, result] of Object.entries(state.toolResults || {})) {
-            const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
-            toolResultMessages.push({
-                role: 'tool',
-                content: [
-                    {
-                        type: 'tool_result',
-                        tool_use_id: toolId,
-                        content: resultStr,
-                    },
-                ],
+        for (const toolCall of lastMessage.tool_calls) {
+            if (!toolCall.id || !toolCall.name) continue;
+
+            // 触发 interrupt,等待前端执行后通过 SDK command.resume 恢复
+            // 恢复值在 controller 端通过 new Command({ resume: ... }) 注入
+            const resumeValue = interrupt({
+                tool_call_id: toolCall.id,
+                tool_name: toolCall.name,
+                args: toolCall.args ?? {},
             });
+
+            // resumeValue 期望形如 { tool_call_id, tool_result }
+            // 但 LangGraph interrupt 对每个 call 单独暂停;此处 resumeValue
+            // 直接是该次 interrupt 的 resume payload
+            const result =
+                resumeValue && typeof resumeValue === 'object' && 'tool_result' in resumeValue
+                    ? (resumeValue as { tool_result: unknown }).tool_result
+                    : resumeValue;
+
+            const content = typeof result === 'string' ? result : JSON.stringify(result ?? '');
+
+            toolMessages.push(
+                new ToolMessage({
+                    tool_call_id: toolCall.id,
+                    name: toolCall.name,
+                    content,
+                }),
+            );
         }
 
-        return {
-            // 清空 pendingToolCalls（已处理）
-            pendingToolCalls: [],
-            hasToolCalls: false,
-            // 工具结果已存入 toolResults，由下一轮 LLM 调用消费
-            toolResults: {},
-            // 追加 tool_result 消息到状态
-            messages: toolResultMessages,
-        };
+        return { messages: toolMessages };
     };
 }

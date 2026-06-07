@@ -180,22 +180,6 @@ describe('ThreadService', () => {
         });
     });
 
-    describe('incrementMessageCount', () => {
-        it('should increment message count by 1', async () => {
-            jest.spyOn(prisma.thread, 'update').mockResolvedValue({
-                ...mockThread,
-                messageCount: 1,
-            });
-            await service.incrementMessageCount('thread-1');
-            expect(prisma.thread.update).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    where: { id: 'thread-1' },
-                    data: { messageCount: { increment: 1 } },
-                }),
-            );
-        });
-    });
-
     describe('getStats', () => {
         it('should return thread statistics', async () => {
             jest.spyOn(prisma.thread, 'count').mockResolvedValue(5);

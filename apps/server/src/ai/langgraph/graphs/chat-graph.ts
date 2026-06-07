@@ -2,20 +2,16 @@
  * ChatGraph — 标准对话工作流
  *
  * 图结构:
- *   __start__ → llm_call → [有工具调用?] → tools → llm_call (loop)
- *                          [无工具调用?] → __end__
+ *   __start__ → llm_call → [有 tool_calls?] → tools → llm_call (loop)
+ *                          [无 tool_calls?] → __end__
  *
- * 纯函数式图定义，不依赖 NestJS DI。
- * LLM 调用通过 configurable.llmCaller 注入。
- * Checkpointer 通过 compile 参数注入（由 RunContext 管理）。
- *
- * 重要：createGraph() 返回未编译的 StateGraph。
- * 编译（含 checkpointer 注入）由 RunContext.getCompiledGraph() 负责。
- * 之前的无限递归 bug 根因是 BaseExecutor.runToolLoop() 用外部
- * while 循环重新驱动 graph.stream()，而不是让 graph 内部的
- * conditional edges 自然处理 tool 循环。这个版本不再有外部循环。
+ * 重构(Plan A1):
+ * - 路由直接读取最后一条 AIMessage 的 tool_calls 字段
+ *   (取代之前的 state.hasToolCalls)
+ * - state.messages 现在是 BaseMessage[](由 MessagesAnnotation 提供)
  */
 
+import { AIMessage } from '@langchain/core/messages';
 import { END, START, StateGraph } from '@langchain/langgraph';
 import { createLLMNode } from '../nodes/llm-node';
 import { createToolNode } from '../nodes/tool-node';
@@ -23,29 +19,29 @@ import { type WorkflowState, WorkflowStateAnnotation } from '../types/workflow.t
 
 export class ChatGraph {
     readonly name = 'chat';
-    readonly description = '标准对话工作流，支持工具调用循环';
+    readonly description = '标准对话工作流,支持工具调用循环';
 
     /**
      * 创建未编译的 graph。
      *
-     * graph 内部的 conditional edge (hasToolCalls → 'tools' → 'llm_call')
-     * 自然处理工具调用循环，不需要外部 while 循环驱动。
-     *
-     * 返回 any 是因为 StateGraph 方法链的泛型收窄问题：
-     * addNode/addEdge 返回的 StateGraph<..., N> 的 N 是字面量联合类型，
-     * 与 StateGraph<typeof WorkflowStateAnnotation> 不兼容。
+     * 返回 any 是因为 StateGraph 方法链的泛型收窄问题。
      * 参考: https://github.com/langchain-ai/langgraphjs/issues/763
      */
+    // biome-ignore lint/suspicious/noExplicitAny: StateGraph generic chain
     createGraph(): any {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // biome-ignore lint/suspicious/noExplicitAny: see above
         const graph = new StateGraph(WorkflowStateAnnotation) as any;
         graph
             .addNode('llm_call', createLLMNode())
             .addNode('tools', createToolNode())
             .addEdge(START, 'llm_call')
-            .addConditionalEdges('llm_call', (state: WorkflowState) =>
-                state.hasToolCalls ? 'tools' : END,
-            )
+            .addConditionalEdges('llm_call', (state: WorkflowState) => {
+                const last = state.messages[state.messages.length - 1];
+                if (last instanceof AIMessage && last.tool_calls && last.tool_calls.length > 0) {
+                    return 'tools';
+                }
+                return END;
+            })
             .addEdge('tools', 'llm_call');
         return graph;
     }

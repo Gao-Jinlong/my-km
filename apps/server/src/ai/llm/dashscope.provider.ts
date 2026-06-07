@@ -1,166 +1,46 @@
 /**
  * Alibaba Cloud DashScope (阿里云百炼) LLM Provider
  *
- * DashScope 兼容 OpenAI 接口格式，直接使用 OpenAI SDK。
- * 支持 reasoning_content（思考过程）输出。
+ * DashScope 兼容 OpenAI 接口格式,通过 `ChatOpenAI` + 自定义 `baseURL`
+ * 直接复用 LangChain 实现,无需独立适配器。
+ *
+ * `reasoning_content`(思考过程)由 ChatOpenAI 通过 `additional_kwargs.reasoning_content`
+ * 透传,前端如需展示可从 AIMessageChunk.additional_kwargs 读取。
+ * 这里通过 modelKwargs 透传 `enable_thinking: true`。
  */
 
-import OpenAI from 'openai';
-import type { LLMMessage, LLMOutput, ToolDefinition } from '../types/ai.types';
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import { ChatOpenAI } from '@langchain/openai';
 import type { LLMConfig, LLMProvider } from './provider.types';
 
 export class DashscopeProvider implements LLMProvider {
     readonly name = 'dashscope';
-    private client: OpenAI;
     readonly model: string;
-    private maxTokens: number;
-    private temperature: number;
+    private chatModel: ChatOpenAI;
 
     constructor(config: LLMConfig) {
         const apiKey = config.apiKey ?? process.env.DASHSCOPE_API_KEY;
         if (!apiKey) throw new Error('DashScope API key is required');
 
-        this.client = new OpenAI({
-            apiKey,
-            baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-        });
         this.model = config.model ?? 'qwen-plus';
-        this.maxTokens = (config.maxTokens as number) ?? 4096;
-        this.temperature = (config.temperature as number) ?? 0.7;
+
+        this.chatModel = new ChatOpenAI({
+            apiKey,
+            model: this.model,
+            temperature: (config.temperature as number) ?? 0.7,
+            maxTokens: (config.maxTokens as number) ?? 4096,
+            streaming: true,
+            configuration: {
+                baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+            },
+            // DashScope 扩展参数,通过 modelKwargs 透传给底层 API
+            modelKwargs: {
+                enable_thinking: true,
+            },
+        });
     }
 
-    async *chat(
-        messages: LLMMessage[],
-        tools?: ToolDefinition[],
-        abortSignal?: AbortSignal,
-    ): AsyncIterable<LLMOutput> {
-        const openaiMessages: OpenAI.ChatCompletionMessageParam[] = messages.map(msg => {
-            // Tool 消息：OpenAI 格式需要 tool_call_id + 纯文本 content
-            if (msg.role === 'tool' && msg.tool_call_id) {
-                return {
-                    role: 'tool' as const,
-                    tool_call_id: msg.tool_call_id,
-                    content:
-                        typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
-                } as OpenAI.ChatCompletionToolMessageParam;
-            }
-            // Assistant with tool_calls：OpenAI 格式需要 tool_calls 数组
-            if (msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length > 0) {
-                return {
-                    role: 'assistant' as const,
-                    content: typeof msg.content === 'string' ? msg.content : null,
-                    tool_calls: msg.tool_calls.map(tc => ({
-                        id: tc.id,
-                        type: 'function' as const,
-                        function: {
-                            name: tc.name,
-                            arguments: tc.arguments,
-                        },
-                    })),
-                } as OpenAI.ChatCompletionAssistantMessageParam;
-            }
-            if (typeof msg.content === 'string') {
-                return {
-                    role: msg.role as 'user' | 'assistant' | 'system',
-                    content: msg.content,
-                } as OpenAI.ChatCompletionMessageParam;
-            }
-            return {
-                role: msg.role as 'user' | 'assistant' | 'tool',
-                content: msg.content as OpenAI.ChatCompletionContentPart[],
-            } as OpenAI.ChatCompletionMessageParam;
-        });
-
-        const openaiTools: OpenAI.ChatCompletionTool[] | undefined = tools?.map(t => ({
-            type: 'function' as const,
-            function: {
-                name: t.name,
-                description: t.description,
-                parameters: t.input_schema as Record<string, unknown>,
-            },
-        }));
-
-        const stream = await this.client.chat.completions.create(
-            {
-                model: this.model,
-                max_tokens: this.maxTokens,
-                temperature: this.temperature,
-                messages: openaiMessages,
-                tools: openaiTools && openaiTools.length > 0 ? openaiTools : undefined,
-                stream: true,
-                // DashScope 扩展参数，支持思考过程
-                enable_thinking: true,
-            } as OpenAI.ChatCompletionCreateParamsStreaming,
-            {
-                signal: abortSignal,
-            },
-        );
-
-        let currentToolUse: { id?: string; name?: string; input: string } | null = null;
-
-        for await (const chunk of stream) {
-            const delta = chunk.choices[0]?.delta;
-            if (!delta) continue;
-
-            // DashScope reasoning_content（思考过程）
-            const reasoning = (delta as { reasoning_content?: string }).reasoning_content;
-            if (reasoning) {
-                yield { type: 'text_chunk', content: reasoning };
-            }
-
-            if (delta.content) {
-                yield { type: 'text_chunk', content: delta.content };
-            }
-
-            if (delta.tool_calls && delta.tool_calls.length > 0) {
-                const tc = delta.tool_calls[0];
-                if (tc.id) {
-                    if (currentToolUse?.id && currentToolUse.name) {
-                        let parsedArgs: Record<string, unknown> = {};
-                        try {
-                            parsedArgs = currentToolUse.input
-                                ? JSON.parse(currentToolUse.input)
-                                : {};
-                        } catch {
-                            parsedArgs = { raw: currentToolUse.input };
-                        }
-                        yield {
-                            type: 'tool_call',
-                            toolCall: {
-                                id: currentToolUse.id,
-                                name: currentToolUse.name,
-                                arguments: parsedArgs,
-                            },
-                        };
-                    }
-                    currentToolUse = {
-                        id: tc.id,
-                        name: tc.function?.name ?? '',
-                        input: tc.function?.arguments ?? '',
-                    };
-                } else if (currentToolUse) {
-                    currentToolUse.input += tc.function?.arguments ?? '';
-                }
-            }
-        }
-
-        if (currentToolUse?.id && currentToolUse.name) {
-            let parsedArgs: Record<string, unknown> = {};
-            try {
-                parsedArgs = currentToolUse.input ? JSON.parse(currentToolUse.input) : {};
-            } catch {
-                parsedArgs = { raw: currentToolUse.input };
-            }
-            yield {
-                type: 'tool_call',
-                toolCall: {
-                    id: currentToolUse.id,
-                    name: currentToolUse.name,
-                    arguments: parsedArgs,
-                },
-            };
-        }
-
-        yield { type: 'done' };
+    getChatModel(): BaseChatModel {
+        return this.chatModel;
     }
 }

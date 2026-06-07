@@ -13,7 +13,7 @@
 import { NotFoundException } from '@nestjs/common';
 import type { Response } from 'express';
 import type { AiChatService } from '../../ai.service';
-import type { MessageService } from '../../message/message.service';
+import type { CheckpointReaderService } from '../../checkpointer/checkpoint-reader.service';
 import type { ThreadService } from '../../thread/thread.service';
 
 // Mock langgraph ESM modules to prevent uuid ESM error in Jest.
@@ -75,7 +75,7 @@ describe('ThreadsController', () => {
     let controller: ThreadsController;
     let mockAiService: jest.Mocked<AiChatService>;
     let mockThreadService: jest.Mocked<ThreadService>;
-    let mockMessageService: jest.Mocked<MessageService>;
+    let mockCheckpointReader: jest.Mocked<CheckpointReaderService>;
 
     const sampleThread = {
         id: 'thread-1',
@@ -83,7 +83,6 @@ describe('ThreadsController', () => {
         status: 'active',
         model: null,
         provider: null,
-        messageCount: 0,
         createdAt: new Date('2026-01-01T00:00:00Z'),
         updatedAt: new Date('2026-01-01T00:00:00Z'),
     };
@@ -104,11 +103,16 @@ describe('ThreadsController', () => {
             delete: jest.fn().mockResolvedValue(undefined),
         } as unknown as jest.Mocked<ThreadService>;
 
-        mockMessageService = {
-            findByRoomId: jest.fn().mockResolvedValue([]),
-        } as unknown as jest.Mocked<MessageService>;
+        mockCheckpointReader = {
+            getThreadState: jest.fn().mockResolvedValue({
+                values: { messages: [] },
+                next: [],
+                checkpoint: { thread_id: 'thread-1' },
+                tasks: [],
+            }),
+        } as unknown as jest.Mocked<CheckpointReaderService>;
 
-        controller = new ThreadsController(mockAiService, mockThreadService, mockMessageService);
+        controller = new ThreadsController(mockAiService, mockThreadService, mockCheckpointReader);
     });
 
     describe('createThread', () => {
@@ -182,18 +186,17 @@ describe('ThreadsController', () => {
 
     describe('getThreadState', () => {
         it('returns LangGraph ThreadState shape', async () => {
-            mockMessageService.findByRoomId.mockResolvedValueOnce([
-                {
-                    id: 'm1',
-                    role: 'user',
-                    content: 'hi',
-                } as never,
-                {
-                    id: 'm2',
-                    role: 'assistant',
-                    content: 'hello',
-                } as never,
-            ]);
+            mockCheckpointReader.getThreadState.mockResolvedValueOnce({
+                values: {
+                    messages: [
+                        { type: 'human', content: 'hi', id: 'm1' },
+                        { type: 'ai', content: 'hello', id: 'm2' },
+                    ],
+                },
+                next: [],
+                checkpoint: { thread_id: 'thread-1' },
+                tasks: [],
+            } as never);
 
             const result = await controller.getThreadState('thread-1');
 
@@ -209,7 +212,7 @@ describe('ThreadsController', () => {
 
     describe('streamRun', () => {
         it('starts a new run when input.messages contains human message', async () => {
-            const fakeRecord = { id: 'run-1', threadId: 'thread-1' };
+            const fakeRecord = { id: 'run-1', threadId: 'thread-1', setSseWriter: jest.fn() };
             mockAiService.startRun.mockResolvedValueOnce(fakeRecord as never);
             const { res } = createMockResponse();
 
@@ -228,11 +231,12 @@ describe('ThreadsController', () => {
                 context: undefined,
                 multitaskStrategy: 'interrupt',
             });
-            expect(mockAiService.executeRunProtocol).toHaveBeenCalledWith(fakeRecord, res);
+            expect(fakeRecord.setSseWriter).toHaveBeenCalled();
+            expect(mockAiService.executeRunProtocol).toHaveBeenCalledWith(fakeRecord);
         });
 
         it('passes multitask_strategy="enqueue" through to service (service decides fallback)', async () => {
-            const fakeRecord = { id: 'run-1', threadId: 'thread-1' };
+            const fakeRecord = { id: 'run-1', threadId: 'thread-1', setSseWriter: jest.fn() };
             mockAiService.startRun.mockResolvedValueOnce(fakeRecord as never);
             const { res } = createMockResponse();
 
@@ -251,7 +255,7 @@ describe('ThreadsController', () => {
         });
 
         it('defaults multitask_strategy to "reject" when omitted', async () => {
-            const fakeRecord = { id: 'run-1', threadId: 'thread-1' };
+            const fakeRecord = { id: 'run-1', threadId: 'thread-1', setSseWriter: jest.fn() };
             mockAiService.startRun.mockResolvedValueOnce(fakeRecord as never);
             const { res } = createMockResponse();
 
@@ -267,7 +271,7 @@ describe('ThreadsController', () => {
         });
 
         it('routes to resumeFromCommand when body.command.resume present', async () => {
-            const fakeRecord = { id: 'run-1', threadId: 'thread-1' };
+            const fakeRecord = { id: 'run-1', threadId: 'thread-1', setSseWriter: jest.fn() };
             mockAiService.resumeFromCommand.mockResolvedValueOnce(fakeRecord as never);
             const { res } = createMockResponse();
 
@@ -281,7 +285,7 @@ describe('ThreadsController', () => {
                 resume: { tool_call_id: 'tc-1', tool_result: 'ok' },
             });
             expect(mockAiService.startRun).not.toHaveBeenCalled();
-            expect(mockAiService.executeRunProtocol).toHaveBeenCalledWith(fakeRecord, res);
+            expect(mockAiService.executeRunProtocol).toHaveBeenCalledWith(fakeRecord);
         });
 
         it('writes invalid_input error when no human message provided', async () => {

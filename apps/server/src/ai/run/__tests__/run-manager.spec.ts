@@ -1,4 +1,5 @@
 import type { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
+import type { PrismaService } from '../../../prisma/prisma.service';
 import type { RunEventStore } from '../../store/run-event-store';
 import { RunStatus } from '../../types/run.types';
 import type { RunContext } from '../run-context';
@@ -22,19 +23,33 @@ function createMockRunContext(overrides?: {
     } as RunContext;
 }
 
+/**
+ * mock PrismaService — RunManager 同步写 prisma.run.create/update
+ */
+function createMockPrisma(): PrismaService {
+    return {
+        run: {
+            create: jest.fn().mockResolvedValue({}),
+            update: jest.fn().mockResolvedValue({}),
+        },
+    } as unknown as PrismaService;
+}
+
 describe('RunManager', () => {
     let manager: RunManager;
+    let prisma: PrismaService;
 
     beforeEach(() => {
-        manager = new RunManager();
+        prisma = createMockPrisma();
+        manager = new RunManager(prisma);
     });
 
     describe('createRun', () => {
-        it('should create a run with runContext and snapshot', () => {
+        it('should create a run with runContext and snapshot', async () => {
             const ctx = createMockRunContext();
             const snapshot = { content: 'Hello' };
 
-            const run = manager.createRun('thread-1', ctx, snapshot);
+            const run = await manager.createRun('thread-1', ctx, snapshot);
             expect(run).toBeDefined();
             expect(run.threadId).toBe('thread-1');
             expect(run.status).toBe(RunStatus.Pending);
@@ -42,9 +57,9 @@ describe('RunManager', () => {
             expect(run.snapshot).toBe(snapshot);
         });
 
-        it('should track the run by ID', () => {
+        it('should track the run by ID', async () => {
             const ctx = createMockRunContext();
-            const run = manager.createRun('thread-1', ctx, { content: 'test' });
+            const run = await manager.createRun('thread-1', ctx, { content: 'test' });
             const found = manager.getRun(run.id);
             expect(found).toBe(run);
         });
@@ -53,12 +68,12 @@ describe('RunManager', () => {
             expect(manager.getRun('nonexistent')).toBeUndefined();
         });
 
-        it('should create distinct records for each call', () => {
+        it('should create distinct records for each call', async () => {
             const ctx1 = createMockRunContext();
             const ctx2 = createMockRunContext();
 
-            const r1 = manager.createRun('t1', ctx1, { content: 'a' });
-            const r2 = manager.createRun('t2', ctx2, { content: 'b' });
+            const r1 = await manager.createRun('t1', ctx1, { content: 'a' });
+            const r2 = await manager.createRun('t2', ctx2, { content: 'b' });
 
             expect(r1).not.toBe(r2);
             expect(r1.runContext).toBe(ctx1);
@@ -67,9 +82,9 @@ describe('RunManager', () => {
     });
 
     describe('getActiveRunForThread', () => {
-        it('should return active run for a thread', () => {
+        it('should return active run for a thread', async () => {
             const ctx = createMockRunContext();
-            const run = manager.createRun('thread-1', ctx, { content: 'test' });
+            const run = await manager.createRun('thread-1', ctx, { content: 'test' });
             run.setStatus(RunStatus.Running);
             const active = manager.getActiveRunForThread('thread-1');
             expect(active).toBe(run);
@@ -79,16 +94,16 @@ describe('RunManager', () => {
             expect(manager.getActiveRunForThread('thread-1')).toBeUndefined();
         });
 
-        it('should not return completed runs', () => {
+        it('should not return completed runs', async () => {
             const ctx = createMockRunContext();
-            const run = manager.createRun('thread-1', ctx, { content: 'test' });
+            const run = await manager.createRun('thread-1', ctx, { content: 'test' });
             run.setStatus(RunStatus.Completed);
             expect(manager.getActiveRunForThread('thread-1')).toBeUndefined();
         });
 
-        it('should return interrupted runs as active', () => {
+        it('should return interrupted runs as active', async () => {
             const ctx = createMockRunContext();
-            const run = manager.createRun('thread-1', ctx, { content: 'test' });
+            const run = await manager.createRun('thread-1', ctx, { content: 'test' });
             run.setStatus(RunStatus.Interrupted);
             const active = manager.getActiveRunForThread('thread-1');
             expect(active).toBe(run);
@@ -96,24 +111,24 @@ describe('RunManager', () => {
     });
 
     describe('cancelRun', () => {
-        it('should cancel a run by ID', () => {
+        it('should cancel a run by ID', async () => {
             const ctx = createMockRunContext();
-            const run = manager.createRun('thread-1', ctx, { content: 'test' });
-            manager.cancelRun(run.id);
+            const run = await manager.createRun('thread-1', ctx, { content: 'test' });
+            await manager.cancelRun(run.id);
             expect(run.status).toBe(RunStatus.Cancelled);
         });
 
-        it('should do nothing for unknown run ID', () => {
-            expect(() => manager.cancelRun('nonexistent')).not.toThrow();
+        it('should do nothing for unknown run ID', async () => {
+            await expect(manager.cancelRun('nonexistent')).resolves.not.toThrow();
         });
     });
 
     describe('cleanup', () => {
-        it('should remove completed/failed/cancelled runs', () => {
+        it('should remove completed/failed/cancelled runs', async () => {
             const ctx1 = createMockRunContext();
             const ctx2 = createMockRunContext();
-            const r1 = manager.createRun('t1', ctx1, { content: 'a' });
-            const r2 = manager.createRun('t2', ctx2, { content: 'b' });
+            const r1 = await manager.createRun('t1', ctx1, { content: 'a' });
+            const r2 = await manager.createRun('t2', ctx2, { content: 'b' });
             r1.setStatus(RunStatus.Completed);
             r2.setStatus(RunStatus.Running);
 

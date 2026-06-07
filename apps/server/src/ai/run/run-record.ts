@@ -60,6 +60,12 @@ export class RunRecord {
     /** SSE response writer（由 controller 设置） */
     private sseWriter?: (event: { event: string; data: unknown }) => void;
 
+    /**
+     * 待恢复的 resume payload（由 resumeFromCommand 注入）
+     * executeRunProtocol 检测到此字段时，用 `new Command({resume})` 作为 graph 输入
+     */
+    private _pendingResume?: unknown;
+
     constructor(opts: RunRecordOpts) {
         this.id = opts.id;
         this.threadId = opts.threadId;
@@ -74,6 +80,23 @@ export class RunRecord {
 
     get tokenUsage(): TokenUsage {
         return { ...this._tokenUsage };
+    }
+
+    /** 是否通过 command.resume 恢复 */
+    get isResume(): boolean {
+        return this._pendingResume !== undefined;
+    }
+
+    /**
+     * 设置 resume payload（controller 调用 resumeFromCommand 时注入）
+     */
+    setResumePayload(payload: unknown): void {
+        this._pendingResume = payload;
+    }
+
+    /** 获取 resume payload */
+    get pendingResume(): unknown {
+        return this._pendingResume;
     }
 
     /**
