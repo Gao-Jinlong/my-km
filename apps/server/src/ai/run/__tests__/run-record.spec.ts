@@ -18,7 +18,6 @@ function createMockRunContext(overrides?: {
         checkpointer: mockCP as unknown as BaseCheckpointSaver,
         eventStore: mockES as unknown as RunEventStore,
         llmConfig: { provider: 'zhipu', model: 'glm-5' },
-        requestContext: undefined,
     } as RunContext;
 }
 

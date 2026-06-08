@@ -16,7 +16,7 @@
  * - 并发控制 (multitask_strategy)
  */
 
-import { HumanMessage } from '@langchain/core/messages';
+import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { Command } from '@langchain/langgraph';
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CheckpointReaderService } from './checkpointer/checkpoint-reader.service';
@@ -31,6 +31,7 @@ import { RunRecord } from './run/run-record';
 import { ThreadService } from './thread/thread.service';
 import { frontendTools } from './tools/tool-definitions';
 import { type MultitaskStrategy, RunStatus } from './types/run.types';
+import { formatEditorContext } from './utils/format-editor-context';
 
 export interface StartRunOpts {
     content: string;
@@ -77,7 +78,6 @@ export class AiChatService {
 
         const runContext = await this.runContextFactory.create({
             llmConfig,
-            requestContext: opts.context,
         });
 
         const record = await this.runManager.createRun(thread.id, runContext, {
@@ -152,11 +152,27 @@ export class AiChatService {
             const chatModel = llmProvider.getChatModel();
 
             // 3. 构造 graph 输入
-            //    - 新 run: { messages: [HumanMessage(content)] }
+            //    - 新 run: { messages: [SystemMessage?(editor context), HumanMessage(用户内容)] }
+            //      editor context 作为带 `hide_from_ui` 标记的 SystemMessage 注入,
+            //      会被 checkpoint 持久化,前端根据标记过滤不显示
             //    - resume: new Command({ resume: payload })
-            const input = record.isResume
-                ? new Command({ resume: record.pendingResume })
-                : { messages: [new HumanMessage(record.snapshot.content)] };
+            let input: { messages: Array<HumanMessage | SystemMessage> } | Command;
+            if (record.isResume) {
+                input = new Command({ resume: record.pendingResume });
+            } else {
+                const ctx = formatEditorContext(record.snapshot.requestContext);
+                const messages: Array<HumanMessage | SystemMessage> = [];
+                if (ctx.formatted) {
+                    messages.push(
+                        new SystemMessage({
+                            content: ctx.formatted,
+                            additional_kwargs: { hide_from_ui: true },
+                        }),
+                    );
+                }
+                messages.push(new HumanMessage(record.snapshot.content));
+                input = { messages };
+            }
 
             // 4. 流式执行 — 多 streamMode 时 chunk 形如 [mode, payload]
             const stream = await graph.stream(input, {
@@ -202,7 +218,7 @@ export class AiChatService {
                     }
                     await record.emitEvent({ event: 'values', data });
                 }
-                // 其他 streamMode 暂不处理
+                // TODO 其他 streamMode 暂不处理
             }
 
             // 6. 终态判定

@@ -47,12 +47,19 @@ let mockStreamImpl: () => AsyncIterable<unknown> = () => ({
     },
 });
 
+// Capture the most recent graph.stream() input — tests can assert on what
+// executeRunProtocol() passed in (e.g. SystemMessage with hide_from_ui kwargs).
+let capturedStreamInput: unknown;
+
 jest.mock('../langgraph/graphs/chat-graph', () => ({
     ChatGraph: jest.fn().mockImplementation(() => ({
         name: 'chat',
         createGraph: jest.fn().mockReturnValue({
             compile: jest.fn().mockReturnValue({
-                stream: jest.fn().mockImplementation(() => mockStreamImpl()),
+                stream: jest.fn().mockImplementation((input: unknown) => {
+                    capturedStreamInput = input;
+                    return mockStreamImpl();
+                }),
             }),
         }),
     })),
@@ -92,7 +99,6 @@ describe('AiChatService', () => {
                         flushRun: jest.fn().mockResolvedValue(undefined),
                     } as unknown as RunEventStore,
                     llmConfig: { ...opts.llmConfig },
-                    requestContext: opts.requestContext ? { ...opts.requestContext } : undefined,
                 } as RunContext;
             }),
         };
@@ -212,6 +218,7 @@ describe('AiChatService', () => {
                 ];
             },
         });
+        capturedStreamInput = undefined;
     });
 
     describe('startRun', () => {
@@ -300,11 +307,22 @@ describe('AiChatService', () => {
             expect(record.runContext.llmConfig.provider).toBe(snapshotProvider);
         });
 
-        it('should pass requestContext to RunContextFactory', async () => {
-            const ctx = { userId: 'u1' };
+        it('should pass context to RunManager snapshot, not RunContextFactory', async () => {
+            const ctx = { selectedText: 'hello', fullContent: 'world' };
             await service.startRun({ content: 'Hello', context: ctx });
 
+            // RunContextFactory should NOT receive requestContext
             expect(mockRunContextFactory.create).toHaveBeenCalledWith(
+                expect.objectContaining({ llmConfig: expect.any(Object) }),
+            );
+            // Verify the factory call has only llmConfig (no requestContext key)
+            const factoryCall = (mockRunContextFactory.create as jest.Mock).mock.calls[0][0];
+            expect(factoryCall).not.toHaveProperty('requestContext');
+
+            // RunManager snapshot should have the context
+            expect(runManager.createRun).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.any(Object),
                 expect.objectContaining({ requestContext: ctx }),
             );
         });
@@ -526,6 +544,69 @@ describe('AiChatService', () => {
             expect(eventTypes).toContain('metadata');
             expect(eventTypes).toContain('values');
             expect(eventTypes).toContain('end');
+        });
+
+        it('should inject editor context as SystemMessage with hide_from_ui kwarg when context is present', async () => {
+            const editorCtx = { selectedText: 'important code', fullContent: 'some content here' };
+            const record = await service.startRun({
+                content: 'Explain this',
+                threadId: 't1',
+                context: editorCtx,
+            });
+            const capture = createEventCapture();
+            record.setSseWriter(capture.sseWriter);
+
+            // Verify snapshot has requestContext
+            expect(record.snapshot.requestContext).toEqual(editorCtx);
+
+            await service.executeRunProtocol(record);
+
+            // Verify graph.stream() received [SystemMessage(editor ctx), HumanMessage(user)]
+            expect(capturedStreamInput).toBeDefined();
+            const input = capturedStreamInput as { messages: unknown[] };
+            expect(input.messages).toHaveLength(2);
+
+            const [sysMsg, humanMsg] = input.messages as Array<{
+                _getType: () => string;
+                content: string;
+                additional_kwargs?: Record<string, unknown>;
+            }>;
+
+            // SystemMessage is first, carries editor context, marked hide_from_ui
+            expect(sysMsg._getType()).toBe('system');
+            expect(sysMsg.content).toContain('[Editor Context]');
+            expect(sysMsg.content).toContain('important code');
+            expect(sysMsg.additional_kwargs?.hide_from_ui).toBe(true);
+
+            // HumanMessage carries ONLY the user input — no editor context bleed-through
+            expect(humanMsg._getType()).toBe('human');
+            expect(humanMsg.content).toBe('Explain this');
+            expect(humanMsg.content).not.toContain('[Editor Context]');
+
+            expect(record.status).toBe(RunStatus.Completed);
+        });
+
+        it('should NOT inject SystemMessage when no editor context', async () => {
+            const record = await service.startRun({ content: 'Hello', threadId: 't1' });
+
+            // No context provided
+            expect(record.snapshot.requestContext).toBeUndefined();
+
+            const capture = createEventCapture();
+            record.setSseWriter(capture.sseWriter);
+
+            await service.executeRunProtocol(record);
+
+            // input.messages should only contain the HumanMessage — no SystemMessage prepended
+            expect(capturedStreamInput).toBeDefined();
+            const input = capturedStreamInput as { messages: unknown[] };
+            expect(input.messages).toHaveLength(1);
+
+            const [humanMsg] = input.messages as Array<{ _getType: () => string; content: string }>;
+            expect(humanMsg._getType()).toBe('human');
+            expect(humanMsg.content).toBe('Hello');
+
+            expect(record.status).toBe(RunStatus.Completed);
         });
     });
 

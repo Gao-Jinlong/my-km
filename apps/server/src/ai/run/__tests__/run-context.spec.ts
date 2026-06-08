@@ -29,27 +29,6 @@ describe('RunContext', () => {
 
             expect(ctx.llmConfig).toEqual(baseLlmConfig);
         });
-
-        it('should expose requestContext when provided', () => {
-            const ctx = new RunContext({
-                checkpointer: mockCheckpointer,
-                eventStore: mockEventStore,
-                llmConfig: baseLlmConfig,
-                requestContext: { userId: 'u1' },
-            });
-
-            expect(ctx.requestContext).toEqual({ userId: 'u1' });
-        });
-
-        it('should leave requestContext undefined when not provided', () => {
-            const ctx = new RunContext({
-                checkpointer: mockCheckpointer,
-                eventStore: mockEventStore,
-                llmConfig: baseLlmConfig,
-            });
-
-            expect(ctx.requestContext).toBeUndefined();
-        });
     });
 
     describe('snapshot immutability', () => {
@@ -69,23 +48,6 @@ describe('RunContext', () => {
             expect(ctx.llmConfig.temperature).toBe(0.7);
         });
 
-        it('should deep clone + freeze requestContext', () => {
-            const reqCtx = { userId: 'u1', meta: { role: 'admin' } };
-            const ctx = new RunContext({
-                checkpointer: mockCheckpointer,
-                eventStore: mockEventStore,
-                llmConfig: baseLlmConfig,
-                requestContext: reqCtx,
-            });
-
-            // Mutating original should not affect snapshot
-            (reqCtx as any).userId = 'u2';
-            reqCtx.meta.role = 'user';
-
-            expect(ctx.requestContext!.userId).toBe('u1');
-            expect((ctx.requestContext!.meta as any).role).toBe('admin');
-        });
-
         it('should freeze llmConfig against runtime mutation', () => {
             const ctx = new RunContext({
                 checkpointer: mockCheckpointer,
@@ -95,19 +57,6 @@ describe('RunContext', () => {
 
             expect(() => {
                 (ctx.llmConfig as any).provider = 'hacked';
-            }).toThrow();
-        });
-
-        it('should freeze nested objects in requestContext', () => {
-            const ctx = new RunContext({
-                checkpointer: mockCheckpointer,
-                eventStore: mockEventStore,
-                llmConfig: baseLlmConfig,
-                requestContext: { nested: { key: 'value' } },
-            });
-
-            expect(() => {
-                (ctx.requestContext!.nested as any).key = 'hacked';
             }).toThrow();
         });
     });

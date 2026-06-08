@@ -59,9 +59,28 @@ export interface UseLangGraphStreamReturn {
 }
 
 /**
- * 将 SDK Message 转换为内部 ChatMessage 格式
+ * 判断消息是否应在 UI 中隐藏
+ *
+ * 后端通过 `additional_kwargs.hide_from_ui = true` 标记系统自动注入的消息
+ * （如 editor context SystemMessage），这些消息会持久化到 checkpoint
+ * 供 LLM 使用，但不应展示给用户。
  */
-function toChatMessage(msg: Message): ChatMessage {
+function isHiddenFromUI(msg: Message): boolean {
+    const kwargs = (msg as { additional_kwargs?: Record<string, unknown> }).additional_kwargs;
+    return kwargs?.hide_from_ui === true;
+}
+
+/**
+ * 将 SDK Message 转换为内部 ChatMessage 格式
+ *
+ * 返回 null 表示该消息不应展示（如 system 消息）。
+ */
+function toChatMessage(msg: Message): ChatMessage | null {
+    // system 消息不在对话流中展示（防御性处理，正常情况下已被 isHiddenFromUI 过滤）
+    if (msg.type === 'system') {
+        return null;
+    }
+
     const role = msg.type === 'human' ? 'human' : 'ai';
     const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
 
@@ -144,7 +163,12 @@ export function useLangGraphStream(): UseLangGraphStreamReturn {
 
     useEffect(() => {
         // 缓存最新计算结果
-        pendingRef.current = (stream.messages ?? []).map(toChatMessage);
+        // 先过滤掉 hide_from_ui 标记的消息（如自动注入的 editor context SystemMessage），
+        // 再 map 转换；toChatMessage 可能返回 null（system 消息防御），用 filter(Boolean) 移除
+        pendingRef.current = (stream.messages ?? [])
+            .filter(msg => !isHiddenFromUI(msg))
+            .map(toChatMessage)
+            .filter((m): m is ChatMessage => m !== null);
 
         // 安排下一帧刷新（如果尚未安排）
         if (!rafIdRef.current) {

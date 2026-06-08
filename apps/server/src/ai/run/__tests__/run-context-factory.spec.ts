@@ -92,24 +92,6 @@ describe('RunContextFactory', () => {
             }).toThrow();
         });
 
-        it('should deep clone + freeze requestContext', async () => {
-            const reqCtx = { userId: 'u1', meta: { role: 'admin' } };
-            const ctx = await factory.create({
-                llmConfig: { provider: 'zhipu', model: 'glm-5' },
-                requestContext: reqCtx,
-            });
-
-            // Mutating original should not affect context
-            (reqCtx as Record<string, unknown>).userId = 'u2';
-
-            expect(ctx.requestContext!.userId).toBe('u1');
-        });
-
-        it('should leave requestContext undefined when not provided', async () => {
-            const ctx = await factory.create({ llmConfig: { provider: 'zhipu', model: 'glm-5' } });
-            expect(ctx.requestContext).toBeUndefined();
-        });
-
         it('should fail clearly when llmConfig contains non-clonable value', async () => {
             const badConfig = { provider: 'zhipu', model: 'glm-5', fn: () => {} };
 

@@ -14,8 +14,6 @@ import { RunContext, type RunContextOpts } from './run-context';
 export interface CreateRunContextOpts {
     /** LLM 配置（会被深克隆冻结） */
     llmConfig: LLMConfig;
-    /** 请求上下文（会被深克隆冻结） */
-    requestContext?: Record<string, unknown>;
 }
 
 @Injectable()
@@ -29,7 +27,7 @@ export class RunContextFactory {
      * 创建一个新的 per-run RunContext
      *
      * - checkpointer 和 eventStore 是 singleton，跨 run 共享引用
-     * - llmConfig 和 requestContext 会被深克隆并冻结
+     * - llmConfig 会被深克隆并冻结
      */
     async create(opts: CreateRunContextOpts): Promise<RunContext> {
         const checkpointer = await this.checkpointerProvider.getCheckpointer();
@@ -38,7 +36,6 @@ export class RunContextFactory {
             checkpointer,
             eventStore: this.eventStore,
             llmConfig: opts.llmConfig,
-            requestContext: opts.requestContext,
         } satisfies RunContextOpts);
     }
 }
