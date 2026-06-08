@@ -37,7 +37,7 @@ export const FRONTEND_TOOLS = new Set([
  * 我们不需要真正校验入参(LLM 输出由 ChatModel 自身按工具 schema 校验);
  * 这里只是把工具签名暴露给 bindTools()。
  */
-function makeFrontendTool(def: {
+function _makeFrontendTool(def: {
     name: string;
     description: string;
     inputSchema: Record<string, unknown>;
@@ -62,10 +62,10 @@ function makeFrontendTool(def: {
  * 所有前端工具 — 供 ChatModel.bindTools() 使用
  */
 export const frontendTools: StructuredToolInterface[] = [
-    makeFrontendTool(getDocumentContentTool),
-    makeFrontendTool(getFileTreeTool),
-    makeFrontendTool(insertTextTool),
-    makeFrontendTool(replaceTextTool),
+    // _makeFrontendTool(getDocumentContentTool),
+    // _makeFrontendTool(getFileTreeTool),
+    // _makeFrontendTool(insertTextTool),
+    // _makeFrontendTool(replaceTextTool),
 ];
 
 /**

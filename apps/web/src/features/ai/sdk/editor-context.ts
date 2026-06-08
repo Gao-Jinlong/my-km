@@ -6,6 +6,7 @@
  * 在发送 AI 消息时作为 context 传递给后端。
  */
 
+import { EditorContainer } from '@/features/editor';
 import type { EditorService } from '@/features/editor/service';
 import { getContainer } from '@/platform/bootstrap';
 
@@ -28,7 +29,7 @@ export function collectEditorContext(): EditorContext | null {
         // 尝试获取 EditorContainer
         const editorContainer = container.get<{
             getActiveInstance(): EditorService | null;
-        }>('editorContainer');
+        }>(EditorContainer);
 
         const editorService = editorContainer?.getActiveInstance?.();
         if (!editorService) return null;
@@ -44,7 +45,8 @@ export function collectEditorContext(): EditorContext | null {
             fullContent: fullContent?.slice(0, 50 * 1024) ?? null, // 最大 50KB
             cursorPosition: selection?.head ?? null,
         };
-    } catch {
+    } catch (error) {
+        console.error('Failed to collect editor context:', error);
         return null;
     }
 }

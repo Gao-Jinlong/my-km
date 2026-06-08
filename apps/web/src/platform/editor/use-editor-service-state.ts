@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from 'react';
 import type { EditorState } from '@/features/editor/service/EditorService';
 import { container } from '@/platform/bootstrap';
-import type { EditorContainer } from './container/editor-container';
+import { EditorContainer } from './container/editor-container';
 
 type EditorStateMap = Map<string, EditorState>;
 
@@ -30,7 +30,7 @@ function ensureInitialized() {
     if (initialized) return;
     initialized = true;
 
-    const editorContainer = container.get('EditorContainer') as EditorContainer;
+    const editorContainer = container.get(EditorContainer);
     editorContainer.onDidChangeEditorState(({ documentId, state }) => {
         editorStates = new Map(editorStates);
         editorStates.set(documentId, state);
