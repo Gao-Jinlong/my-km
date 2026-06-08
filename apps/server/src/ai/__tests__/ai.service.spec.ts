@@ -574,14 +574,14 @@ describe('AiChatService', () => {
 
             // SystemMessage is first, carries editor context, marked hide_from_ui
             expect(sysMsg._getType()).toBe('system');
-            expect(sysMsg.content).toContain('[Editor Context]');
+            expect(sysMsg.content).toContain('<editor_context>');
             expect(sysMsg.content).toContain('important code');
             expect(sysMsg.additional_kwargs?.hide_from_ui).toBe(true);
 
             // HumanMessage carries ONLY the user input — no editor context bleed-through
             expect(humanMsg._getType()).toBe('human');
             expect(humanMsg.content).toBe('Explain this');
-            expect(humanMsg.content).not.toContain('[Editor Context]');
+            expect(humanMsg.content).not.toContain('<editor_context>');
 
             expect(record.status).toBe(RunStatus.Completed);
         });
