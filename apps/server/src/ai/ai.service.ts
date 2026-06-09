@@ -183,6 +183,12 @@ export class AiChatService {
                     tools: frontendTools,
                     abortSignal: record.abortSignal,
                 },
+                metadata: {
+                    runId: record.id,
+                    threadId: record.threadId,
+                    provider: record.runContext.llmConfig.provider,
+                    model: record.runContext.llmConfig.model,
+                },
                 signal: record.abortSignal,
             });
 
