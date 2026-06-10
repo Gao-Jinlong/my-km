@@ -2,27 +2,32 @@
   "name": "@my-km/prisma",
   "version": "0.0.1",
   "description": "Prisma ORM package for my-km monorepo",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "scripts": {
-    "build": "prisma generate && tsc",
+    "build": "prisma generate",
     "dev": "prisma generate",
     "generate": "prisma generate",
     "push": "prisma db push",
     "migrate": "prisma migrate dev",
     "studio": "prisma studio",
     "reset": "prisma migrate reset",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf generated"
   },
   "dependencies": {
-    "@prisma/client": "^6.19.1"
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "pg": "^8.21.0"
   },
   "devDependencies": {
-    "prisma": "^6.19.1",
+    "@types/pg": "^8.20.0",
+    "dotenv": "^17.2.3",
+    "prisma": "^7.8.0",
     "typescript": "^5.7.3"
   },
   "files": [
-    "dist",
+    "src",
+    "generated",
     "prisma"
   ]
 }

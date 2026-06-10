@@ -1,13 +1,17 @@
-// This is your Prisma schema file,
-// learn more it in the docs: https://pris.ly/d/prisma-schema
+// Prisma 7 schema 文件
+//
+// 【与 Prisma 6 的关键差异】
+// 1. generator provider: "prisma-client-js" → "prisma-client"（纯 TS 引擎，无 Rust）
+// 2. output 字段现在是必填的（不再默认生成到 node_modules）
+// 3. datasource 块不再支持 url/directUrl/shadowDatabaseUrl（移到 prisma.config.ts）
 
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../generated"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model User {
