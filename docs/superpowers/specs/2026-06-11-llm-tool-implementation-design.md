@@ -71,6 +71,37 @@ LLM 决定调用工具
 ├── packages/shared/src/ai/tools/    ← 更新 schema 定义
 ```
 
+## 关键实现细节
+
+### .km 文件解析
+
+未打开文档需要从 `.km` 文件提取纯文本。`.km` 文件是 JSON 格式（通过 `serializeToKmFile` 序列化），结构为：
+
+```
+{ title, createdAt, updatedAt, content: Block[] }
+```
+
+其中 `Block` 是结构化内容块（段落、标题等）。已有的 `parseKmFile` + `blocksToPlainText`（或 `blocksToLexical` 后读取文本内容）可用于提取纯文本。
+
+Handler 中对未打开文档的处理流程：
+1. `FileSystemService.readFile(path)` 获取文件内容（字符串）
+2. `JSON.parse(content)` 解析为结构化数据
+3. 从 `Block[]` 中提取纯文本（遍历 block 的 text 子节点）
+4. 返回纯文本字符串
+
+注意：此解析逻辑应抽取为独立的 `parseKmFileContent(raw: string): string` 工具函数，放在 `features/editor/utils/` 下，供多个 handler 复用。
+
+### splice_text 的 Lexical 节点操作
+
+对已打开文档执行 `splice_text` 时，不能简单地替换整个编辑器内容（会丢失格式、选区等状态）。需要在 Lexical 节点树中精确定位字符偏移量并修改：
+
+1. 获取全文字符偏移量到 Lexical 节点的映射表（遍历所有 TextNode，累加文本长度）
+2. 找到 `start` 和 `start + deleteCount` 对应的 TextNode 及其内部偏移
+3. 在目标 TextNode 上执行 `splice` 操作（利用 Lexical 的 `TextNode.splice()` 或 `splitText()`）
+4. 如果跨多个 TextNode，需要拆分、合并节点
+
+实现建议：在 `EditorService` 中新增 `spliceText(start: number, deleteCount: number, insert?: string)` 方法，封装上述 Lexical 节点操作。这样 handler 只需调用 `editorService.spliceText()` 即可。
+
 ## 工具详细设计
 
 ### 1. `get_document_content` — 获取文档内容
@@ -245,8 +276,8 @@ LLM 决定调用工具
    - `after = content.slice(start + deleteCount)`
    - `newContent = before + (insert || '') + after`
 5. 写回：
-   - **已打开文档** → 通过 Lexical `editor.update()` 精确替换文本节点
-   - **未打开文档** → `FileSystemService.writeFile()`
+   - **已打开文档** → `editorService.spliceText(start, deleteCount, insert)`（见上方"splice_text 的 Lexical 节点操作"）
+   - **未打开文档** → 重新构建 `.km` 文件内容 + `FileSystemService.writeFile()`
 6. 返回结果
 
 **返回值：**
@@ -272,7 +303,15 @@ LLM 决定调用工具
 ```typescript
 // features/ai/tools/types.ts
 
-export interface ToolHandler {
+/**
+ * 前端工具处理器接口。
+ *
+ * 注意：与 apps/web/src/features/ai/types/ai.types.ts 中的 ToolHandler 不同。
+ * 那个接口面向通用的前端工具注册（含 description、inputSchema），
+ * 本接口专为 LLM 工具执行设计，只需 name + type + execute。
+ * 实现时应避免命名冲突，可考虑命名为 FrontendToolHandler 或放在独立路径下。
+ */
+export interface FrontendToolHandler {
   /** 工具名称，与 shared schema 中的 name 一致 */
   name: string;
   /** 操作类型：read 自动执行，write 需要确认 */
@@ -298,7 +337,7 @@ export interface ConfirmationRequest {
 // features/ai/tools/frontend-tool-executor.ts
 
 export class FrontendToolExecutor {
-  private handlers = new Map<string, ToolHandler>();
+  private handlers = new Map<string, FrontendToolHandler>();
   private _onConfirmationRequest = new Emitter<ConfirmationRequest>();
 
   constructor() {
@@ -308,7 +347,7 @@ export class FrontendToolExecutor {
     this.register(new SpliceTextHandler());
   }
 
-  register(handler: ToolHandler): void {
+  register(handler: FrontendToolHandler): void {
     this.handlers.set(handler.name, handler);
   }
 
