@@ -60,7 +60,7 @@ export const insertTextTool = {
         type: 'object',
         properties: {
             text: { type: 'string', description: '要插入的文本' },
-            documentId: { type: 'string', description: '文档 ID（必填）' },
+            documentId: { type: 'string', description: '文档 ID' },
             position: {
                 type: 'string',
                 enum: ['end', 'cursor'],
@@ -73,7 +73,7 @@ export const insertTextTool = {
 };
 
 /**
- * 对文档执行 splice 操作（类似 JavaScript String.splice）
+ * 对文档执行 splice 操作（类似 JavaScript Array.splice）
  * 从 start 位置删除 deleteCount 个字符，然后插入 insert 文本
  */
 export const spliceTextTool = {
@@ -83,7 +83,7 @@ export const spliceTextTool = {
     inputSchema: {
         type: 'object',
         properties: {
-            documentId: { type: 'string', description: '文档 ID（必填）' },
+            documentId: { type: 'string', description: '文档 ID' },
             start: {
                 type: 'number',
                 description: '起始字符位置，从 0 开始',
