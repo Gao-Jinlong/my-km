@@ -4,9 +4,9 @@ export const getDocumentContentTool = {
     input_schema: { type: 'object', properties: {} },
 };
 
-export const getFileTreeTool = {
-    name: 'get_file_tree',
-    description: 'Get file tree',
+export const getChildItemsTool = {
+    name: 'get_child_items',
+    description: 'Get child items',
     input_schema: { type: 'object', properties: {} },
 };
 
@@ -16,8 +16,8 @@ export const insertTextTool = {
     input_schema: { type: 'object', properties: {} },
 };
 
-export const replaceTextTool = {
-    name: 'replace_text',
-    description: 'Replace text',
+export const spliceTextTool = {
+    name: 'splice_text',
+    description: 'Splice text',
     input_schema: { type: 'object', properties: {} },
 };

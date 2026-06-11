@@ -1,6 +1,6 @@
 export {
+    getChildItemsTool,
     getDocumentContentTool,
-    getFileTreeTool,
     insertTextTool,
-    replaceTextTool,
+    spliceTextTool,
 } from './tools';
