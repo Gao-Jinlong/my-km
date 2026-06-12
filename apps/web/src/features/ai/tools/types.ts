@@ -43,3 +43,13 @@ export interface ConfirmationRequest {
     /** 用户决定回调（true=确认，false=拒绝） */
     resolve: (approved: boolean) => void;
 }
+
+/**
+ * 工具操作类别 — 用于确认策略判断
+ */
+export type ToolCategory = 'read' | 'write';
+
+/**
+ * 判断工具是否为只读操作
+ */
+export type NeedsConfirmationFn = (toolName: string, input: Record<string, unknown>) => boolean;

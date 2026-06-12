@@ -10,10 +10,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { collectEditorContext } from '@/features/ai/sdk/editor-context';
 import { FrontendToolExecutor } from '@/features/ai/tools/frontend-tool-executor';
-import { GetChildItemsHandler } from '@/features/ai/tools/handlers/get-child-items';
-import { GetDocumentContentHandler } from '@/features/ai/tools/handlers/get-document-content';
-import { InsertTextHandler } from '@/features/ai/tools/handlers/insert-text';
-import { SpliceTextHandler } from '@/features/ai/tools/handlers/splice-text';
+import { FileOpsHandler } from '@/features/ai/tools/handlers/file-ops';
+import { DocReadHandler } from '@/features/ai/tools/handlers/doc-read';
+import { DocEditHandler } from '@/features/ai/tools/handlers/doc-edit';
+import { SearchHandler } from '@/features/ai/tools/handlers/search';
 import type { ConfirmationRequest } from '@/features/ai/tools/types';
 import type { MessageWire } from '@/features/ai/types/ai.types';
 import { type ChatMessage, useLangGraphStream } from '@/hooks/use-langgraph-stream';
@@ -70,13 +70,11 @@ export function AIPanel() {
             return `memory://${project.name}`;
         };
 
-        const exec = new FrontendToolExecutor();
-        exec.register(
-            new GetDocumentContentHandler(documentStore, editorContainer, fileSystemService),
-        );
-        exec.register(new GetChildItemsHandler(fileSystemService, getProjectRoot));
-        exec.register(new InsertTextHandler(documentStore, editorContainer, fileSystemService));
-        exec.register(new SpliceTextHandler(documentStore, editorContainer, fileSystemService));
+        const exec = new FrontendToolExecutor('confirm-write');
+        exec.register(new FileOpsHandler(fileSystemService, getProjectRoot));
+        exec.register(new DocReadHandler(documentStore, editorContainer, fileSystemService));
+        exec.register(new DocEditHandler(documentStore, editorContainer, fileSystemService));
+        exec.register(new SearchHandler(documentStore, editorContainer, fileSystemService, getProjectRoot));
         return exec;
     }, []);
 
