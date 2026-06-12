@@ -45,7 +45,7 @@ export class DocEditHandler implements FrontendToolHandler {
         if (!opType) return { success: false, error: 'operationType is required' };
 
         const target = this.resolveTarget(args);
-        if ('error' in target) return target;
+        if ('success' in target) return target;
 
         switch (opType) {
             case 'splice-text':
