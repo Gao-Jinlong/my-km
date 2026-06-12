@@ -139,4 +139,13 @@ describe('EditorService', () => {
         service.setEditor(mockEditor);
         expect(service.getEditor()).toBe(mockEditor);
     });
+
+    describe('spliceText', () => {
+        it('未挂载 editor 时应返回错误', () => {
+            const service = createEditorService('doc-1', '/x.km');
+            const result = service.spliceText(0, 0, 'hello');
+            expect(result.success).toBe(false);
+            expect(result.error).toMatch(/editor not initialized/i);
+        });
+    });
 });

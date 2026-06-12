@@ -4,6 +4,7 @@
 
 import type { LexicalEditor } from 'lexical';
 import {
+    $createParagraphNode,
     $createTextNode,
     $getRoot,
     $getSelection,
@@ -69,6 +70,26 @@ export interface EditorService {
     // 编辑器操作
     insertTextAtCursor(text: string): void;
     replaceSelection(text: string): void;
+
+    /**
+     * 对整个文档内容执行 splice 操作
+     *
+     * 类似 JavaScript 的 Array.splice：从字符位置 start 开始删除 deleteCount 个字符，
+     * 然后在该位置插入 insert 字符串。
+     *
+     * 注意：此操作基于纯文本视图，会重建编辑器内容（按 \n 拆分为段落），
+     * 因此会丢失富文本格式（粗体、链接等）。这是 AI 工具的已知限制。
+     */
+    spliceText(
+        start: number,
+        deleteCount: number,
+        insert?: string,
+    ): {
+        success: boolean;
+        error?: string;
+        charsDeleted: number;
+        charsInserted: number;
+    };
 
     // 生命周期
     destroy(): void;
@@ -402,6 +423,58 @@ class EditorServiceImpl implements EditorService {
         return this.editor.getEditorState().read(() => {
             return $getRoot().getTextContent();
         });
+    }
+
+    spliceText(
+        start: number,
+        deleteCount: number,
+        insert?: string,
+    ): { success: boolean; error?: string; charsDeleted: number; charsInserted: number } {
+        if (!this.editor) {
+            return {
+                success: false,
+                error: 'Editor not initialized',
+                charsDeleted: 0,
+                charsInserted: 0,
+            };
+        }
+
+        const fullText = this.getFullContent();
+
+        if (start < 0 || start > fullText.length) {
+            return {
+                success: false,
+                error: `Start position ${start} out of bounds (content length: ${fullText.length})`,
+                charsDeleted: 0,
+                charsInserted: 0,
+            };
+        }
+
+        const actualDeleteCount = Math.max(0, Math.min(deleteCount, fullText.length - start));
+        const insertText = insert ?? '';
+        const before = fullText.slice(0, start);
+        const after = fullText.slice(start + actualDeleteCount);
+        const newText = before + insertText + after;
+
+        // Rebuild editor content: split by \n into paragraphs
+        this.editor.update(() => {
+            const root = $getRoot();
+            root.clear();
+            const lines = newText.length === 0 ? [''] : newText.split('\n');
+            for (const line of lines) {
+                const paragraph = $createParagraphNode();
+                if (line.length > 0) {
+                    paragraph.append($createTextNode(line));
+                }
+                root.append(paragraph);
+            }
+        });
+
+        return {
+            success: true,
+            charsDeleted: actualDeleteCount,
+            charsInserted: insertText.length,
+        };
     }
 
     destroy(): void {

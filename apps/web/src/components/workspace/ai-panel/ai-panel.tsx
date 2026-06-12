@@ -9,13 +9,21 @@ import { Loader2, Send } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { collectEditorContext } from '@/features/ai/sdk/editor-context';
+import { FrontendToolExecutor } from '@/features/ai/tools/frontend-tool-executor';
+import { GetChildItemsHandler } from '@/features/ai/tools/handlers/get-child-items';
+import { GetDocumentContentHandler } from '@/features/ai/tools/handlers/get-document-content';
+import { InsertTextHandler } from '@/features/ai/tools/handlers/insert-text';
+import { SpliceTextHandler } from '@/features/ai/tools/handlers/splice-text';
+import type { ConfirmationRequest } from '@/features/ai/tools/types';
 import type { MessageWire } from '@/features/ai/types/ai.types';
 import { type ChatMessage, useLangGraphStream } from '@/hooks/use-langgraph-stream';
+import { container } from '@/platform/bootstrap';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import { AIHeader } from './ai-header';
 import { ContextBadge } from './context-badge';
 import { ConversationList } from './conversation-list';
 import { MessageBubble } from './message-bubble';
+import { ToolConfirmationDialog } from './tool-confirmation-dialog';
 
 /**
  * ChatMessage → MessageWire 格式映射
@@ -51,6 +59,51 @@ export function AIPanel() {
         resumeWithToolResult,
         stop,
     } = useLangGraphStream();
+
+    // 工具执行器（单例 per panel）— 注册 4 个 handler
+    const toolExecutor = useMemo(() => {
+        const { documentStore, editorContainer, fileSystemService } = container;
+
+        const getProjectRoot = () => {
+            const project = useWorkspaceStore.getState().project.currentProject;
+            if (!project) return null;
+            return `memory://${project.name}`;
+        };
+
+        const exec = new FrontendToolExecutor();
+        exec.register(
+            new GetDocumentContentHandler(documentStore, editorContainer, fileSystemService),
+        );
+        exec.register(new GetChildItemsHandler(fileSystemService, getProjectRoot));
+        exec.register(new InsertTextHandler(documentStore, editorContainer, fileSystemService));
+        exec.register(new SpliceTextHandler(documentStore, editorContainer, fileSystemService));
+        return exec;
+    }, []);
+
+    // 当前等待用户确认的请求
+    const [pendingConfirmation, setPendingConfirmation] = useState<ConfirmationRequest | null>(
+        null,
+    );
+
+    useEffect(() => {
+        const sub = toolExecutor.onConfirmationRequest(req => {
+            setPendingConfirmation(req);
+        });
+        return () => sub.dispose();
+    }, [toolExecutor]);
+
+    // interrupt 到来时自动分发到执行器
+    useEffect(() => {
+        if (!interrupt) return;
+        let cancelled = false;
+        toolExecutor.dispatch(interrupt.toolName, interrupt.input).then(result => {
+            if (cancelled) return;
+            resumeWithToolResult(interrupt.toolCallId, result);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [interrupt, toolExecutor, resumeWithToolResult]);
 
     // Track which thread is currently generating
     const [generatingThreadId, setGeneratingThreadId] = useState<string | undefined>();
@@ -124,15 +177,6 @@ export function AIPanel() {
             setAIPanelViewMode('chat');
         },
         [setAIPanelViewMode],
-    );
-
-    // 工具中断确认处理
-    const handleToolConfirm = useCallback(
-        (toolCallId: string) => {
-            // TODO: Phase 4 — 实际执行前端工具并返回结果
-            resumeWithToolResult(toolCallId, { confirmed: true });
-        },
-        [resumeWithToolResult],
     );
 
     // 获取编辑器上下文（用于 ContextBadge 显示）
@@ -209,29 +253,14 @@ export function AIPanel() {
                             />
                         ))}
 
-                        {/* 工具中断确认 UI */}
-                        {interrupt && (
-                            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
-                                <div className="mb-2 flex items-center gap-2">
-                                    <div className="h-2 w-2 animate-pulse rounded-full bg-amber-500" />
-                                    <span className="font-mono text-amber-400 text-xs">
-                                        {interrupt.toolName}
-                                    </span>
-                                </div>
-                                <pre className="mb-2 overflow-auto rounded bg-black/20 p-2 text-[11px] text-ws-fg-secondary">
-                                    {JSON.stringify(interrupt.input, null, 2)}
-                                </pre>
-                                <div className="flex gap-2">
-                                    <Button
-                                        size="sm"
-                                        onClick={() => handleToolConfirm(interrupt.toolCallId)}
-                                        className="h-7 px-3 text-xs"
-                                    >
-                                        Confirm
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
+                        {/* 工具中断确认 UI — 仅对写操作显示 */}
+                        <ToolConfirmationDialog
+                            request={pendingConfirmation}
+                            onResolve={approved => {
+                                pendingConfirmation?.resolve(approved);
+                                setPendingConfirmation(null);
+                            }}
+                        />
 
                         <div ref={messagesEndRef} />
                     </div>
