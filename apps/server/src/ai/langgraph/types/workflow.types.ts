@@ -66,6 +66,12 @@ export interface GraphConfig {
     tools?: any[];
     /** 中止信号 */
     abortSignal?: AbortSignal;
+    /** OTel: LLM provider（用于 span attributes） */
+    provider?: string;
+    /** OTel: LLM model（用于 span attributes） */
+    model?: string;
+    /** OTel: 第几轮 LLM 调用（用于 span attributes） */
+    llmRound?: number;
 }
 
 /**

@@ -19,6 +19,7 @@
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { Command } from '@langchain/langgraph';
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { context as otelContext, SpanStatusCode, trace } from '@opentelemetry/api';
 import { CheckpointReaderService } from './checkpointer/checkpoint-reader.service';
 import { ChatGraph } from './langgraph/graphs/chat-graph';
 import { LLMFactory } from './llm/llm-factory';
@@ -139,109 +140,136 @@ export class AiChatService {
      * - interrupt 通过 values payload 中的 `__interrupt__` 字段感知
      */
     async executeRunProtocol(record: RunRecord): Promise<void> {
+        const tracer = trace.getTracer('my-km-server');
+        const langgraphSpan = tracer.startSpan('langgraph.run', {
+            attributes: {
+                'langgraph.runId': record.id,
+                'langgraph.threadId': record.threadId,
+            },
+        });
+        const langgraphCtx = trace.setSpan(otelContext.active(), langgraphSpan);
+
         try {
-            // 1. metadata 事件
-            await record.emitEvent({
-                event: 'metadata',
-                data: { run_id: record.id, thread_id: record.threadId },
-            });
+            await otelContext.with(langgraphCtx, async () => {
+                // 1. metadata 事件（附加 traceId 给前端）
+                const traceId = langgraphSpan.spanContext().traceId;
+                await record.emitEvent({
+                    event: 'metadata',
+                    data: {
+                        run_id: record.id,
+                        thread_id: record.threadId,
+                        trace_id: traceId,
+                    },
+                });
 
-            // 2. 编译 graph，准备 LLM + 工具
-            const graph = this.compileGraph(record.runContext);
-            const llmProvider = this.llmFactory.getOrCreate(record.runContext.llmConfig);
-            const chatModel = llmProvider.getChatModel();
+                // 2. 编译 graph，准备 LLM + 工具
+                const graph = this.compileGraph(record.runContext);
+                const llmProvider = this.llmFactory.getOrCreate(record.runContext.llmConfig);
+                const chatModel = llmProvider.getChatModel();
 
-            // 3. 构造 graph 输入
-            //    - 新 run: { messages: [SystemMessage?(editor context), HumanMessage(用户内容)] }
-            //      editor context 作为带 `hide_from_ui` 标记的 SystemMessage 注入,
-            //      会被 checkpoint 持久化,前端根据标记过滤不显示
-            //    - resume: new Command({ resume: payload })
-            let input: { messages: Array<HumanMessage | SystemMessage> } | Command;
-            if (record.isResume) {
-                input = new Command({ resume: record.pendingResume });
-            } else {
-                const ctx = formatEditorContext(record.snapshot.requestContext);
-                const messages: Array<HumanMessage | SystemMessage> = [];
-                if (ctx.formatted) {
-                    messages.push(
-                        new SystemMessage({
-                            content: ctx.formatted,
-                            additional_kwargs: { hide_from_ui: true },
-                        }),
-                    );
-                }
-                messages.push(new HumanMessage(record.snapshot.content));
-                input = { messages };
-            }
-
-            // 4. 流式执行 — 多 streamMode 时 chunk 形如 [mode, payload]
-            const stream = await graph.stream(input, {
-                streamMode: ['messages', 'values'],
-                configurable: {
-                    thread_id: record.threadId,
-                    chatModel,
-                    tools: frontendTools,
-                    abortSignal: record.abortSignal,
-                },
-                metadata: {
-                    runId: record.id,
-                    threadId: record.threadId,
-                    provider: record.runContext.llmConfig.provider,
-                    model: record.runContext.llmConfig.model,
-                },
-                signal: record.abortSignal,
-            });
-
-            // 5. 透传 LangGraph 事件 → SSE
-            let hasInterrupt = false;
-
-            for await (const chunk of stream as AsyncIterable<unknown>) {
-                if (record.abortSignal.aborted) break;
-
-                if (!Array.isArray(chunk) || chunk.length < 2) continue;
-                const [mode, payload] = chunk as [string, unknown];
-
-                if (mode === 'messages') {
-                    // payload 形如 [BaseMessage(Chunk), metadata]
-                    // 将 BaseMessage 序列化为 plain dict，SDK 端能反序列化为 chunk
-                    const data = this.serializeMessagesPayload(payload);
-                    // 高频 token 事件，仅写 SSE 不持久化
-                    record.emitSSEOnly({ event: 'messages', data });
-                    continue;
-                }
-
-                if (mode === 'values') {
-                    // payload 是状态快照 { messages, threadId, error, [__interrupt__] }
-                    const data = this.serializeValuesPayload(payload);
-                    if (
-                        data &&
-                        typeof data === 'object' &&
-                        '__interrupt__' in data &&
-                        Array.isArray((data as Record<string, unknown>).__interrupt__) &&
-                        ((data as Record<string, unknown>).__interrupt__ as unknown[]).length > 0
-                    ) {
-                        hasInterrupt = true;
+                // 3. 构造 graph 输入
+                //    - 新 run: { messages: [SystemMessage?(editor context), HumanMessage(用户内容)] }
+                //      editor context 作为带 `hide_from_ui` 标记的 SystemMessage 注入,
+                //      会被 checkpoint 持久化,前端根据标记过滤不显示
+                //    - resume: new Command({ resume: payload })
+                let input: { messages: Array<HumanMessage | SystemMessage> } | Command;
+                if (record.isResume) {
+                    input = new Command({ resume: record.pendingResume });
+                } else {
+                    const ctx = formatEditorContext(record.snapshot.requestContext);
+                    const messages: Array<HumanMessage | SystemMessage> = [];
+                    if (ctx.formatted) {
+                        messages.push(
+                            new SystemMessage({
+                                content: ctx.formatted,
+                                additional_kwargs: { hide_from_ui: true },
+                            }),
+                        );
                     }
-                    await record.emitEvent({ event: 'values', data });
+                    messages.push(new HumanMessage(record.snapshot.content));
+                    input = { messages };
                 }
-                // TODO 其他 streamMode 暂不处理
-            }
 
-            // 6. 终态判定
-            if (record.abortSignal.aborted) {
-                record.setStatus(RunStatus.Cancelled);
-                await this.runManager.setStatus(record.id, RunStatus.Cancelled);
-            } else if (hasInterrupt) {
-                record.setStatus(RunStatus.Interrupted);
-                await this.runManager.setStatus(record.id, RunStatus.Interrupted);
-            } else {
-                record.setStatus(RunStatus.Completed);
-                await this.runManager.setStatus(record.id, RunStatus.Completed);
-            }
+                // 4. 流式执行 — 多 streamMode 时 chunk 形如 [mode, payload]
+                const stream = await graph.stream(input, {
+                    streamMode: ['messages', 'values'],
+                    configurable: {
+                        thread_id: record.threadId,
+                        chatModel,
+                        tools: frontendTools,
+                        abortSignal: record.abortSignal,
+                        // OTel: 注入给 llm-node 用于 span attributes
+                        provider: record.runContext.llmConfig.provider,
+                        model: record.runContext.llmConfig.model,
+                        llmRound: 1,
+                    },
+                    metadata: {
+                        runId: record.id,
+                        threadId: record.threadId,
+                        provider: record.runContext.llmConfig.provider,
+                        model: record.runContext.llmConfig.model,
+                    },
+                    signal: record.abortSignal,
+                });
 
-            await record.emitEvent({ event: 'end', data: {} });
+                // 5. 透传 LangGraph 事件 → SSE
+                let hasInterrupt = false;
+
+                for await (const chunk of stream as AsyncIterable<unknown>) {
+                    if (record.abortSignal.aborted) break;
+
+                    if (!Array.isArray(chunk) || chunk.length < 2) continue;
+                    const [mode, payload] = chunk as [string, unknown];
+
+                    if (mode === 'messages') {
+                        // payload 形如 [BaseMessage(Chunk), metadata]
+                        // 将 BaseMessage 序列化为 plain dict，SDK 端能反序列化为 chunk
+                        const data = this.serializeMessagesPayload(payload);
+                        // 高频 token 事件，仅写 SSE 不持久化
+                        record.emitSSEOnly({ event: 'messages', data });
+                        continue;
+                    }
+
+                    if (mode === 'values') {
+                        // payload 是状态快照 { messages, threadId, error, [__interrupt__] }
+                        const data = this.serializeValuesPayload(payload);
+                        if (
+                            data &&
+                            typeof data === 'object' &&
+                            '__interrupt__' in data &&
+                            Array.isArray((data as Record<string, unknown>).__interrupt__) &&
+                            ((data as Record<string, unknown>).__interrupt__ as unknown[]).length >
+                                0
+                        ) {
+                            hasInterrupt = true;
+                        }
+                        await record.emitEvent({ event: 'values', data });
+                    }
+                    // TODO 其他 streamMode 暂不处理
+                }
+
+                // 6. 终态判定
+                if (record.abortSignal.aborted) {
+                    record.setStatus(RunStatus.Cancelled);
+                    await this.runManager.setStatus(record.id, RunStatus.Cancelled);
+                } else if (hasInterrupt) {
+                    record.setStatus(RunStatus.Interrupted);
+                    await this.runManager.setStatus(record.id, RunStatus.Interrupted);
+                } else {
+                    record.setStatus(RunStatus.Completed);
+                    await this.runManager.setStatus(record.id, RunStatus.Completed);
+                }
+
+                langgraphSpan.setStatus({ code: SpanStatusCode.OK });
+                await record.emitEvent({ event: 'end', data: {} });
+            });
         } catch (error) {
             this.logger.error(`Run ${record.id} failed: ${error}`, (error as Error).stack);
+            langgraphSpan.setStatus({
+                code: SpanStatusCode.ERROR,
+                message: (error as Error).message,
+            });
+            langgraphSpan.recordException(error as Error);
             record.setStatus(RunStatus.Failed);
             await this.runManager.setStatus(record.id, RunStatus.Failed);
             await record.emitEvent({
@@ -249,6 +277,7 @@ export class AiChatService {
                 data: { error: 'execution_error', message: (error as Error).message },
             });
         } finally {
+            langgraphSpan.end();
             await this.runManager.finalize(record.id);
             await record.runContext.eventStore.flushRun(record.id);
         }

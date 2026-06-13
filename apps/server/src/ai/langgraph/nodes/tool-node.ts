@@ -15,6 +15,7 @@
 
 import { AIMessage, type BaseMessage, ToolMessage } from '@langchain/core/messages';
 import { interrupt } from '@langchain/langgraph';
+import { endToolSpan, startToolSpan } from '../../../tracing/instrumentations/tool-node.span';
 import type { WorkflowState } from '../types/workflow.types';
 
 export function createToolNode() {
@@ -28,6 +29,11 @@ export function createToolNode() {
 
         for (const toolCall of lastMessage.tool_calls) {
             if (!toolCall.id || !toolCall.name) continue;
+
+            const toolSpan = startToolSpan({
+                toolName: toolCall.name,
+                toolCallId: toolCall.id,
+            });
 
             // 触发 interrupt,等待前端执行后通过 SDK command.resume 恢复
             // 恢复值在 controller 端通过 new Command({ resume: ... }) 注入
@@ -44,6 +50,8 @@ export function createToolNode() {
                 resumeValue && typeof resumeValue === 'object' && 'tool_result' in resumeValue
                     ? (resumeValue as { tool_result: unknown }).tool_result
                     : resumeValue;
+
+            endToolSpan(toolSpan);
 
             const content = typeof result === 'string' ? result : JSON.stringify(result ?? '');
 

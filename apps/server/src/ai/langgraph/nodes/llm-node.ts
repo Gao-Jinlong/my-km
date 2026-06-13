@@ -13,6 +13,8 @@
 
 import type { AIMessage } from '@langchain/core/messages';
 import type { Runnable } from '@langchain/core/runnables';
+import { context as otelContext } from '@opentelemetry/api';
+import { endLLMSpan, startLLMSpan } from '../../../tracing/instrumentations/llm-node.span';
 import type { GraphConfig, WorkflowState } from '../types/workflow.types';
 
 export function createLLMNode() {
@@ -28,6 +30,12 @@ export function createLLMNode() {
             return { error: 'chatModel not provided in configurable context' };
         }
 
+        // OTel Span
+        const provider = context?.configurable?.provider ?? 'unknown';
+        const model = context?.configurable?.model ?? 'unknown';
+        const round = context?.configurable?.llmRound ?? 1;
+        const { span, ctx: spanCtx } = startLLMSpan({ model, provider, round });
+
         try {
             // bindTools 后的 model 仍然是 Runnable<BaseMessage[], AIMessage>
             const modelWithTools: Runnable =
@@ -37,13 +45,18 @@ export function createLLMNode() {
 
             // 直接 invoke — LangGraph runtime 通过 callbacks 在内部触发 streaming
             // 并按 messages-tuple 协议向 SDK 发出 token chunk
-            const aiMessage: AIMessage = await modelWithTools.invoke(state.messages, {
-                signal: abortSignal,
-            });
+            const aiMessage: AIMessage = await otelContext.with(spanCtx, () =>
+                modelWithTools.invoke(state.messages, {
+                    signal: abortSignal,
+                }),
+            );
 
+            endLLMSpan(span, aiMessage);
             return { messages: [aiMessage] };
         } catch (error) {
-            return { error: error instanceof Error ? error.message : 'LLM call failed' };
+            const message = error instanceof Error ? error.message : 'LLM call failed';
+            endLLMSpan(span, { error: message });
+            return { error: message };
         }
     };
 }
