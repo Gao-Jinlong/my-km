@@ -17,6 +17,13 @@ Available gstack skills: `/office-hours`, `/plan-ceo-review`, `/plan-eng-review`
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
 | [CLAUDE.md](CLAUDE.md) | Project instructions (this file) |
 
+## Design System
+
+Read [docs/design-system/agent-guide.md](docs/design-system/agent-guide.md) before touching UI code.
+Quick reference: no bare hex colors, new components go to `packages/design-system/`, tokens -> `packages/design-tokens/src/`.
+Visual spec (authoritative): `docs/design-system/design-system.pen`.
+Design-first: code implements design, never the reverse. No script reads/writes `.pen` files.
+
 ## Skill routing
 
 When the user's request matches an available skill, invoke it via the Skill tool. When in doubt, invoke the skill.

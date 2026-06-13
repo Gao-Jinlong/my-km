@@ -2,12 +2,11 @@
 
 - **Status**: accepted
 - **Date**: 2026-06-13
-- **Owners**: 单人 + AI agent 协作（小团队 / 设计稿 + 代码双向同步）
-- **Source of truth**: 本文件 + `packages/design-tokens/src/`
+- **Owners**: 单人 + AI agent 协作（design-first / code-aligning）
+- **Source of truth**: `docs/design-system/design-system.pen`（视觉）+ 本文件（工程治理）
 - **Related**:
-  - 设计稿探索：`docs/design-system/pencil-new.pen`
+  - 权威设计稿：`docs/design-system/design-system.pen`
   - 决策记录：`docs/design-system/decisions/`
-  - 实施计划（待生成）：`docs/superpowers/specs/2026-06-13-design-system-plan.md`
 
 ---
 
@@ -17,7 +16,7 @@
 
 | 维度 | 现状 | 问题 |
 |---|---|---|
-| Token | `apps/web/src/app/globals.css` 内置 `--color-*` + `--ws-*`；`tailwind.config.ts` 各映射一份；Pencil `pencil-new.pen` 手画色板/字号/间距 | 三处不同步，无 single source of truth；`--ws-*` 命名扁平、语义不明 |
+| Token | `apps/web/src/app/globals.css` 内置 `--color-*` + `--ws-*`；`tailwind.config.ts` 各映射一份 | 三处不同步，无 single source of truth；`--ws-*` 命名扁平、语义不明 |
 | 组件 | `apps/web/src/components/ui/` 共 13 个 shadcn 风格组件 | 数量不够；API 不统一；混入业务组件（LanguageSwitcher）；缺 a11y / Storybook |
 | Pattern | 业务里 EmptyState / 确认弹窗 / 页头到处复制粘贴 | 无沉淀，每次重写 |
 | 编辑器 UI | Lexical 编辑器内 toolbar / floating menu 散落，颜色间距硬编码 | 不能独立预览、与 chrome 主题耦合 |
@@ -26,7 +25,7 @@
 
 ### 0.2 目标
 
-1. **token 与代码对齐**：代码为唯一源，Pencil 单向同步。
+1. **设计稿为唯一视觉源（design-first）**：`design-system.pen` 是权威设计稿，代码实现对齐设计稿。
 2. **组件库统一化**：Primitives + Patterns 双层结构，覆盖 chrome 与编辑器。
 3. **多主题可扩展**：架构上即支持 light / dark + 预留 sepia / high-contrast / 编辑器独立主题。
 4. **AI agent 友好**：所有 token / primitive / pattern 在 codegraph 与 `docs/design-system/index.md` 中可被检索。
@@ -43,7 +42,7 @@
 
 ### 1.1 三大设计哲学
 
-1. **代码为唯一源**：`packages/design-tokens` 的 TS 源文件是真理；CSS、Pencil variables、TS 类型、Markdown 索引都通过脚本生成。禁止人工双向同步。
+1. **设计稿为唯一视觉源（design-first）**：`docs/design-system/design-system.pen` 是唯一权威设计稿。token 源码、组件实现都必须主动对齐设计稿。如果实现与设计冲突，默认实现是错的。任何脚本都不能读取、生成或修改 `.pen` 设计稿。
 2. **三层金字塔，禁止跨层乱引**：
 
    ```
@@ -71,11 +70,10 @@ apps/
   web/                    # 业务，依赖 design-system
 
 docs/design-system/
-  spec.md                 # 本文件
-  pencil-new.pen          # Pencil 探索/评审稿（人工）
-  pencil-system.pen       # 由脚本同步、与 token 一致的快照（机器）
+  design-system.pen       # 唯一权威设计稿（人工维护，禁止脚本读写）
+  spec.md                 # 本文件（工程治理规范）
+  agent-guide.md          # AI agent 快速上手
   decisions/              # ADR 序列
-  index.md                # 由脚本生成的 agent 索引
 ```
 
 ### 1.3 边界判定
@@ -215,7 +213,7 @@ packages/design-tokens/dist/
   tokens.css            # :root, [data-theme="light"] { --color-bg-primary: ... }
                         # [data-theme="dark"]          { --color-bg-primary: ... }
   tokens.ts             # { color: { bg: { primary: 'var(--color-bg-primary)' } } }
-  tokens.json           # 中间产物，给 Pencil 同步用
+  tokens.json           # 中间产物，供工具链使用
   tokens.d.ts           # 完整类型定义
 ```
 
@@ -246,11 +244,12 @@ import { tokens } from '@my-km/design-tokens';
 
 - **编辑器独立主题**（如 sepia 阅读模式）：在编辑器容器节点上挂 `data-editor-theme="sepia"`，CSS 仅覆盖 `editor.*` 那部分变量。靠 CSS 变量级联作用域实现，**不靠 prop drilling**。
 
-### 2.7 Pencil 设计稿协作（单向）
+### 2.7 设计稿协作（design-first）
 
-- **Pencil → 代码（探索阶段）**：在 `pencil-new.pen` 画新设计、加新色块；评审通过后**人工**把新值加到 design-tokens 源码，再跑生成。Pencil 在这里是"提案稿"。
-- **代码 → Pencil（同步阶段）**：脚本 `pnpm tokens:sync` 读 `tokens.json`，调用 `pencil_set_variables` 注入 `pencil-system.pen` 的 variables，并按模板重新渲染色板/字号/间距示例 frame。
-- **铁律**：Pencil 同步是**单向**（代码 → Pencil），不读 Pencil 反向回写。
+- **设计变更从 `design-system.pen` 开始**：任何视觉或组件规格变更，先在设计稿中更新，再对齐代码。
+- **代码实现设计稿**：`packages/design-tokens/src/` 和 `packages/design-system/src/` 是设计稿的工程实现，不是设计稿的来源。
+- **铁律**：任何脚本都不能读取、生成或修改 `.pen` 设计稿。Pencil 设计稿只能通过 Pencil 编辑器或 MCP 工具人工维护。
+- **设计规格缺失时**：先更新 `design-system.pen`，再实现代码。不允许"先写代码再补设计"。
 
 ---
 
@@ -485,7 +484,7 @@ schema.ts          # Token 形状的 TS 类型 + zod 运行时 schema
 - 输出四份产物到 `dist/`：
   1. `tokens.css` —— `:root, [data-theme="light"] { ... }` + `[data-theme="dark"] { ... }`
   2. `tokens.ts` —— `{ color: { bg: { primary: 'var(--color-bg-primary)' } } }`
-  3. `tokens.json` —— 中间产物，供 Pencil 同步用
+  3. `tokens.json` —— 中间产物，供工具链使用
   4. `tokens.d.ts` —— 完整类型定义
 
 **npm scripts**：
@@ -498,19 +497,17 @@ verify      # 校验两份主题形状一致 + 引用完整性
 
 **与 Tailwind 衔接**：design-system 包导出 `tailwind-preset.ts`，读 `tokens.ts` 自动映射进 Tailwind 的 `theme.colors / spacing / borderRadius`。`apps/web/tailwind.config.ts` 只引这个 preset，不再手写颜色。
 
-### 5.2 Pencil 同步脚本
+### 5.2 设计稿维护（无脚本）
 
-**位置**：`scripts/sync-pencil-tokens.ts`（仓库根级）
+**位置**：`docs/design-system/design-system.pen`
 
-**功能**：
+**维护方式**：通过 Pencil 编辑器或 MCP 工具人工维护。
 
-- 读 `dist/tokens.json`；
-- 调 `pencil_set_variables` 写入 `docs/design-system/pencil-system.pen`；
-- 用 `pencil_batch_design` 按模板重新渲染色板/字号/间距示例 frame。
-
-**触发**：本地 `pnpm tokens:sync`；CI 在 design-tokens 包变更时跑校验，diff 超阈值 fail。
-
-**铁律**：单向（代码 → Pencil），不反向回写。
+**铁律**：
+- 任何脚本都不能读取、生成或修改 `.pen` 设计稿。
+- 设计变更从设计稿开始，代码对齐设计稿。
+- `packages/design-tokens/src/` 实现设计稿中的 foundation 和 theme 决策。
+- `packages/design-system/src/` 实现设计稿中的 primitives 和 patterns。
 
 ### 5.3 Storybook 站点
 
@@ -667,7 +664,6 @@ Stage 4  收尾与清理         —— 删 web 旧 components/ui
 6. **批量修硬编码颜色**：跑全仓 grep，把 `#xxx` / `bg-[#xxx]` / `style={{ color }}` 替换为 token utility；**单 PR 不含其他变更**；
 7. **`--ws-*` 升级为 `workspace.*` Tier 3 token**：编辑器/三栏布局受影响，单独再开一个 PR；
 8. 补 5 个 primitive 的 stories + token 展示 stories；
-9. Pencil 同步脚本 `pnpm tokens:sync` 跑通，更新 `pencil-system.pen`。
 
 **验收**：
 
@@ -771,9 +767,9 @@ Stage 4  收尾与清理         —— 删 web 旧 components/ui
 | 1 | 现状痛点排序 | 整体规划 | 单点突破 | §0 |
 | 2 | 使用与协作场景 | 小团队 + 设计代码双向 | 单人 / 多人发包 | §0 |
 | 3 | 覆盖边界 | 含编辑器 + 专项 token | 仅 chrome / 仅 base | §1.3 / §2.3 |
-| 4 | Token 唯一源 | 代码（design-tokens） | 中立源生成 / 文档 | §2 / §5.1 |
+| 4 | Token 唯一源 | 设计稿（design-first）+ 代码实现 | 中立源生成 / 文档 | §2 / §5.1 |
 | 5 | 包形态 | 双包（tokens + system） | 单包 / 三包 | §1.2 |
-| 6 | 文档平台 | Storybook + Pencil 双质 | 仅 Storybook / 内部 styleguide | §5.3 / §2.7 |
+| 6 | 文档平台 | Storybook + 设计稿（design-system.pen） | 仅 Storybook / 内部 styleguide | §5.3 / §2.7 |
 | 7 | 主题支持 | 多主题可扩展（data-theme） | 仅 light / 仅 light+dark | §2.5 / §2.6 |
 | 8 | 治理偏重 | 文档 + 轻 lint，分阶段加重 | 全自动化硬架构 / 仅文档 | §5.4 |
 | 9 | Token 分层 | Reference / System / Domain 三段 | 扁平 / 两段 | §2.1 |
@@ -792,7 +788,7 @@ Stage 4  收尾与清理         —— 删 web 旧 components/ui
 - **Primitive**：无业务语义的基础组件，强调可访问性 + 通用 API。
 - **Pattern**：由 primitive 组合的复合 UI 模式，解决反复出现的具体问题。
 - **Reference / System / Component**：三段式 token 分层（也称 Global / Alias / Component，本系统用 Tier 1/2/3 表达）。
-- **Single Source of Truth (SoT)**：唯一权威源，本系统是 `packages/design-tokens/src/`。
+- **Single Source of Truth (SoT)**：唯一权威源，视觉是 `docs/design-system/design-system.pen`，工程是 `packages/design-tokens/src/`。
 - **CVA**：[class-variance-authority](https://cva.style/)，用类型安全方式定义组件变体。
 - **ADR**：Architecture Decision Record，结构化的决策记录。
 - **领域子树（Domain subtree）**：在 token 树下以命名空间形式存在的领域专用 token 集合，如 `editor.*` / `workspace.*`。

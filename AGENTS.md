@@ -64,17 +64,27 @@ pnpm dev
 
 | 文档 | 摘要 |
 |------|------|
+| [docs/design-system/agent-guide.md](docs/design-system/agent-guide.md) | AI agent 快速上手指南（design-first 治理） |
 | [docs/design-system/spec.md](docs/design-system/spec.md) | 设计系统完整规范（token / primitive / pattern / 工程化 / 路线图） |
+| [docs/design-system/design-system.pen](docs/design-system/design-system.pen) | 唯一权威设计稿（人工维护，禁止脚本读写） |
 | [docs/design-system/decisions/](docs/design-system/decisions/) | ADR 序列：0001 三段式 token、0002 双包结构、0003 API 公约、0004 primitive vs pattern |
-| [packages/design-tokens/](packages/design-tokens/) | Token 唯一源；改 token 只动这里，跑 `pnpm tokens:build` |
-| [packages/design-system/](packages/design-system/) | Primitives + patterns + Tailwind preset（Stage 0/1a 为空壳，plan #2 填充） |
+| [packages/design-tokens/](packages/design-tokens/) | Token 工程实现（设计稿的 foundation 映射）；改 token 只动这里，跑 `pnpm tokens:build` |
+| [packages/design-system/](packages/design-system/) | Primitives + patterns + Tailwind preset（骨架阶段） |
 | [apps/storybook/](apps/storybook/) | 文档站；`pnpm design:storybook` 启动，`pnpm design:storybook:build` 构建静态站 |
+
+### Design-first 源头关系
+
+1. `design-system.pen` 是唯一权威设计稿。
+2. `packages/design-tokens/src/` 实现设计稿的 foundation/theme。
+3. `packages/design-system/` 实现设计稿的 primitives/patterns。
+4. **如果实现与设计冲突，默认实现是错的。**
+5. **任何脚本都不能读取、生成或修改 `.pen` 设计稿。**
 
 ### 三条最常违反的规则
 
 1. **不要写裸十六进制颜色或 `bg-[#xxx]`**。颜色一律走 token：`bg-bg-primary` / `text-fg-muted` 或 `style={{ background: tokens.color.bg.primary }}`。
 2. **新组件不进 `apps/web/src/components/ui/`**。primitive 进 `packages/design-system/src/primitives/`，pattern 进 `.../patterns/`，业务组件留在 `apps/web/src/components/{domain}/`。
-3. **改 token 必走源码**：编辑 `packages/design-tokens/src/themes/{light,dark}.ts`，**不要**手改 `globals.css` 或 `dist/tokens.css`（后者是生成产物）。
+3. **视觉变更从 `design-system.pen` 开始**：先更新设计稿，再对齐代码。不允许"先写代码再补设计"。
 
 ## 注意事项
 
