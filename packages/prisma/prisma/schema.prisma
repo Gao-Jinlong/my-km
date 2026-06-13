@@ -155,3 +155,48 @@ model RunEvent {
   @@index([threadId, createdAt])
   @@index([runId])
 }
+
+model OtelTrace {
+  id          String   @id @default(cuid())
+  traceId     String   @unique @map("trace_id")
+  rootSpanId  String   @map("root_span_id")
+  serviceName String   @map("service_name")
+  startTime   DateTime @map("start_time")
+  endTime     DateTime? @map("end_time")
+  durationMs  Int?     @map("duration_ms")
+  status      String   @default("OK")
+  attributes  Json     @default("{}")
+
+  spans       OtelSpan[]
+
+  @@map("otel_traces")
+  @@index([startTime(sort: Desc)])
+  @@index([traceId])
+}
+
+model OtelSpan {
+  id            String   @id @default(cuid())
+  spanId        String   @unique @map("span_id")
+  traceId       String   @map("trace_id")
+  parentSpanId  String?  @map("parent_span_id")
+  name          String
+  kind          String
+  serviceName   String   @map("service_name")
+  startTime     DateTime @map("start_time")
+  endTime       DateTime? @map("end_time")
+  durationMs    Int?     @map("duration_ms")
+  status        String   @default("OK")
+  statusMessage String?  @map("status_message")
+  attributes    Json     @default("{}")
+  events        Json     @default("[]")
+  links         Json     @default("[]")
+
+  trace         OtelTrace @relation(fields: [traceId], references: [traceId], onDelete: Cascade)
+
+  @@map("otel_spans")
+  @@index([traceId])
+  @@index([parentSpanId])
+  @@index([name])
+  @@index([serviceName])
+  @@index([startTime(sort: Desc)])
+}
