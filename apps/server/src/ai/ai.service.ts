@@ -190,6 +190,13 @@ export class AiChatService {
                     input = { messages };
                 }
 
+                langgraphSpan.addEvent('stream_started', {
+                    runId: record.id,
+                    threadId: record.threadId,
+                    provider: record.runContext.llmConfig.provider,
+                    model: record.runContext.llmConfig.model,
+                });
+
                 // 4. 流式执行 — 多 streamMode 时 chunk 形如 [mode, payload]
                 const stream = await graph.stream(input, {
                     streamMode: ['messages', 'values'],
@@ -214,12 +221,18 @@ export class AiChatService {
 
                 // 5. 透传 LangGraph 事件 → SSE
                 let hasInterrupt = false;
+                let firstChunkEmitted = false;
 
                 for await (const chunk of stream as AsyncIterable<unknown>) {
                     if (record.abortSignal.aborted) break;
 
                     if (!Array.isArray(chunk) || chunk.length < 2) continue;
                     const [mode, payload] = chunk as [string, unknown];
+
+                    if (!firstChunkEmitted) {
+                        langgraphSpan.addEvent('first_chunk_emitted', { mode });
+                        firstChunkEmitted = true;
+                    }
 
                     if (mode === 'messages') {
                         // payload 形如 [BaseMessage(Chunk), metadata]
@@ -233,16 +246,25 @@ export class AiChatService {
                     if (mode === 'values') {
                         // payload 是状态快照 { messages, threadId, error, [__interrupt__] }
                         const data = this.serializeValuesPayload(payload);
-                        if (
-                            data &&
-                            typeof data === 'object' &&
-                            '__interrupt__' in data &&
-                            Array.isArray((data as Record<string, unknown>).__interrupt__) &&
-                            ((data as Record<string, unknown>).__interrupt__ as unknown[]).length >
-                                0
-                        ) {
+                        const valueData =
+                            data && typeof data === 'object'
+                                ? (data as Record<string, unknown>)
+                                : null;
+                        const hasInterruptOnChunk = Boolean(
+                            valueData &&
+                                '__interrupt__' in valueData &&
+                                Array.isArray(valueData.__interrupt__) &&
+                                (valueData.__interrupt__ as unknown[]).length > 0,
+                        );
+                        if (hasInterruptOnChunk) {
                             hasInterrupt = true;
                         }
+                        langgraphSpan.addEvent('values_emitted', {
+                            hasInterrupt: hasInterruptOnChunk,
+                            messageCount: Array.isArray(valueData?.messages)
+                                ? (valueData.messages as unknown[]).length
+                                : 0,
+                        });
                         await record.emitEvent({ event: 'values', data });
                     }
                     // TODO 其他 streamMode 暂不处理
@@ -260,6 +282,7 @@ export class AiChatService {
                     await this.runManager.setStatus(record.id, RunStatus.Completed);
                 }
 
+                langgraphSpan.addEvent('stream_completed', { status: record.status });
                 langgraphSpan.setStatus({ code: SpanStatusCode.OK });
                 await record.emitEvent({ event: 'end', data: {} });
             });

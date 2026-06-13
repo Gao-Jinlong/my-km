@@ -5,21 +5,11 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
-import './config/load-env';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { I18nMiddleware } from './i18n';
 import { LoggerService } from './logger/logger.service';
-import { initTracing } from './tracing/tracing.init';
 
-// OTel 必须在其他模块之前初始化
-initTracing(() => {
-    const { PrismaClient, PrismaPg } = require('@my-km/prisma') as typeof import('@my-km/prisma');
-    return new PrismaClient({
-        adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }),
-    });
-});
-
-async function bootstrap() {
+export async function bootstrap() {
     const app = await NestFactory.create(AppModule, {
         bufferLogs: true,
     });
@@ -118,5 +108,3 @@ async function bootstrap() {
         url: `http://localhost:${port}/api-docs`,
     });
 }
-
-void bootstrap();

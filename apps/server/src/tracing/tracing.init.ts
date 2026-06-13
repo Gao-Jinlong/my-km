@@ -16,6 +16,12 @@ import { PgSpanExporter } from './exporters/pg-span.exporter';
 
 let sdk: NodeSDK | undefined;
 
+export function shouldIgnoreIncomingTracingRequest(url?: string): boolean {
+    if (!url) return false;
+    const path = url.split('?')[0];
+    return path === '/api/health' || path === '/favicon.ico' || path.startsWith('/api/traces');
+}
+
 /**
  * 初始化 OTel SDK
  *
@@ -38,9 +44,7 @@ export function initTracing(getPrisma: () => import('@my-km/prisma').PrismaClien
         }),
         instrumentations: [
             new HttpInstrumentation({
-                ignoreIncomingRequestHook: req => {
-                    return req.url === '/api/health' || req.url === '/favicon.ico';
-                },
+                ignoreIncomingRequestHook: req => shouldIgnoreIncomingTracingRequest(req.url),
             }),
             new RedisInstrumentation(),
         ],

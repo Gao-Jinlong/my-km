@@ -44,6 +44,7 @@ export function endLLMSpan(
     result: AIMessage | { error: string },
 ): void {
     if ('error' in result) {
+        span.addEvent('llm.error', { message: result.error });
         span.setStatus({ code: SpanStatusCode.ERROR, message: result.error });
     } else {
         const msg = result as AIMessage;
@@ -54,7 +55,10 @@ export function endLLMSpan(
             span.setAttributes({
                 'llm.inputTokens': usage.input_tokens ?? 0,
                 'llm.outputTokens': usage.output_tokens ?? 0,
+                'llm.usageAvailable': true,
             });
+        } else {
+            span.setAttribute('llm.usageAvailable', false);
         }
         span.addEvent('completion_received');
         span.setStatus({ code: SpanStatusCode.OK });

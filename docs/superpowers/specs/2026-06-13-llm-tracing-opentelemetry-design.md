@@ -279,3 +279,135 @@ model OtelSpan {
 # 前端
 @opentelemetry/api                        # ~5KB 纯接口包
 ```
+
+## 7. 当前链路缺口修复增量
+
+### 7.1 问题
+
+当前对话链路通常只能看到 `frontend.chat.sendMessage`，缺少 LLM 调用返回、SSE 接收、前端消息处理与渲染阶段的可观测记录。排查结果显示原因分为两类：
+
+1. **后端 OTel 初始化时序风险**：`main.ts` 中 `initTracing()` 写在静态 import 之后执行。由于 ESM/CommonJS 模块加载会先解析并执行静态依赖，HTTP 自动埋点可能晚于 HTTP/Nest 相关模块加载，导致 `HttpInstrumentation` 无法稳定 patch 请求入口，前端传入的 `traceparent` 不能稳定成为后端 active context。
+2. **前端接收侧没有埋点**：`use-langgraph-stream.ts` 只创建并结束 `frontend.chat.sendMessage` 根 span，没有在 metadata、messages、values、rAF 渲染提交、stream end 等阶段记录 event 或子 span。
+
+### 7.2 目标链路
+
+本次修复后，一次用户消息应形成如下观测结构：
+
+```
+frontend.chat.sendMessage
+  events:
+    request_submitted
+    metadata_received
+    first_message_chunk_received
+    values_received
+    stream_ended
+
+POST /api/threads/:threadId/runs/stream
+  langgraph.run
+    events:
+      stream_started
+      first_chunk_emitted
+      values_emitted
+      stream_completed
+    llm_node.invoke
+      events:
+        prompt_sent
+        completion_received
+```
+
+其中：
+- 前后端必须通过同一个 `traceId` 串联。
+- 后端 `langgraph.run` 必须成为 HTTP server span 的子 span。
+- `llm_node.invoke` 必须成为 `langgraph.run` 的子 span。
+- 前端高频 token 不创建大量 span，只在请求、metadata、首次 AI 消息、values、结束等关键节点加 event。
+
+### 7.3 后端修复设计
+
+#### OTel 初始化前置
+
+新增独立 bootstrap 入口，例如 `apps/server/src/bootstrap.ts` 或等价入口，保证第一步执行 tracing 初始化，再动态加载 Nest 主程序：
+
+1. bootstrap 入口先加载 env。
+2. 调用 `initTracing()`。
+3. 再动态 `import('./main')` 或调用 `bootstrap()`。
+4. `main.ts` 不再直接执行 `initTracing()`，只负责 Nest 应用创建和监听。
+
+这样可以确保 `@opentelemetry/instrumentation-http` 在 Nest/HTTP 模块加载前完成 patch。
+
+#### 明确上下文传播验证
+
+保留前端 `traceparent` 注入逻辑，后端依赖 HTTP instrumentation 自动提取。修复后用测试或手动验证确认：
+
+- 前端根 span 的 `traceId` 与后端 HTTP span 一致。
+- `langgraph.run` 的 parent 是后端 HTTP span。
+- `llm_node.invoke` 的 parent 是 `langgraph.run`。
+
+#### LangGraph stream events
+
+在 `executeRunProtocol()` 的 `langgraph.run` span 上增加事件：
+
+| 事件 | 时机 | 属性 |
+|------|------|------|
+| `stream_started` | graph.stream 创建前或创建后 | `runId`, `threadId`, `provider`, `model` |
+| `first_chunk_emitted` | 第一个 `messages` 或 `values` chunk 发出时 | `mode` |
+| `values_emitted` | 每次 values 事件发出时 | `hasInterrupt`, `messageCount` |
+| `stream_completed` | end 事件发出前 | `status` |
+
+避免对每个 token 创建 span；对于 messages token chunk，只记录首个 chunk。
+
+#### LLM span 完善
+
+保留现有 `prompt_sent` 与 `completion_received`，补齐：
+
+- error 路径记录 `llm.error` event，并设置 span status ERROR。
+- 成功路径记录 `llm.inputTokens`、`llm.outputTokens`，缺失 usage 时不写 0 误导，可记录 `llm.usageAvailable=false`。
+
+### 7.4 前端修复设计
+
+#### 根 span 保持不变
+
+`frontend.chat.sendMessage` 继续作为前端根 span，并负责生成 `traceparent`。它不拆成多个高频子 span，避免浏览器侧上报量过大。
+
+#### 接收侧事件
+
+在 `use-langgraph-stream.ts` 中围绕 `useStream` 状态变化记录事件：
+
+| 事件 | 时机 | 属性 |
+|------|------|------|
+| `request_submitted` | `stream.submit()` 前 | `messageLength`, `hasContext` |
+| `metadata_received` | 收到 run/thread 信息时 | `runId`, `threadId`, `serverTraceId` |
+| `first_message_chunk_received` | `stream.messages` 首次出现 AI 内容时 | `messageCount` |
+| `values_received` | `stream.messages` 更新并完成转换时 | `messageCount` |
+| `stream_ended` | `isLoading=false` 且根 span 将结束前 | `hasError` |
+
+如果 LangGraph SDK 不暴露原始 metadata 事件，则使用 `onCreated`、`onThreadId` 与 `stream.messages` 状态作为可观测边界；不为了埋点绕开 SDK 或重写 SSE 客户端。
+
+#### flush 策略
+
+根 span 结束后立即 `forceFlush()`，减少用户发送消息后等待 5 秒才看到 trace 的延迟。flush 失败继续静默，不影响对话。
+
+### 7.5 测试与验收
+
+#### 单元测试
+
+- `langgraph-client`：继续验证 active `traceparent` 会进入请求 header。
+- `TracingService`：验证 span event 会被序列化并上报。
+- `AiChatService.executeRunProtocol`：验证 `metadata` 里包含 traceId，且 stream 相关事件被添加到 active span。
+
+#### 集成/手动验收
+
+发送一条普通消息后，在 trace 详情中应看到：
+
+1. 同一 trace 下同时存在 `my-km-web` 与 `my-km-server` span。
+2. `frontend.chat.sendMessage` events 包含 `request_submitted`、`first_message_chunk_received`、`values_received`、`stream_ended`。
+3. `langgraph.run` events 包含 `stream_started`、`first_chunk_emitted`、`stream_completed`。
+4. `llm_node.invoke` events 包含 `prompt_sent`、`completion_received`，并带有 model/provider/token usage 属性。
+5. 若 LLM 调用失败，`llm_node.invoke` 和 `langgraph.run` 均标记 ERROR，并能看到错误 message。
+
+### 7.6 非目标
+
+- 不引入完整前端 OTel SDK。
+- 不对每个 token chunk 创建 span。
+- 不在本次实现 OTLP、Jaeger、Grafana。
+- 不重写 LangGraph SDK 的 SSE 客户端。
+- 不记录 tracing 调试接口自身（`/api/traces*`）的 HTTP spans，避免“查看 trace”污染业务 trace 列表。
