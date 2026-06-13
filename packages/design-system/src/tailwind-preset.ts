@@ -70,9 +70,9 @@ const config: Partial<Config> = {
             },
             spacing: {
                 0: cssVar('spacing-0'),
-                0.5: cssVar('spacing-0_5'),
+                0.5: cssVar('spacing-0-5'),
                 1: cssVar('spacing-1'),
-                1.5: cssVar('spacing-1_5'),
+                1.5: cssVar('spacing-1-5'),
                 2: cssVar('spacing-2'),
                 3: cssVar('spacing-3'),
                 4: cssVar('spacing-4'),
