@@ -3,12 +3,13 @@
   "mcp": {
     "codegraph": {
       "type": "local",
-      "command": [
-        "codegraph",
-        "serve",
-        "--mcp"
-      ],
-      "enabled": true
-    }
-  }
+      "command": ["codegraph", "serve", "--mcp"],
+      "enabled": true,
+    },
+  },
+  "permission": {
+    "edit": "allow",
+    "bash": "allow",
+    "read": "allow",
+  },
 }
