@@ -21,7 +21,12 @@
     "clean": "turbo run clean && rm -rf node_modules",
     "setup:env": "node -e \"require('fs').cpSync('apps/server/.env.example','apps/server/.env');require('fs').cpSync('apps/web/.env.example','apps/web/.env',{force:false})\"",
     "prepare": "husky",
-    "generate-docs-index": "npx tsx skills/project-docs/scripts/generate-index.ts"
+    "generate-docs-index": "npx tsx skills/project-docs/scripts/generate-index.ts",
+    "tokens:build": "pnpm --filter @my-km/design-tokens build",
+    "tokens:verify": "pnpm --filter @my-km/design-tokens verify",
+    "tokens:test": "pnpm --filter @my-km/design-tokens test",
+    "design:storybook": "pnpm --filter @my-km/storybook dev",
+    "design:storybook:build": "pnpm --filter @my-km/storybook build"
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.11",
