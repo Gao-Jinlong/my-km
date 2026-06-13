@@ -9,6 +9,15 @@ import './config/load-env';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { I18nMiddleware } from './i18n';
 import { LoggerService } from './logger/logger.service';
+import { initTracing } from './tracing/tracing.init';
+
+// OTel 必须在其他模块之前初始化
+initTracing(() => {
+    const { PrismaClient, PrismaPg } = require('@my-km/prisma') as typeof import('@my-km/prisma');
+    return new PrismaClient({
+        adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }),
+    });
+});
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule, {
@@ -92,8 +101,8 @@ async function bootstrap() {
         },
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization', 'X-Locale'],
-        exposedHeaders: ['Content-Range', 'X-Content-Range'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Locale', 'traceparent', 'tracestate'],
+        exposedHeaders: ['Content-Range', 'X-Content-Range', 'traceparent'],
     });
 
     const port = process.env.PORT ?? 3000;
