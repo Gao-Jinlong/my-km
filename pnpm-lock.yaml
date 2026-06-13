@@ -370,6 +370,12 @@ importers:
       '@lexical/utils':
         specifier: ^0.39.0
         version: 0.39.0
+      '@my-km/design-system':
+        specifier: workspace:*
+        version: link:../../packages/design-system
+      '@my-km/design-tokens':
+        specifier: workspace:*
+        version: link:../../packages/design-tokens
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1

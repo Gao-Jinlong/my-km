@@ -1,7 +1,9 @@
+import dsPreset from '@my-km/design-system/tailwind-preset';
 import type { Config } from 'tailwindcss';
 
 const config: Config = {
-    darkMode: 'class',
+    presets: [dsPreset],
+    darkMode: ['selector', '[data-theme="dark"]'],
     content: [
         './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
         './src/components/**/*.{js,ts,jsx,tsx,mdx}',

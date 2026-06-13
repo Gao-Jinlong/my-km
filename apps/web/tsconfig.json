@@ -23,7 +23,11 @@
             "@/components/*": ["./src/components/*"],
             "@/lib/*": ["./src/lib/*"],
             "@workspace/shared": ["../../packages/shared/src"],
-            "@workspace/shared/*": ["../../packages/shared/src/*"]
+            "@workspace/shared/*": ["../../packages/shared/src/*"],
+            "@my-km/design-tokens": ["../../packages/design-tokens/src"],
+            "@my-km/design-tokens/*": ["../../packages/design-tokens/src/*"],
+            "@my-km/design-system": ["../../packages/design-system/src"],
+            "@my-km/design-system/*": ["../../packages/design-system/src/*"]
         },
         "allowArbitraryExtensions": true,
         "experimentalDecorators": true,

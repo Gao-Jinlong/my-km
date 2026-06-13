@@ -30,13 +30,12 @@ export function updateThemeDOM(theme: Theme) {
     if (typeof window === 'undefined') return;
 
     const root = window.document.documentElement;
-    root.classList.remove('light', 'dark');
 
     if (theme === 'system') {
         const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        root.classList.add(isDark ? 'dark' : 'light');
+        root.setAttribute('data-theme', isDark ? 'dark' : 'light');
     } else {
-        root.classList.add(theme);
+        root.setAttribute('data-theme', theme);
     }
 }
 

@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
-import { AuthProvider } from '@/components/auth/auth-provider';
 import type { Locale } from '@/i18n/routing';
 import { routing } from '@/i18n/routing';
 import { ThemeInitializer } from '@/stores/theme-store';
@@ -44,12 +43,14 @@ export default async function LocaleLayout({
     const messages = await getMessages();
 
     return (
-        <html lang={isValidLocale ? locale : routing.defaultLocale}>
+        <html
+            lang={isValidLocale ? locale : routing.defaultLocale}
+            data-theme="light"
+            suppressHydrationWarning
+        >
             <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
                 <ThemeInitializer />
-                <NextIntlClientProvider messages={messages}>
-                    <AuthProvider>{children}</AuthProvider>
-                </NextIntlClientProvider>
+                <NextIntlClientProvider messages={messages}>{children}</NextIntlClientProvider>
             </body>
         </html>
     );
