@@ -9,6 +9,7 @@ import { I18nModule } from './i18n';
 import { LoggerMiddleware } from './logger/logger.middleware';
 import { LoggerModule } from './logger/logger.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { TracingModule } from './tracing/tracing.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -21,6 +22,7 @@ import { UsersModule } from './users/users.module';
         AuthModule,
         I18nModule,
         AiModule,
+        TracingModule,
     ],
     controllers: [AppController],
     providers: [AppService],
