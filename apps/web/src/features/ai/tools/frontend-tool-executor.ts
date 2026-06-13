@@ -1,8 +1,9 @@
 import { Emitter, type Event } from '@/base/common/event';
+import { getTracer } from '@/lib/tracing/tracer';
 import {
-    createConfirmationStrategy,
     type ConfirmationMode,
     type ConfirmationStrategy,
+    createConfirmationStrategy,
 } from './confirmation-strategy';
 import type { ConfirmationRequest, FrontendToolHandler, ToolResult } from './types';
 
@@ -49,15 +50,33 @@ export class FrontendToolExecutor {
             return { success: false, error: `Unknown tool: ${toolName}` };
         }
 
+        const tracer = getTracer();
+        const toolSpan = tracer.startSpan('frontend.tool.execute', {
+            attributes: {
+                'tool.name': toolName,
+                'tool.type': handler.type,
+            },
+        });
+
         try {
             if (this.strategy.needsConfirmation(toolName, input)) {
                 const approved = await this.requestConfirmation(handler, input);
                 if (!approved) {
+                    toolSpan.setError('User rejected the operation');
+                    tracer.endSpan(toolSpan);
                     return { success: false, error: 'User rejected the operation' };
                 }
             }
-            return await handler.execute(input);
+
+            const result = await handler.execute(input);
+            if (!result.success) {
+                toolSpan.setError(result.error ?? 'Tool execution failed');
+            }
+            tracer.endSpan(toolSpan);
+            return result;
         } catch (err) {
+            toolSpan.setError(err instanceof Error ? err.message : String(err));
+            tracer.endSpan(toolSpan);
             return {
                 success: false,
                 error: err instanceof Error ? err.message : String(err),
