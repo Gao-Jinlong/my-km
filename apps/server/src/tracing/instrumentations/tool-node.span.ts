@@ -16,17 +16,24 @@ export function startToolSpan(options: ToolSpanOptions) {
         attributes: {
             'tool.name': options.toolName,
             'tool.call_id': options.toolCallId,
+            'tool.status': 'pending',
         },
     });
-    span.addEvent('interrupt_sent');
+    span.addEvent('interrupt_sent', { 'tool.status': 'pending' });
     return span;
 }
 
-export function endToolSpan(span: import('@opentelemetry/api').Span, error?: string): void {
+export function endToolSpan(
+    span: import('@opentelemetry/api').Span,
+    error?: string,
+    status = error ? 'error' : 'resumed',
+): void {
+    span.setAttribute('tool.status', status);
     if (error) {
+        span.addEvent('interrupt_error', { 'tool.status': status });
         span.setStatus({ code: SpanStatusCode.ERROR, message: error });
     } else {
-        span.addEvent('interrupt_resumed');
+        span.addEvent('interrupt_resumed', { 'tool.status': status });
         span.setStatus({ code: SpanStatusCode.OK });
     }
     span.end();

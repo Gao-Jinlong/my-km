@@ -1,6 +1,7 @@
 import { Emitter, type Event } from '@/base/common/event';
 import { getContainer } from '@/platform/bootstrap';
 import { TracingService } from '@/platform/tracing';
+import type { ITracingService, SpanOptions } from '@/platform/tracing/types';
 import {
     type ConfirmationMode,
     type ConfirmationStrategy,
@@ -20,6 +21,13 @@ import type { ConfirmationRequest, FrontendToolHandler, ToolResult } from './typ
  *    - confirm-destructive: 仅破坏性操作需确认
  * 3. 把执行结果作为 ToolResult 返回给调用方（再由调用方 resumeWithToolResult）
  */
+export interface ToolDispatchOptions {
+    toolCallId?: string;
+}
+
+export interface ToolTracingService
+    extends Pick<ITracingService, 'startSpan' | 'endSpan' | 'getActiveTraceparent'> {}
+
 export class FrontendToolExecutor {
     private readonly handlers = new Map<string, FrontendToolHandler>();
     private readonly _onConfirmationRequest = new Emitter<ConfirmationRequest>();
@@ -27,7 +35,10 @@ export class FrontendToolExecutor {
 
     private strategy: ConfirmationStrategy;
 
-    constructor(mode: ConfirmationMode = 'confirm-write') {
+    constructor(
+        mode: ConfirmationMode = 'confirm-write',
+        private readonly tracer?: ToolTracingService,
+    ) {
         this.strategy = createConfirmationStrategy(mode);
     }
 
@@ -45,24 +56,41 @@ export class FrontendToolExecutor {
         this.handlers.set(handler.name, handler);
     }
 
-    async dispatch(toolName: string, input: Record<string, unknown>): Promise<ToolResult> {
+    async dispatch(
+        toolName: string,
+        input: Record<string, unknown>,
+        options?: ToolDispatchOptions,
+    ): Promise<ToolResult> {
         const handler = this.handlers.get(toolName);
         if (!handler) {
             return { success: false, error: `Unknown tool: ${toolName}` };
         }
 
-        const tracer = getContainer().get(TracingService);
-        const toolSpan = tracer.startSpan('frontend.tool.execute', {
+        const tracer = this.tracer ?? getContainer().get(TracingService);
+        const traceContext = parseTraceparent(tracer.getActiveTraceparent());
+        const spanOptions: SpanOptions = {
+            traceId: traceContext?.traceId,
+            parentSpanId: traceContext?.parentSpanId,
             attributes: {
                 'tool.name': toolName,
                 'tool.type': handler.type,
+                'tool.status': 'running',
             },
-        });
+        };
+        if (options?.toolCallId) {
+            spanOptions.attributes = {
+                ...spanOptions.attributes,
+                'tool.call_id': options.toolCallId,
+            };
+        }
+        const toolSpan = tracer.startSpan('frontend.tool.execute', spanOptions);
+        toolSpan.addEvent('tool.execution_started');
 
         try {
             if (handler.type === 'write' || this.strategy.needsConfirmation(toolName, input)) {
                 const approved = await this.requestConfirmation(handler, input);
                 if (!approved) {
+                    toolSpan.setAttribute('tool.status', 'rejected');
                     toolSpan.setError('User rejected the operation');
                     tracer.endSpan(toolSpan);
                     return { success: false, error: 'User rejected the operation' };
@@ -71,16 +99,22 @@ export class FrontendToolExecutor {
 
             const result = await handler.execute(input);
             if (!result.success) {
+                toolSpan.setAttribute('tool.status', 'error');
                 toolSpan.setError(result.error ?? 'Tool execution failed');
+            } else {
+                toolSpan.setAttribute('tool.status', 'success');
             }
+            toolSpan.addEvent('tool.execution_completed');
             tracer.endSpan(toolSpan);
             return result;
         } catch (err) {
-            toolSpan.setError(err instanceof Error ? err.message : String(err));
+            const message = err instanceof Error ? err.message : String(err);
+            toolSpan.setAttribute('tool.status', 'error');
+            toolSpan.setError(message);
             tracer.endSpan(toolSpan);
             return {
                 success: false,
-                error: err instanceof Error ? err.message : String(err),
+                error: message,
             };
         }
     }
@@ -103,4 +137,17 @@ export class FrontendToolExecutor {
         this._onConfirmationRequest.dispose();
         this.handlers.clear();
     }
+}
+
+function parseTraceparent(
+    traceparent: string | null,
+): { traceId: string; parentSpanId: string } | null {
+    if (!traceparent) return null;
+    const parts = traceparent.split('-');
+    if (parts.length !== 4) return null;
+    const [, traceId, parentSpanId] = parts;
+    if (!/^[a-f0-9]{32}$/.test(traceId) || !/^[a-f0-9]{16}$/.test(parentSpanId)) {
+        return null;
+    }
+    return { traceId, parentSpanId };
 }

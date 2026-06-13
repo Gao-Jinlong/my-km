@@ -10,9 +10,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { collectEditorContext } from '@/features/ai/sdk/editor-context';
 import { FrontendToolExecutor } from '@/features/ai/tools/frontend-tool-executor';
-import { FileOpsHandler } from '@/features/ai/tools/handlers/file-ops';
-import { DocReadHandler } from '@/features/ai/tools/handlers/doc-read';
 import { DocEditHandler } from '@/features/ai/tools/handlers/doc-edit';
+import { DocReadHandler } from '@/features/ai/tools/handlers/doc-read';
+import { FileOpsHandler } from '@/features/ai/tools/handlers/file-ops';
 import { SearchHandler } from '@/features/ai/tools/handlers/search';
 import type { ConfirmationRequest } from '@/features/ai/tools/types';
 import type { MessageWire } from '@/features/ai/types/ai.types';
@@ -74,7 +74,9 @@ export function AIPanel() {
         exec.register(new FileOpsHandler(fileSystemService, getProjectRoot));
         exec.register(new DocReadHandler(documentStore, editorContainer, fileSystemService));
         exec.register(new DocEditHandler(documentStore, editorContainer, fileSystemService));
-        exec.register(new SearchHandler(documentStore, editorContainer, fileSystemService, getProjectRoot));
+        exec.register(
+            new SearchHandler(documentStore, editorContainer, fileSystemService, getProjectRoot),
+        );
         return exec;
     }, []);
 
@@ -94,10 +96,12 @@ export function AIPanel() {
     useEffect(() => {
         if (!interrupt) return;
         let cancelled = false;
-        toolExecutor.dispatch(interrupt.toolName, interrupt.input).then(result => {
-            if (cancelled) return;
-            resumeWithToolResult(interrupt.toolCallId, result);
-        });
+        toolExecutor
+            .dispatch(interrupt.toolName, interrupt.input, { toolCallId: interrupt.toolCallId })
+            .then(result => {
+                if (cancelled) return;
+                resumeWithToolResult(interrupt.toolCallId, result);
+            });
         return () => {
             cancelled = true;
         };

@@ -19,6 +19,8 @@ import { langgraphClient } from '@/features/ai/sdk/langgraph-client';
 import { getContainer } from '@/platform/bootstrap';
 import { type ActiveSpan, TracingService } from '@/platform/tracing';
 
+type TraceEventSpan = Pick<ActiveSpan, 'addEvent'>;
+
 /**
  * 与 useAIThread 兼容的消息格式
  *
@@ -77,6 +79,10 @@ function isHiddenFromUI(msg: Message): boolean {
  *
  * 返回 null 表示该消息不应展示（如 system 消息）。
  */
+export function toChatMessageForTest(msg: Message): ChatMessage | null {
+    return toChatMessage(msg);
+}
+
 function toChatMessage(msg: Message): ChatMessage | null {
     // system 消息不在对话流中展示（防御性处理，正常情况下已被 isHiddenFromUI 过滤）
     if (msg.type === 'system') {
@@ -114,6 +120,40 @@ function toChatMessage(msg: Message): ChatMessage | null {
 /**
  * 从 SDK Interrupt 中提取工具调用信息
  */
+export function recordToolCallEvents(
+    span: TraceEventSpan | null,
+    messages: Array<ChatMessage | null>,
+    seenToolCallIds: Set<string>,
+): void {
+    if (!span) return;
+
+    for (const message of messages) {
+        if (!message?.toolCalls?.length) continue;
+        for (const toolCall of message.toolCalls) {
+            if (seenToolCallIds.has(toolCall.id)) continue;
+            seenToolCallIds.add(toolCall.id);
+            span.addEvent('tool_call_received', {
+                'tool.call_id': toolCall.id,
+                'tool.name': toolCall.name,
+                messageId: message.id,
+            });
+        }
+    }
+}
+
+export function recordToolInterruptEvent(
+    span: TraceEventSpan | null,
+    interrupt: ToolInterrupt | null,
+    seenToolCallIds: Set<string>,
+): void {
+    if (!span || !interrupt || seenToolCallIds.has(interrupt.toolCallId)) return;
+    seenToolCallIds.add(interrupt.toolCallId);
+    span.addEvent('tool_call_interrupt_received', {
+        'tool.call_id': interrupt.toolCallId,
+        'tool.name': interrupt.toolName,
+    });
+}
+
 function extractInterrupt(interrupt: unknown): ToolInterrupt | null {
     if (!interrupt || typeof interrupt !== 'object') return null;
 
@@ -142,6 +182,9 @@ export function useLangGraphStream(): UseLangGraphStreamReturn {
     const [runId, setRunId] = useState<string | null>(null);
     const activeTraceSpan = useRef<ActiveSpan | null>(null);
     const activeTraceId = useRef<string | null>(null);
+    const hasSeenFirstMessageChunk = useRef(false);
+    const seenMessageToolCallIds = useRef(new Set<string>());
+    const seenInterruptToolCallIds = useRef(new Set<string>());
 
     const stream = useStream<{ messages: Message[] }>({
         client: langgraphClient,
@@ -149,9 +192,11 @@ export function useLangGraphStream(): UseLangGraphStreamReturn {
         threadId,
         messagesKey: 'messages',
         onThreadId: id => {
+            activeTraceSpan.current?.addEvent('metadata_received', { threadId: id });
             setThreadId(id);
         },
         onCreated: info => {
+            activeTraceSpan.current?.addEvent('metadata_received', { runId: info.run_id ?? null });
             setRunId(info.run_id ?? null);
         },
     });
@@ -173,6 +218,28 @@ export function useLangGraphStream(): UseLangGraphStreamReturn {
             .filter(msg => !isHiddenFromUI(msg))
             .map(toChatMessage)
             .filter((m): m is ChatMessage => m !== null);
+
+        if (activeTraceSpan.current && pendingRef.current.length > 0) {
+            recordToolCallEvents(
+                activeTraceSpan.current,
+                pendingRef.current,
+                seenMessageToolCallIds.current,
+            );
+
+            activeTraceSpan.current.addEvent('values_received', {
+                messageCount: pendingRef.current.length,
+            });
+
+            if (
+                !hasSeenFirstMessageChunk.current &&
+                pendingRef.current.some(msg => msg.role === 'ai')
+            ) {
+                activeTraceSpan.current.addEvent('first_message_chunk_received', {
+                    messageCount: pendingRef.current.length,
+                });
+                hasSeenFirstMessageChunk.current = true;
+            }
+        }
 
         // 安排下一帧刷新（如果尚未安排）
         if (!rafIdRef.current) {
@@ -198,6 +265,14 @@ export function useLangGraphStream(): UseLangGraphStreamReturn {
         [stream.interrupt],
     );
 
+    useEffect(() => {
+        recordToolInterruptEvent(
+            activeTraceSpan.current,
+            interrupt,
+            seenInterruptToolCallIds.current,
+        );
+    }, [interrupt]);
+
     // AI 正在流式生成：isLoading + 最后一条消息是 AI
     const isLastMessageStreaming =
         stream.isLoading && messages.length > 0 && messages[messages.length - 1].role === 'ai';
@@ -215,6 +290,10 @@ export function useLangGraphStream(): UseLangGraphStreamReturn {
             activeTraceSpan.current = rootSpan;
             activeTraceId.current = rootSpan.traceId;
             tracer.setActiveTraceparent(tracer.getTraceparent(rootSpan.traceId, rootSpan.spanId));
+            rootSpan.addEvent('request_submitted', {
+                messageLength: content.length,
+                hasContext: Boolean(context && Object.keys(context).length > 0),
+            });
 
             await stream.submit(
                 {
@@ -242,7 +321,7 @@ export function useLangGraphStream(): UseLangGraphStreamReturn {
                 traceId: activeTraceId.current ?? undefined,
                 parentSpanId: activeTraceSpan.current?.spanId,
                 attributes: {
-                    'tool.callId': toolCallId,
+                    'tool.call_id': toolCallId,
                 },
             });
             tracer.setActiveTraceparent(
@@ -276,9 +355,16 @@ export function useLangGraphStream(): UseLangGraphStreamReturn {
             if (stream.error) {
                 activeTraceSpan.current.setError(String(stream.error));
             }
+            activeTraceSpan.current.addEvent('stream_ended', {
+                hasError: Boolean(stream.error),
+            });
             tracer.endSpan(activeTraceSpan.current);
             tracer.setActiveTraceparent(null);
+            tracer.forceFlush();
             activeTraceSpan.current = null;
+            hasSeenFirstMessageChunk.current = false;
+            seenMessageToolCallIds.current.clear();
+            seenInterruptToolCallIds.current.clear();
         }
     }, [stream.isLoading, stream.error]);
 
