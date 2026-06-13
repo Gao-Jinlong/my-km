@@ -77,4 +77,19 @@ export const dark: ThemeShape = {
         accent: { default: ref.darkAccent.blue, foreground: ref.gray[1000] },
         icon: ref.darkText.muted,
     },
+    typography: {
+        family: { sans: ref.typography.family.sans, mono: ref.typography.family.mono },
+        size: { ...ref.typography.size },
+        weight: { ...ref.typography.weight },
+        lineHeight: { ...ref.typography.lineHeight },
+        letterSpacing: { ...ref.typography.letterSpacing },
+    },
+    spacing: { ...ref.spacing },
+    radius: { ...ref.radius },
+    shadow: { ...ref.shadow },
+    motion: {
+        duration: { ...ref.motion.duration },
+        easing: { ...ref.motion.easing },
+    },
+    zIndex: { ...ref.zIndex },
 };

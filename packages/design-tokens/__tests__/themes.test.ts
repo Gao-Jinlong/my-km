@@ -42,4 +42,47 @@ describe('themes registry', () => {
     it('editor selection in light is the brand accent at ~18% alpha', () => {
         expect(themes.light.editor.selection.bg).toBe('#0969da2e');
     });
+
+    it('exposes typography family anchors in light theme', () => {
+        expect(themes.light.typography.family.sans).toContain('BlinkMacSystemFont');
+        expect(themes.light.typography.family.mono).toContain('SF Mono');
+        expect(themes.light.typography.size.base).toBe('1rem');
+        expect(themes.light.typography.weight.regular).toBe('400');
+    });
+
+    it('light and dark themes have identical typography', () => {
+        expect(themes.dark.typography).toEqual(themes.light.typography);
+    });
+
+    it('exposes spacing scale on 4px baseline', () => {
+        expect(themes.light.spacing['0']).toBe('0px');
+        expect(themes.light.spacing['1']).toBe('4px');
+        expect(themes.light.spacing['4']).toBe('16px');
+        expect(themes.light.spacing['16']).toBe('64px');
+    });
+
+    it('exposes radius scale', () => {
+        expect(themes.light.radius.none).toBe('0px');
+        expect(themes.light.radius.md).toBe('6px');
+        expect(themes.light.radius.full).toBe('9999px');
+    });
+
+    it('exposes shadow scale', () => {
+        expect(themes.light.shadow.sm).toContain('0 1px 2px');
+        expect(themes.light.shadow.overlay).toContain('rgb(0 0 0');
+        expect(themes.light.shadow['focus-ring']).toContain('var(--color-border-focus)');
+    });
+
+    it('exposes motion duration and easing', () => {
+        expect(themes.light.motion.duration.fast).toBe('100ms');
+        expect(themes.light.motion.duration.slow).toBe('300ms');
+        expect(themes.light.motion.easing.standard).toContain('cubic-bezier');
+    });
+
+    it('exposes zIndex scale with ordered layers', () => {
+        expect(themes.light.zIndex.base).toBe('0');
+        expect(themes.light.zIndex.dropdown).toBe('1000');
+        expect(themes.light.zIndex.modal).toBe('1200');
+        expect(themes.light.zIndex.toast).toBe('1500');
+    });
 });

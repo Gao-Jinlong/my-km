@@ -67,6 +67,78 @@ export const ref = {
         blue: '#58a6ff',
         red: '#f85149',
     },
+    typography: {
+        family: {
+            sans: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif",
+            mono: "'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace",
+        },
+        size: {
+            xs: '0.75rem',
+            sm: '0.875rem',
+            base: '1rem',
+            md: '1.125rem',
+            lg: '1.25rem',
+            xl: '1.5rem',
+            '2xl': '1.875rem',
+            '3xl': '2.25rem',
+        },
+        weight: {
+            regular: '400',
+            medium: '500',
+            semibold: '600',
+            bold: '700',
+        },
+        lineHeight: {
+            tight: '1.25',
+            normal: '1.5',
+            relaxed: '1.75',
+        },
+        letterSpacing: {
+            tight: '-0.01em',
+            normal: '0em',
+            wide: '0.01em',
+        },
+    },
+    spacing: {
+        '0': '0px',
+        '0.5': '2px',
+        '1': '4px',
+        '1.5': '6px',
+        '2': '8px',
+        '3': '12px',
+        '4': '16px',
+        '5': '20px',
+        '6': '24px',
+        '8': '32px',
+        '10': '40px',
+        '12': '48px',
+        '16': '64px',
+    },
+    radius: { none: '0px', sm: '4px', md: '6px', lg: '8px', xl: '12px', full: '9999px' },
+    shadow: {
+        sm: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+        md: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+        lg: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+        overlay: '0 0 0 1px rgb(0 0 0 / 0.05), 0 8px 24px rgb(0 0 0 / 0.2)',
+        'focus-ring': '0 0 0 2px var(--color-border-focus)',
+    },
+    motion: {
+        duration: { fast: '100ms', base: '150ms', slow: '300ms' },
+        easing: {
+            standard: 'cubic-bezier(0.4, 0, 0.2, 1)',
+            emphasized: 'cubic-bezier(0.2, 0, 0, 1)',
+            exit: 'cubic-bezier(0.4, 0, 1, 1)',
+        },
+    },
+    zIndex: {
+        base: '0',
+        dropdown: '1000',
+        sticky: '1100',
+        modal: '1200',
+        popover: '1300',
+        tooltip: '1400',
+        toast: '1500',
+    },
 } as const;
 
 export type Reference = typeof ref;

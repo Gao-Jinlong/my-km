@@ -63,6 +63,99 @@ const feedback = z
 
 const colorTree = z.object({ bg, fg, border, accent, feedback }).strict();
 
+const fontFamily = z.object({ sans: z.string(), mono: z.string() }).strict();
+
+const fontSize = z
+    .object({
+        xs: z.string(),
+        sm: z.string(),
+        base: z.string(),
+        md: z.string(),
+        lg: z.string(),
+        xl: z.string(),
+        '2xl': z.string(),
+        '3xl': z.string(),
+    })
+    .strict();
+
+const fontWeight = z
+    .object({
+        regular: z.string(),
+        medium: z.string(),
+        semibold: z.string(),
+        bold: z.string(),
+    })
+    .strict();
+
+const lineHeight = z
+    .object({ tight: z.string(), normal: z.string(), relaxed: z.string() })
+    .strict();
+
+const letterSpacing = z
+    .object({ tight: z.string(), normal: z.string(), wide: z.string() })
+    .strict();
+
+const typography = z
+    .object({ family: fontFamily, size: fontSize, weight: fontWeight, lineHeight, letterSpacing })
+    .strict();
+
+const spacing = z
+    .object({
+        '0': z.string(),
+        '0.5': z.string(),
+        '1': z.string(),
+        '1.5': z.string(),
+        '2': z.string(),
+        '3': z.string(),
+        '4': z.string(),
+        '5': z.string(),
+        '6': z.string(),
+        '8': z.string(),
+        '10': z.string(),
+        '12': z.string(),
+        '16': z.string(),
+    })
+    .strict();
+
+const radius = z
+    .object({
+        none: z.string(),
+        sm: z.string(),
+        md: z.string(),
+        lg: z.string(),
+        xl: z.string(),
+        full: z.string(),
+    })
+    .strict();
+
+const shadow = z
+    .object({
+        sm: z.string(),
+        md: z.string(),
+        lg: z.string(),
+        overlay: z.string(),
+        'focus-ring': z.string(),
+    })
+    .strict();
+
+const motionDuration = z.object({ fast: z.string(), base: z.string(), slow: z.string() }).strict();
+const motionEasing = z
+    .object({ standard: z.string(), emphasized: z.string(), exit: z.string() })
+    .strict();
+const motion = z.object({ duration: motionDuration, easing: motionEasing }).strict();
+
+const zIndex = z
+    .object({
+        base: z.string(),
+        dropdown: z.string(),
+        sticky: z.string(),
+        modal: z.string(),
+        popover: z.string(),
+        tooltip: z.string(),
+        toast: z.string(),
+    })
+    .strict();
+
 const editor = z
     .object({
         surface: z.object({ bg: colorString }).strict(),
@@ -100,6 +193,12 @@ const workspace = z
 export const tokenSchema = z
     .object({
         color: colorTree,
+        typography,
+        spacing,
+        radius,
+        shadow,
+        motion,
+        zIndex,
         editor,
         workspace,
     })

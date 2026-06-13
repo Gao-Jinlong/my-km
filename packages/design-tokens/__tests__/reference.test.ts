@@ -19,7 +19,8 @@ describe('reference palette', () => {
         expect(ref.yellow[500]).toBeDefined();
     });
 
-    it('every reference value is a 7-char lowercase hex', () => {
+    it('every color reference value is a 7-char lowercase hex', () => {
+        const { typography, spacing, radius, shadow, motion, zIndex, ...colors } = ref;
         const visit = (node: unknown): string[] => {
             if (typeof node === 'string') return [node];
             if (node && typeof node === 'object') {
@@ -27,11 +28,19 @@ describe('reference palette', () => {
             }
             return [];
         };
-        const all = visit(ref);
+        const all = visit(colors);
         expect(all.length).toBeGreaterThan(20);
         for (const value of all) {
             expect(value).toMatch(/^#[0-9a-f]{6}$/);
         }
+    });
+
+    it('exposes a typography scale', () => {
+        expect(ref.typography.family.sans).toContain('sans-serif');
+        expect(ref.typography.family.mono).toContain('monospace');
+        expect(ref.typography.size.xs).toBe('0.75rem');
+        expect(ref.typography.size['3xl']).toBe('2.25rem');
+        expect(ref.typography.weight.bold).toBe('700');
     });
 });
 

@@ -65,4 +65,19 @@ export const light: ThemeShape = {
         accent: { default: ref.blue[500], foreground: ref.gray[0] },
         icon: ref.gray[600],
     },
+    typography: {
+        family: { sans: ref.typography.family.sans, mono: ref.typography.family.mono },
+        size: { ...ref.typography.size },
+        weight: { ...ref.typography.weight },
+        lineHeight: { ...ref.typography.lineHeight },
+        letterSpacing: { ...ref.typography.letterSpacing },
+    },
+    spacing: { ...ref.spacing },
+    radius: { ...ref.radius },
+    shadow: { ...ref.shadow },
+    motion: {
+        duration: { ...ref.motion.duration },
+        easing: { ...ref.motion.easing },
+    },
+    zIndex: { ...ref.zIndex },
 };
