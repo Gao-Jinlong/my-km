@@ -144,7 +144,7 @@ const motionEasing = z
     .strict();
 const motion = z.object({ duration: motionDuration, easing: motionEasing }).strict();
 
-const zIndex = z
+const zIndexScale = z
     .object({
         base: z.string(),
         dropdown: z.string(),
@@ -198,7 +198,7 @@ export const tokenSchema = z
         radius,
         shadow,
         motion,
-        zIndex,
+        'z-index': zIndexScale,
         editor,
         workspace,
     })

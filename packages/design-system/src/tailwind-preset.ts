@@ -68,6 +68,16 @@ const config: Partial<Config> = {
                 semibold: cssVar('typography-weight-semibold'),
                 bold: cssVar('typography-weight-bold'),
             },
+            lineHeight: {
+                tight: cssVar('typography-line-height-tight'),
+                normal: cssVar('typography-line-height-normal'),
+                relaxed: cssVar('typography-line-height-relaxed'),
+            },
+            letterSpacing: {
+                tight: cssVar('typography-letter-spacing-tight'),
+                normal: cssVar('typography-letter-spacing-normal'),
+                wide: cssVar('typography-letter-spacing-wide'),
+            },
             spacing: {
                 0: cssVar('spacing-0'),
                 0.5: cssVar('spacing-0-5'),

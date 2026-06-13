@@ -91,7 +91,7 @@ const validTheme = {
         duration: { fast: 'sans', base: 'sans', slow: 'sans' },
         easing: { standard: 'sans', emphasized: 'sans', exit: 'sans' },
     },
-    zIndex: {
+    'z-index': {
         base: 'sans',
         dropdown: 'sans',
         sticky: 'sans',

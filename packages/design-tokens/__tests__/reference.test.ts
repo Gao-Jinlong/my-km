@@ -20,7 +20,7 @@ describe('reference palette', () => {
     });
 
     it('every color reference value is a 7-char lowercase hex', () => {
-        const { typography, spacing, radius, shadow, motion, zIndex, ...colors } = ref;
+        const { typography, spacing, radius, shadow, motion, 'z-index': _zIndex, ...colors } = ref;
         const visit = (node: unknown): string[] => {
             if (typeof node === 'string') return [node];
             if (node && typeof node === 'object') {

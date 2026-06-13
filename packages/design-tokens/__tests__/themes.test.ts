@@ -80,9 +80,9 @@ describe('themes registry', () => {
     });
 
     it('exposes zIndex scale with ordered layers', () => {
-        expect(themes.light.zIndex.base).toBe('0');
-        expect(themes.light.zIndex.dropdown).toBe('1000');
-        expect(themes.light.zIndex.modal).toBe('1200');
-        expect(themes.light.zIndex.toast).toBe('1500');
+        expect(themes.light['z-index'].base).toBe('0');
+        expect(themes.light['z-index'].dropdown).toBe('1000');
+        expect(themes.light['z-index'].modal).toBe('1200');
+        expect(themes.light['z-index'].toast).toBe('1500');
     });
 });

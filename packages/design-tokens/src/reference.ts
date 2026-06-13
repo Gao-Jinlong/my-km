@@ -130,7 +130,7 @@ export const ref = {
             exit: 'cubic-bezier(0.4, 0, 1, 1)',
         },
     },
-    zIndex: {
+    'z-index': {
         base: '0',
         dropdown: '1000',
         sticky: '1100',

@@ -79,5 +79,5 @@ export const light: ThemeShape = {
         duration: { ...ref.motion.duration },
         easing: { ...ref.motion.easing },
     },
-    zIndex: { ...ref.zIndex },
+    'z-index': { ...ref['z-index'] },
 };
