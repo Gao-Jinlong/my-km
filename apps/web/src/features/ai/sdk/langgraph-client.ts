@@ -17,8 +17,21 @@
  */
 
 import { Client } from '@langchain/langgraph-sdk';
+import { getContainer } from '@/platform/bootstrap';
+import { TracingService } from '@/platform/tracing';
 
 const API_URL = process.env.NEXT_PUBLIC_LANGGRAPH_API_URL ?? 'http://localhost:3000/api';
+
+export function createLangGraphRequestHook() {
+    return (_url: URL, init: RequestInit): RequestInit => {
+        const traceparent = getContainer().get(TracingService).getActiveTraceparent();
+        if (!traceparent) return init;
+
+        const headers = new Headers(init.headers);
+        headers.set('traceparent', traceparent);
+        return { ...init, headers };
+    };
+}
 
 /**
  * 全局 SDK Client 单例。
@@ -28,6 +41,7 @@ const API_URL = process.env.NEXT_PUBLIC_LANGGRAPH_API_URL ?? 'http://localhost:3
  */
 export const langgraphClient = new Client({
     apiUrl: API_URL,
+    onRequest: createLangGraphRequestHook(),
 });
 
 /**
@@ -42,5 +56,6 @@ export function createClient(options?: { apiUrl?: string; apiKey?: string }): Cl
     return new Client({
         apiUrl: options?.apiUrl ?? API_URL,
         apiKey: options?.apiKey,
+        onRequest: createLangGraphRequestHook(),
     });
 }

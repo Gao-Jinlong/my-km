@@ -1,5 +1,6 @@
 import { Emitter, type Event } from '@/base/common/event';
-import { getTracer } from '@/lib/tracing/tracer';
+import { getContainer } from '@/platform/bootstrap';
+import { TracingService } from '@/platform/tracing';
 import {
     type ConfirmationMode,
     type ConfirmationStrategy,
@@ -50,7 +51,7 @@ export class FrontendToolExecutor {
             return { success: false, error: `Unknown tool: ${toolName}` };
         }
 
-        const tracer = getTracer();
+        const tracer = getContainer().get(TracingService);
         const toolSpan = tracer.startSpan('frontend.tool.execute', {
             attributes: {
                 'tool.name': toolName,
@@ -59,7 +60,7 @@ export class FrontendToolExecutor {
         });
 
         try {
-            if (this.strategy.needsConfirmation(toolName, input)) {
+            if (handler.type === 'write' || this.strategy.needsConfirmation(toolName, input)) {
                 const approved = await this.requestConfirmation(handler, input);
                 if (!approved) {
                     toolSpan.setError('User rejected the operation');

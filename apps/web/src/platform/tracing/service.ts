@@ -1,18 +1,6 @@
-/**
- * BrowserTracer — 轻量级前端 Span 追踪器
- *
- * 不引入 OTel SDK 全家桶（太重），只用 `@opentelemetry/api` 的
- * traceContext 生成工具。手动创建 Span 数据，通过 BrowserSpanExporter
- * 批量 POST 到后端。
- *
- * 使用方式：
- *   const tracer = new BrowserTracer();
- *   const span = tracer.startSpan('frontend.chat.sendMessage', { ... });
- *   span.addEvent('stream_start');
- *   span.end();
- */
-
-import type { SpanData, SpanEvent, SpanLink } from './types';
+import { ServiceBase } from '@/platform/base/service-base';
+import { Service } from '@/platform/di';
+import type { ITracingService, SpanData, SpanEvent, SpanLink, SpanOptions } from './types';
 
 const SERVICE_NAME = 'my-km-web';
 const FLUSH_INTERVAL = 5000;
@@ -35,14 +23,7 @@ export class ActiveSpan {
     durationMs?: number;
     private ended = false;
 
-    constructor(options: {
-        name: string;
-        traceId?: string;
-        parentSpanId?: string;
-        kind?: string;
-        attributes?: Record<string, unknown>;
-        links?: SpanLink[];
-    }) {
+    constructor(options: { name: string } & SpanOptions) {
         this.spanId = generateSpanId();
         this.traceId = options.traceId ?? generateTraceId();
         this.parentSpanId = options.parentSpanId;
@@ -131,42 +112,45 @@ class BrowserSpanExporter {
 
         const spans = this.buffer.splice(0);
 
-        // 使用 sendBeacon 兜底（页面卸载时）
         if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
             const blob = new Blob([JSON.stringify({ spans })], { type: 'application/json' });
             const ok = navigator.sendBeacon(`${API_URL}/traces/spans`, blob);
             if (ok) return;
         }
 
-        // 正常情况用 fetch
         fetch(`${API_URL}/traces/spans`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ spans }),
-        }).catch(() => {
-            // 上报失败静默处理
-        });
+        }).catch(() => undefined);
     }
 
-    /** 页面卸载时调用 */
     forceFlush(): void {
         this.flush();
     }
+
+    dispose(): void {
+        if (this.timer) {
+            clearTimeout(this.timer);
+            this.timer = null;
+        }
+    }
 }
 
-export class BrowserTracer {
-    private exporter = new BrowserSpanExporter();
+@Service({ singleton: true })
+export class TracingService extends ServiceBase implements ITracingService {
+    private readonly exporter = new BrowserSpanExporter();
+    private activeTraceparent: string | null = null;
+    private readonly handleBeforeUnload = () => this.forceFlush();
 
-    startSpan(
-        name: string,
-        options?: {
-            traceId?: string;
-            parentSpanId?: string;
-            kind?: string;
-            attributes?: Record<string, unknown>;
-            links?: SpanLink[];
-        },
-    ): ActiveSpan {
+    constructor() {
+        super();
+        if (typeof window !== 'undefined') {
+            window.addEventListener('beforeunload', this.handleBeforeUnload);
+        }
+    }
+
+    startSpan(name: string, options?: SpanOptions): ActiveSpan {
         return new ActiveSpan({
             name,
             traceId: options?.traceId,
@@ -184,37 +168,36 @@ export class BrowserTracer {
     }
 
     getTraceparent(traceId: string, spanId: string): string {
-        // W3C traceparent format: version-traceId-spanId-flags
         return `00-${traceId}-${spanId}-01`;
+    }
+
+    setActiveTraceparent(traceparent: string | null): void {
+        this.activeTraceparent = traceparent;
+    }
+
+    getActiveTraceparent(): string | null {
+        return this.activeTraceparent;
     }
 
     forceFlush(): void {
         this.exporter.forceFlush();
     }
-}
 
-// 全局单例
-let _tracer: BrowserTracer | null = null;
-
-export function getTracer(): BrowserTracer {
-    if (!_tracer) {
-        _tracer = new BrowserTracer();
-        // 页面卸载时 flush
+    override dispose(): void {
         if (typeof window !== 'undefined') {
-            window.addEventListener('beforeunload', () => _tracer?.forceFlush());
+            window.removeEventListener('beforeunload', this.handleBeforeUnload);
         }
+        this.exporter.dispose();
+        super.dispose();
     }
-    return _tracer;
 }
-
-// ========== ID 生成 ==========
 
 function generateTraceId(): string {
-    return `${randomHex(8)}${randomHex(8)}${randomHex(8)}${randomHex(8)}`;
+    return randomHex(16);
 }
 
 function generateSpanId(): string {
-    return `${randomHex(8)}${randomHex(8)}`;
+    return randomHex(8);
 }
 
 function randomHex(bytes: number): string {

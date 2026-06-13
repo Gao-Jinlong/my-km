@@ -30,6 +30,7 @@
 | `MessageChannelService` | 消息通道 |
 | `StorageService` | 持久化存储 (IndexedDB / LocalStorage / Memory) |
 | `LoggerService` | 前端日志系统 |
+| `TracingService` | 前端链路追踪：Span 创建、批量上报、traceparent 传播 |
 
 ---
 

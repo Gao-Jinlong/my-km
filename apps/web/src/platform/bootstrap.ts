@@ -24,6 +24,7 @@ import { MessageChannelService } from './message-channel/service';
 import { MonitorService } from './monitor/service';
 import { IndexedDBWriter } from './monitor/writers/indexeddb';
 import { PanelService } from './panel/service';
+import { TracingService } from './tracing/service';
 
 /**
  * 应用服务容器类型
@@ -46,6 +47,7 @@ export interface AppServices {
     keyboardShortcutService: KeyboardShortcutService;
     panelService: PanelService;
     conditionalService: ConditionalService;
+    tracingService: TracingService;
 }
 
 /**
@@ -69,6 +71,7 @@ function createServiceContainer(): ServiceContainer {
     container.register(KeyboardShortcutService);
     container.register(PanelService);
     container.register(ConditionalService);
+    container.register(TracingService);
 
     return container;
 }

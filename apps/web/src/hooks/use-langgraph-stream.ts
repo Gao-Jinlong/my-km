@@ -16,8 +16,8 @@ import type { Message } from '@langchain/langgraph-sdk';
 import { useStream } from '@langchain/langgraph-sdk/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { langgraphClient } from '@/features/ai/sdk/langgraph-client';
-import type { ActiveSpan } from '@/lib/tracing/tracer';
-import { getTracer } from '@/lib/tracing/tracer';
+import { getContainer } from '@/platform/bootstrap';
+import { type ActiveSpan, TracingService } from '@/platform/tracing';
 
 /**
  * 与 useAIThread 兼容的消息格式
@@ -204,7 +204,7 @@ export function useLangGraphStream(): UseLangGraphStreamReturn {
 
     const sendMessage = useCallback(
         async (content: string, context?: Record<string, unknown>) => {
-            const tracer = getTracer();
+            const tracer = getContainer().get(TracingService);
 
             // 创建根 Span
             const rootSpan = tracer.startSpan('frontend.chat.sendMessage', {
@@ -214,6 +214,7 @@ export function useLangGraphStream(): UseLangGraphStreamReturn {
             });
             activeTraceSpan.current = rootSpan;
             activeTraceId.current = rootSpan.traceId;
+            tracer.setActiveTraceparent(tracer.getTraceparent(rootSpan.traceId, rootSpan.spanId));
 
             await stream.submit(
                 {
@@ -225,12 +226,7 @@ export function useLangGraphStream(): UseLangGraphStreamReturn {
                     ],
                 },
                 {
-                    // context 通过 SubmitOptions 透传到后端
-                    context: {
-                        ...context,
-                        // 传递 traceparent 给后端
-                        _traceparent: tracer.getTraceparent(rootSpan.traceId, rootSpan.spanId),
-                    } as never,
+                    context: context as never,
                 },
             );
         },
@@ -239,7 +235,7 @@ export function useLangGraphStream(): UseLangGraphStreamReturn {
 
     const resumeWithToolResult = useCallback(
         async (toolCallId: string, result: unknown) => {
-            const tracer = getTracer();
+            const tracer = getContainer().get(TracingService);
 
             // 创建 resume Span（与 sendMessage 同一 trace）
             const resumeSpan = tracer.startSpan('POST /runs/resume', {
@@ -249,6 +245,9 @@ export function useLangGraphStream(): UseLangGraphStreamReturn {
                     'tool.callId': toolCallId,
                 },
             });
+            tracer.setActiveTraceparent(
+                tracer.getTraceparent(resumeSpan.traceId, resumeSpan.spanId),
+            );
 
             // 通过 submit(null, { command: { resume: ... } }) 触发恢复
             // 后端 ThreadsController.streamRun() 检测 body.command.resume 进入 resume 分支
@@ -273,11 +272,12 @@ export function useLangGraphStream(): UseLangGraphStreamReturn {
     // 结束 trace span 当 stream 结束时
     useEffect(() => {
         if (!stream.isLoading && activeTraceSpan.current) {
-            const tracer = getTracer();
+            const tracer = getContainer().get(TracingService);
             if (stream.error) {
                 activeTraceSpan.current.setError(String(stream.error));
             }
             tracer.endSpan(activeTraceSpan.current);
+            tracer.setActiveTraceparent(null);
             activeTraceSpan.current = null;
         }
     }, [stream.isLoading, stream.error]);
