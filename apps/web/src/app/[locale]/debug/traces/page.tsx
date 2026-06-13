@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { listTraces } from '@/api/tracing';
 
 interface TraceListItem {
     id: string;
@@ -25,15 +26,19 @@ interface TracesResponse {
 
 export default function TracesPage() {
     const [data, setData] = useState<TracesResponse | null>(null);
+    const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
 
     useEffect(() => {
         setLoading(true);
-        fetch(`http://localhost:3000/api/traces?page=${page}&pageSize=20`)
-            .then(r => r.json())
-            .then(d => setData(d))
-            .catch(() => setData(null))
+        setError(null);
+        listTraces({ page, pageSize: 20 })
+            .then(setData)
+            .catch(err => {
+                setError(err instanceof Error ? err.message : String(err));
+                setData(null);
+            })
             .finally(() => setLoading(false));
     }, [page]);
 
@@ -43,7 +48,13 @@ export default function TracesPage() {
 
             {loading && <p className="text-muted-foreground">Loading...</p>}
 
-            {!loading && data && (
+            {!loading && error && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-800">
+                    Failed to load traces: {error}
+                </div>
+            )}
+
+            {!loading && !error && data && (
                 <>
                     <p className="mb-4 text-muted-foreground text-sm">Total: {data.total} traces</p>
 

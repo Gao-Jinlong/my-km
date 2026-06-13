@@ -2,36 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-
-interface SpanItem {
-    id: string;
-    spanId: string;
-    traceId: string;
-    parentSpanId: string | null;
-    name: string;
-    kind: string;
-    serviceName: string;
-    startTime: string;
-    endTime: string | null;
-    durationMs: number | null;
-    status: string;
-    statusMessage: string | null;
-    attributes: Record<string, unknown>;
-    events: Array<{ name: string; time: string; attributes?: Record<string, unknown> }>;
-}
-
-interface TraceDetail {
-    id: string;
-    traceId: string;
-    rootSpanId: string;
-    serviceName: string;
-    startTime: string;
-    endTime: string | null;
-    durationMs: number | null;
-    status: string;
-    attributes: Record<string, unknown>;
-    spans: SpanItem[];
-}
+import { getTrace, type SpanDetail, type TraceDetail } from '@/api/tracing';
 
 function WaterfallRow({
     span,
@@ -39,7 +10,7 @@ function WaterfallRow({
     traceDuration,
     depth,
 }: {
-    span: SpanItem;
+    span: SpanDetail;
     traceStart: number;
     traceDuration: number;
     depth: number;
@@ -147,9 +118,8 @@ export default function TraceDetailPage() {
 
     useEffect(() => {
         setLoading(true);
-        fetch(`http://localhost:3000/api/traces/${traceId}`)
-            .then(r => r.json())
-            .then(d => setTrace(d))
+        getTrace(traceId)
+            .then(setTrace)
             .catch(() => setTrace(null))
             .finally(() => setLoading(false));
     }, [traceId]);
