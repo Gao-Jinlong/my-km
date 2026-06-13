@@ -1,4 +1,5 @@
-// @my-km/design-system — populated in plan #2 (primitives migration).
-// Stage 0/1a only ships the package shell + Tailwind preset.
+// @my-km/design-system
+// Primitives, patterns, and Tailwind preset for my-km.
+// Visual spec: docs/design-system/design-system.pen
 
-export {};
+export { default as tailwindPreset } from './tailwind-preset';
