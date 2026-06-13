@@ -24,6 +24,7 @@
 | 文档 | 摘要 |
 |------|------|
 | [docs/backend/architecture.md](docs/backend/architecture.md) | 后端架构：API 设计、数据层、服务组织 |
+| [docs/backend/ddd-redesign.md](docs/backend/ddd-redesign.md) | 后端 DDD 重设计方案（学习型）：Bounded Context、聚合、值对象、领域事件、迁移路径 |
 
 ## 调试与排障
 
@@ -58,6 +59,22 @@ pnpm dev
 - 前端：http://localhost:4000
 - 后端：http://localhost:3000
 - Swagger：http://localhost:3000/api-docs
+
+## 设计系统
+
+| 文档 | 摘要 |
+|------|------|
+| [docs/design-system/spec.md](docs/design-system/spec.md) | 设计系统完整规范（token / primitive / pattern / 工程化 / 路线图） |
+| [docs/design-system/decisions/](docs/design-system/decisions/) | ADR 序列：0001 三段式 token、0002 双包结构、0003 API 公约、0004 primitive vs pattern |
+| [packages/design-tokens/](packages/design-tokens/) | Token 唯一源；改 token 只动这里，跑 `pnpm tokens:build` |
+| [packages/design-system/](packages/design-system/) | Primitives + patterns + Tailwind preset（Stage 0/1a 为空壳，plan #2 填充） |
+| [apps/storybook/](apps/storybook/) | 文档站；`pnpm design:storybook` 启动，`pnpm design:storybook:build` 构建静态站 |
+
+### 三条最常违反的规则
+
+1. **不要写裸十六进制颜色或 `bg-[#xxx]`**。颜色一律走 token：`bg-bg-primary` / `text-fg-muted` 或 `style={{ background: tokens.color.bg.primary }}`。
+2. **新组件不进 `apps/web/src/components/ui/`**。primitive 进 `packages/design-system/src/primitives/`，pattern 进 `.../patterns/`，业务组件留在 `apps/web/src/components/{domain}/`。
+3. **改 token 必走源码**：编辑 `packages/design-tokens/src/themes/{light,dark}.ts`，**不要**手改 `globals.css` 或 `dist/tokens.css`（后者是生成产物）。
 
 ## 注意事项
 
