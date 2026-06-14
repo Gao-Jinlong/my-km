@@ -20,7 +20,7 @@ import { Client } from '@langchain/langgraph-sdk';
 
 const API_URL = process.env.NEXT_PUBLIC_LANGGRAPH_API_URL ?? 'http://localhost:3000/api';
 
-type RequestHook = (url: URL, init: RequestInit) => RequestInit;
+type RequestHook = (url: URL, init: RequestInit) => Promise<RequestInit> | RequestInit;
 
 /**
  * Traceparent 注入中间件。
