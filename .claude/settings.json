@@ -1,7 +1,5 @@
 {
-    "language": "zh-CN",
     "permissions": {
-        "defaultMode": "bypassPermissions",
         "allow": [
             "mcp__codegraph__codegraph_explore",
             "mcp__codegraph__codegraph_search",
@@ -11,6 +9,11 @@
             "mcp__codegraph__codegraph_impact",
             "mcp__codegraph__codegraph_files",
             "mcp__codegraph__codegraph_status"
-        ]
+        ],
+        "defaultMode": "bypassPermissions"
+    },
+    "language": "zh-CN",
+    "enabledPlugins": {
+        "superpowers@superpowers-marketplace": true
     }
 }
