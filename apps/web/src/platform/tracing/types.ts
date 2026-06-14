@@ -46,8 +46,6 @@ export interface ITracingService {
     endSpan(span: ActiveSpanLike): SpanData;
     getTraceparent(traceId: string, spanId: string): string;
     toTraceContext(span: ActiveSpanLike): TraceContext;
-    setActiveTraceparent(traceparent: string | null): void;
-    getActiveTraceparent(): string | null;
     forceFlush(): void;
 }
 

@@ -147,7 +147,6 @@ class BrowserSpanExporter {
 @Service({ singleton: true })
 export class TracingService extends ServiceBase implements ITracingService {
     private readonly exporter = new BrowserSpanExporter();
-    private activeTraceparent: string | null = null;
     private readonly handleBeforeUnload = () => this.forceFlush();
 
     constructor() {
@@ -184,14 +183,6 @@ export class TracingService extends ServiceBase implements ITracingService {
             spanId: span.spanId,
             traceparent: this.getTraceparent(span.traceId, span.spanId),
         };
-    }
-
-    setActiveTraceparent(traceparent: string | null): void {
-        this.activeTraceparent = traceparent;
-    }
-
-    getActiveTraceparent(): string | null {
-        return this.activeTraceparent;
     }
 
     forceFlush(): void {

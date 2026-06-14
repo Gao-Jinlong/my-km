@@ -64,16 +64,6 @@ describe('TracingService', () => {
         expect(ctx.traceparent).toBe(`00-${span.traceId}-${span.spanId}-01`);
     });
 
-    it('stores and clears active traceparent', () => {
-        service.setActiveTraceparent('00-0123456789abcdef0123456789abcdef-0123456789abcdef-01');
-        expect(service.getActiveTraceparent()).toBe(
-            '00-0123456789abcdef0123456789abcdef-0123456789abcdef-01',
-        );
-
-        service.setActiveTraceparent(null);
-        expect(service.getActiveTraceparent()).toBeNull();
-    });
-
     it('flushes ended spans with fetch when sendBeacon is unavailable', async () => {
         const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
         vi.stubGlobal('fetch', fetchMock);
