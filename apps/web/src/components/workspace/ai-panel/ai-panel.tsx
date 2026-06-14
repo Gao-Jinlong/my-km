@@ -55,6 +55,7 @@ export function AIPanel() {
         error,
         threadId,
         interrupt,
+        traceContext,
         sendMessage,
         resumeWithToolResult,
         stop,
@@ -97,7 +98,10 @@ export function AIPanel() {
         if (!interrupt) return;
         let cancelled = false;
         toolExecutor
-            .dispatch(interrupt.toolName, interrupt.input, { toolCallId: interrupt.toolCallId })
+            .dispatch(interrupt.toolName, interrupt.input, {
+                toolCallId: interrupt.toolCallId,
+                traceContext: traceContext ?? undefined,
+            })
             .then(result => {
                 if (cancelled) return;
                 resumeWithToolResult(interrupt.toolCallId, result);
@@ -105,7 +109,7 @@ export function AIPanel() {
         return () => {
             cancelled = true;
         };
-    }, [interrupt, toolExecutor, resumeWithToolResult]);
+    }, [interrupt, toolExecutor, resumeWithToolResult, traceContext]);
 
     // Track which thread is currently generating
     const [generatingThreadId, setGeneratingThreadId] = useState<string | undefined>();
