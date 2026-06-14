@@ -1,16 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import 'reflect-metadata';
-import { getContainer } from '@/platform/bootstrap';
-import { TracingService } from '@/platform/tracing';
-import { createLangGraphRequestHook } from '../langgraph-client';
+import { createLangGraphClient, withTraceparent } from '../langgraph-client';
 
-describe('langgraphClient tracing', () => {
-    it('adds active traceparent to outgoing request headers', () => {
-        const tracing = getContainer().get(TracingService);
-        tracing.setActiveTraceparent('00-0123456789abcdef0123456789abcdef-0123456789abcdef-01');
-        const hook = createLangGraphRequestHook();
+describe('withTraceparent', () => {
+    it('injects traceparent header when getter returns a value', () => {
+        const middleware = withTraceparent(
+            () => '00-0123456789abcdef0123456789abcdef-0123456789abcdef-01',
+        );
 
-        const init = hook(new URL('http://localhost:3000/api/threads/t1/runs/stream'), {
+        const init = middleware(new URL('http://localhost:3000/api/threads/t1/runs/stream'), {
             headers: { 'content-type': 'application/json' },
         });
 
@@ -19,15 +16,28 @@ describe('langgraphClient tracing', () => {
         );
     });
 
-    it('does not add traceparent when no active trace exists', () => {
-        const tracing = getContainer().get(TracingService);
-        tracing.setActiveTraceparent(null);
-        const hook = createLangGraphRequestHook();
+    it('passes through unchanged when getter returns null', () => {
+        const middleware = withTraceparent(() => null);
 
-        const init = hook(new URL('http://localhost:3000/api/threads/t1/runs/stream'), {
+        const init = middleware(new URL('http://localhost:3000/api/threads/t1/runs/stream'), {
             headers: { 'content-type': 'application/json' },
         });
 
         expect(new Headers(init.headers).has('traceparent')).toBe(false);
+    });
+});
+
+describe('createLangGraphClient', () => {
+    it('creates a client with onRequest hook', () => {
+        const client = createLangGraphClient({
+            onRequest: withTraceparent(() => '00-abc-def-01'),
+        });
+
+        expect(client).toBeDefined();
+    });
+
+    it('creates a bare client without onRequest', () => {
+        const client = createLangGraphClient();
+        expect(client).toBeDefined();
     });
 });

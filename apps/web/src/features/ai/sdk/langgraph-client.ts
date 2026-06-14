@@ -17,45 +17,42 @@
  */
 
 import { Client } from '@langchain/langgraph-sdk';
-import { getContainer } from '@/platform/bootstrap';
-import { TracingService } from '@/platform/tracing';
 
 const API_URL = process.env.NEXT_PUBLIC_LANGGRAPH_API_URL ?? 'http://localhost:3000/api';
 
-export function createLangGraphRequestHook() {
-    return (_url: URL, init: RequestInit): RequestInit => {
-        const traceparent = getContainer().get(TracingService).getActiveTraceparent();
-        if (!traceparent) return init;
+type RequestHook = (url: URL, init: RequestInit) => RequestInit;
 
+/**
+ * Traceparent 注入中间件。
+ * 从 getter 获取当前 traceparent，注入到请求 header。
+ */
+export function withTraceparent(getTraceparent: () => string | null): RequestHook {
+    return (_url, init) => {
+        const tp = getTraceparent();
+        if (!tp) return init;
         const headers = new Headers(init.headers);
-        headers.set('traceparent', traceparent);
+        headers.set('traceparent', tp);
         return { ...init, headers };
     };
 }
 
 /**
- * 全局 SDK Client 单例。
- *
- * 用于 thread CRUD（client.threads.*）和 run 流式调用（client.runs.stream）。
- * useStream hook 也可以通过 client 参数直接复用此实例。
+ * 创建 LangGraph Client 实例。
+ * @param options.onRequest 可选的请求拦截 hook（用于注入 traceparent 等）
  */
-export const langgraphClient = new Client({
-    apiUrl: API_URL,
-    onRequest: createLangGraphRequestHook(),
-});
-
-/**
- * 当前 LangGraph API URL（供 useStream 等 hook 直接使用）
- */
-export const LANGGRAPH_API_URL = API_URL;
-
-/**
- * 创建独立的 Client 实例（用于测试或多租户场景）
- */
-export function createClient(options?: { apiUrl?: string; apiKey?: string }): Client {
+export function createLangGraphClient(options?: { onRequest?: RequestHook }): Client {
     return new Client({
-        apiUrl: options?.apiUrl ?? API_URL,
-        apiKey: options?.apiKey,
-        onRequest: createLangGraphRequestHook(),
+        apiUrl: API_URL,
+        ...(options?.onRequest ? { onRequest: options.onRequest } : {}),
     });
 }
+
+/**
+ * 全局裸单例 Client（供 thread CRUD 等无需 traceparent 的操作）。
+ */
+export const langgraphClient = createLangGraphClient();
+
+/**
+ * 当前 LangGraph API URL
+ */
+export const LANGGRAPH_API_URL = API_URL;
