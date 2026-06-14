@@ -1,0 +1,35 @@
+<h2>全量 primitives 视觉矩阵组织方案</h2>
+<p class="subtitle">你选择了全部约 37 个基础组件都补充状态/变体示例。下面是三种可维护组织方式。</p>
+
+<div class="cards">
+  <div class="card" data-choice="family-sections" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="display:grid;gap:10px;padding:16px;background:#111;border-radius:10px;color:#fff;font-size:11px">
+        <div style="padding:8px;border:1px solid #444;border-radius:8px"><b>Form Inputs</b> · Button / Input / Select / Checkbox / ...</div>
+        <div style="padding:8px;border:1px solid #444;border-radius:8px"><b>Overlays</b> · Dialog / Popover / Tooltip / Menus / ...</div>
+        <div style="padding:8px;border:1px solid #444;border-radius:8px"><b>Feedback</b> · Alert / Toast / Progress / Spinner / ...</div>
+      </div>
+    </div>
+    <div class="card-body"><h3>A. Family sections 推荐</h3><p>按规范 §3.2 家族分组；每组内每个组件一张 compact matrix。最适合权威设计稿和后续查找。</p></div>
+  </div>
+
+  <div class="card" data-choice="interaction-density" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="display:grid;gap:10px;padding:16px;background:#111;border-radius:10px;color:#fff;font-size:11px">
+        <div style="padding:8px;border:1px solid #444;border-radius:8px"><b>Static</b> · Card / Badge / Kbd / Code / Table</div>
+        <div style="padding:8px;border:1px solid #444;border-radius:8px"><b>Stateful</b> · Button / Input / Tabs / Accordion</div>
+        <div style="padding:8px;border:1px solid #444;border-radius:8px"><b>Overlay</b> · Dialog / Drawer / Popover / Menus</div>
+      </div>
+    </div>
+    <div class="card-body"><h3>B. Interaction density</h3><p>按交互复杂度组织，利于实现优先级，但会偏离现有 spec 的家族分类。</p></div>
+  </div>
+
+  <div class="card" data-choice="storybook-index" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="padding:16px;background:#111;border-radius:10px;color:#fff;font-size:11px">
+        <div style="display:grid;grid-template-columns:120px 1fr;gap:6px"><b>Button</b><span>variants / states / sizes</span><b>Input</b><span>states / validation</span><b>Dialog</b><span>closed / open / destructive</span><b>...</b><span>story-like rows</span></div>
+      </div>
+    </div>
+    <div class="card-body"><h3>C. Storybook index</h3><p>按组件字母/导航顺序一列到底，像 Storybook 目录。简单，但信息架构较弱。</p></div>
+  </div>
+</div>
