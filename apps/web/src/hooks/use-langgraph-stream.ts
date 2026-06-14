@@ -15,9 +15,9 @@
 import type { Message } from '@langchain/langgraph-sdk';
 import { useStream } from '@langchain/langgraph-sdk/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { langgraphClient } from '@/features/ai/sdk/langgraph-client';
+import { createLangGraphClient, withTraceparent } from '@/features/ai/sdk/langgraph-client';
 import { getContainer } from '@/platform/bootstrap';
-import { type ActiveSpan, TracingService } from '@/platform/tracing';
+import { type ActiveSpan, type TraceContext, TracingService } from '@/platform/tracing';
 
 type TraceEventSpan = Pick<ActiveSpan, 'addEvent'>;
 
@@ -60,6 +60,8 @@ export interface UseLangGraphStreamReturn {
     sendMessage: (content: string, context?: Record<string, unknown>) => Promise<void>;
     resumeWithToolResult: (toolCallId: string, result: unknown) => Promise<void>;
     stop: () => Promise<void>;
+    /** 当前活跃 trace 上下文（供下游消费者创建子 span） */
+    traceContext: TraceContext | null;
 }
 
 /**
@@ -185,13 +187,29 @@ export function useLangGraphStream(): UseLangGraphStreamReturn {
     const hasSeenFirstMessageChunk = useRef(false);
     const seenMessageToolCallIds = useRef(new Set<string>());
     const seenInterruptToolCallIds = useRef(new Set<string>());
+    const threadTraceIds = useRef<Map<string, string>>(new Map());
+    const pendingTraceId = useRef<string | null>(null);
+    const traceparentRef = useRef<string | null>(null);
+
+    const client = useMemo(
+        () =>
+            createLangGraphClient({
+                onRequest: withTraceparent(() => traceparentRef.current),
+            }),
+        [],
+    );
 
     const stream = useStream<{ messages: Message[] }>({
-        client: langgraphClient,
+        client,
         assistantId: 'default',
         threadId,
         messagesKey: 'messages',
         onThreadId: id => {
+            // Persist pending traceId when the thread is first created
+            if (pendingTraceId.current && !threadTraceIds.current.has(id)) {
+                threadTraceIds.current.set(id, pendingTraceId.current);
+                pendingTraceId.current = null;
+            }
             activeTraceSpan.current?.addEvent('metadata_received', { threadId: id });
             setThreadId(id);
         },
@@ -281,15 +299,29 @@ export function useLangGraphStream(): UseLangGraphStreamReturn {
         async (content: string, context?: Record<string, unknown>) => {
             const tracer = getContainer().get(TracingService);
 
-            // 创建根 Span
+            // 查找已有的 thread 级 traceId（首条消息时 threadId 可能为 null）
+            const existingTraceId = threadId ? threadTraceIds.current.get(threadId) : undefined;
+
+            // 创建 root span — 复用 traceId 或自动生成
             const rootSpan = tracer.startSpan('frontend.chat.sendMessage', {
+                ...(existingTraceId ? { traceId: existingTraceId } : {}),
                 attributes: {
                     'chat.messageLength': content.length,
                 },
             });
             activeTraceSpan.current = rootSpan;
             activeTraceId.current = rootSpan.traceId;
-            tracer.setActiveTraceparent(tracer.getTraceparent(rootSpan.traceId, rootSpan.spanId));
+
+            // 持久化 traceId：thread 已知时直接存入 map，否则暂存待 onThreadId 回调
+            if (threadId) {
+                if (!threadTraceIds.current.has(threadId)) {
+                    threadTraceIds.current.set(threadId, rootSpan.traceId);
+                }
+            } else {
+                pendingTraceId.current = rootSpan.traceId;
+            }
+
+            traceparentRef.current = tracer.getTraceparent(rootSpan.traceId, rootSpan.spanId);
             rootSpan.addEvent('request_submitted', {
                 messageLength: content.length,
                 hasContext: Boolean(context && Object.keys(context).length > 0),
@@ -306,30 +338,31 @@ export function useLangGraphStream(): UseLangGraphStreamReturn {
                 },
                 {
                     context: context as never,
+                    metadata: { __trace: { traceId: rootSpan.traceId } },
                 },
             );
         },
-        [stream],
+        [stream, threadId],
     );
 
     const resumeWithToolResult = useCallback(
         async (toolCallId: string, result: unknown) => {
             const tracer = getContainer().get(TracingService);
 
-            // 创建 resume Span（与 sendMessage 同一 trace）
+            const traceId =
+                (threadId && threadTraceIds.current.get(threadId)) ??
+                activeTraceId.current ??
+                undefined;
+
             const resumeSpan = tracer.startSpan('POST /runs/resume', {
-                traceId: activeTraceId.current ?? undefined,
+                ...(traceId ? { traceId } : {}),
                 parentSpanId: activeTraceSpan.current?.spanId,
                 attributes: {
                     'tool.call_id': toolCallId,
                 },
             });
-            tracer.setActiveTraceparent(
-                tracer.getTraceparent(resumeSpan.traceId, resumeSpan.spanId),
-            );
+            traceparentRef.current = tracer.getTraceparent(resumeSpan.traceId, resumeSpan.spanId);
 
-            // 通过 submit(null, { command: { resume: ... } }) 触发恢复
-            // 后端 ThreadsController.streamRun() 检测 body.command.resume 进入 resume 分支
             await stream.submit(null, {
                 command: {
                     resume: {
@@ -341,7 +374,7 @@ export function useLangGraphStream(): UseLangGraphStreamReturn {
 
             tracer.endSpan(resumeSpan);
         },
-        [stream],
+        [stream, threadId],
     );
 
     const stop = useCallback(async () => {
@@ -359,7 +392,7 @@ export function useLangGraphStream(): UseLangGraphStreamReturn {
                 hasError: Boolean(stream.error),
             });
             tracer.endSpan(activeTraceSpan.current);
-            tracer.setActiveTraceparent(null);
+            traceparentRef.current = null;
             tracer.forceFlush();
             activeTraceSpan.current = null;
             hasSeenFirstMessageChunk.current = false;
@@ -367,6 +400,10 @@ export function useLangGraphStream(): UseLangGraphStreamReturn {
             seenInterruptToolCallIds.current.clear();
         }
     }, [stream.isLoading, stream.error]);
+
+    const traceContext: TraceContext | null = activeTraceSpan.current
+        ? getContainer().get(TracingService).toTraceContext(activeTraceSpan.current)
+        : null;
 
     return useMemo(
         () => ({
@@ -377,6 +414,7 @@ export function useLangGraphStream(): UseLangGraphStreamReturn {
             threadId,
             runId,
             interrupt,
+            traceContext,
             sendMessage,
             resumeWithToolResult,
             stop,
@@ -389,6 +427,7 @@ export function useLangGraphStream(): UseLangGraphStreamReturn {
             threadId,
             runId,
             interrupt,
+            traceContext,
             sendMessage,
             resumeWithToolResult,
             stop,
