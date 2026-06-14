@@ -35,10 +35,17 @@ export interface SpanOptions {
     links?: SpanLink[];
 }
 
+export interface TraceContext {
+    readonly traceId: string;
+    readonly spanId: string;
+    readonly traceparent: string;
+}
+
 export interface ITracingService {
     startSpan(name: string, options?: SpanOptions): ActiveSpanLike;
     endSpan(span: ActiveSpanLike): SpanData;
     getTraceparent(traceId: string, spanId: string): string;
+    toTraceContext(span: ActiveSpanLike): TraceContext;
     setActiveTraceparent(traceparent: string | null): void;
     getActiveTraceparent(): string | null;
     forceFlush(): void;

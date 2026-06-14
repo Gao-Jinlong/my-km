@@ -6,4 +6,5 @@ export type {
     SpanEvent,
     SpanLink,
     SpanOptions,
+    TraceContext,
 } from './types';

@@ -55,6 +55,15 @@ describe('TracingService', () => {
         );
     });
 
+    it('creates immutable TraceContext snapshot from a span', () => {
+        const span = service.startSpan('frontend.test');
+        const ctx = service.toTraceContext(span);
+
+        expect(ctx.traceId).toBe(span.traceId);
+        expect(ctx.spanId).toBe(span.spanId);
+        expect(ctx.traceparent).toBe(`00-${span.traceId}-${span.spanId}-01`);
+    });
+
     it('stores and clears active traceparent', () => {
         service.setActiveTraceparent('00-0123456789abcdef0123456789abcdef-0123456789abcdef-01');
         expect(service.getActiveTraceparent()).toBe(

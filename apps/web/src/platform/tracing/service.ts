@@ -1,6 +1,13 @@
 import { ServiceBase } from '@/platform/base/service-base';
 import { Service } from '@/platform/di';
-import type { ITracingService, SpanData, SpanEvent, SpanLink, SpanOptions } from './types';
+import type {
+    ITracingService,
+    SpanData,
+    SpanEvent,
+    SpanLink,
+    SpanOptions,
+    TraceContext,
+} from './types';
 
 const SERVICE_NAME = 'my-km-web';
 const FLUSH_INTERVAL = 5000;
@@ -169,6 +176,14 @@ export class TracingService extends ServiceBase implements ITracingService {
 
     getTraceparent(traceId: string, spanId: string): string {
         return `00-${traceId}-${spanId}-01`;
+    }
+
+    toTraceContext(span: ActiveSpan): TraceContext {
+        return {
+            traceId: span.traceId,
+            spanId: span.spanId,
+            traceparent: this.getTraceparent(span.traceId, span.spanId),
+        };
     }
 
     setActiveTraceparent(traceparent: string | null): void {
