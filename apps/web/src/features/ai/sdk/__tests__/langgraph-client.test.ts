@@ -9,7 +9,7 @@ describe('withTraceparent', () => {
 
         const init = middleware(new URL('http://localhost:3000/api/threads/t1/runs/stream'), {
             headers: { 'content-type': 'application/json' },
-        });
+        }) as RequestInit;
 
         expect(new Headers(init.headers).get('traceparent')).toBe(
             '00-0123456789abcdef0123456789abcdef-0123456789abcdef-01',
@@ -21,7 +21,7 @@ describe('withTraceparent', () => {
 
         const init = middleware(new URL('http://localhost:3000/api/threads/t1/runs/stream'), {
             headers: { 'content-type': 'application/json' },
-        });
+        }) as RequestInit;
 
         expect(new Headers(init.headers).has('traceparent')).toBe(false);
     });

@@ -145,19 +145,19 @@ describe('FrontendToolExecutor', () => {
                 spanId: 'span-1',
                 attributes: {} as Record<string, unknown>,
                 events: [] as Array<{ name: string }>,
-                setAttribute() {
+                setAttribute(): any {
                     return this;
                 },
-                addEvent() {
+                addEvent(): any {
                     return this;
                 },
-                setError() {
+                setError(): any {
                     return this;
                 },
-                end() {
+                end(): any {
                     return this;
                 },
-                toData() {
+                toData(): any {
                     return this;
                 },
             })),
