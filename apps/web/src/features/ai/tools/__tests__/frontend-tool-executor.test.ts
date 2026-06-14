@@ -44,7 +44,7 @@ describe('FrontendToolExecutor', () => {
         expect(confirmListener).not.toHaveBeenCalled();
     });
 
-    it('工具执行 span 应继承 trace 并记录 tool_call 状态', async () => {
+    it('工具执行 span 应从传入的 traceContext 继承 trace', async () => {
         const endedSpans: Array<{
             traceId: string;
             parentSpanId?: string;
@@ -103,19 +103,27 @@ describe('FrontendToolExecutor', () => {
                 endedSpans.push(span);
                 return span.toData();
             }),
-            getActiveTraceparent: vi.fn(
-                () => '00-0123456789abcdef0123456789abcdef-fedcba9876543210-01',
-            ),
         };
         executor = new FrontendToolExecutor('bypass', tracer);
         const handler = makeHandler('read-tool', 'read', { success: true });
         executor.register(handler);
 
-        await executor.dispatch('read-tool', { foo: 1 }, { toolCallId: 'tc-1' });
+        await executor.dispatch(
+            'read-tool',
+            { foo: 1 },
+            {
+                toolCallId: 'tc-1',
+                traceContext: {
+                    traceId: 'aabbccdd'.repeat(4),
+                    spanId: '0123456789abcdef',
+                    traceparent: '00-aabbccddaabbccddaabbccddaabbccdd-0123456789abcdef-01',
+                },
+            },
+        );
 
         expect(tracer.startSpan).toHaveBeenCalledWith('frontend.tool.execute', {
-            traceId: '0123456789abcdef0123456789abcdef',
-            parentSpanId: 'fedcba9876543210',
+            traceId: 'aabbccdd'.repeat(4),
+            parentSpanId: '0123456789abcdef',
             attributes: {
                 'tool.name': 'read-tool',
                 'tool.type': 'read',
@@ -128,6 +136,47 @@ describe('FrontendToolExecutor', () => {
             'tool.execution_started',
             'tool.execution_completed',
         ]);
+    });
+
+    it('traceContext 缺失时仍能创建 span（traceId 自动生成）', async () => {
+        const tracer = {
+            startSpan: vi.fn((_name: string, options?: { traceId?: string }) => ({
+                traceId: options?.traceId ?? 'auto-generated',
+                spanId: 'span-1',
+                attributes: {} as Record<string, unknown>,
+                events: [] as Array<{ name: string }>,
+                setAttribute() {
+                    return this;
+                },
+                addEvent() {
+                    return this;
+                },
+                setError() {
+                    return this;
+                },
+                end() {
+                    return this;
+                },
+                toData() {
+                    return this;
+                },
+            })),
+            endSpan: vi.fn(),
+        };
+        executor = new FrontendToolExecutor('bypass', tracer);
+        executor.register(makeHandler('read-tool', 'read'));
+
+        await executor.dispatch('read-tool', {}, {});
+
+        expect(tracer.startSpan).toHaveBeenCalledWith('frontend.tool.execute', {
+            traceId: undefined,
+            parentSpanId: undefined,
+            attributes: {
+                'tool.name': 'read-tool',
+                'tool.type': 'read',
+                'tool.status': 'running',
+            },
+        });
     });
 
     it('写工具应触发 confirmation，approved=true 时执行', async () => {

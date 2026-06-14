@@ -1,7 +1,7 @@
 import { Emitter, type Event } from '@/base/common/event';
 import { getContainer } from '@/platform/bootstrap';
 import { TracingService } from '@/platform/tracing';
-import type { ITracingService, SpanOptions } from '@/platform/tracing/types';
+import type { ITracingService, SpanOptions, TraceContext } from '@/platform/tracing/types';
 import {
     type ConfirmationMode,
     type ConfirmationStrategy,
@@ -23,10 +23,10 @@ import type { ConfirmationRequest, FrontendToolHandler, ToolResult } from './typ
  */
 export interface ToolDispatchOptions {
     toolCallId?: string;
+    traceContext?: TraceContext;
 }
 
-export interface ToolTracingService
-    extends Pick<ITracingService, 'startSpan' | 'endSpan' | 'getActiveTraceparent'> {}
+export interface ToolTracingService extends Pick<ITracingService, 'startSpan' | 'endSpan'> {}
 
 export class FrontendToolExecutor {
     private readonly handlers = new Map<string, FrontendToolHandler>();
@@ -67,10 +67,9 @@ export class FrontendToolExecutor {
         }
 
         const tracer = this.tracer ?? getContainer().get(TracingService);
-        const traceContext = parseTraceparent(tracer.getActiveTraceparent());
         const spanOptions: SpanOptions = {
-            traceId: traceContext?.traceId,
-            parentSpanId: traceContext?.parentSpanId,
+            traceId: options?.traceContext?.traceId,
+            parentSpanId: options?.traceContext?.spanId,
             attributes: {
                 'tool.name': toolName,
                 'tool.type': handler.type,
@@ -137,17 +136,4 @@ export class FrontendToolExecutor {
         this._onConfirmationRequest.dispose();
         this.handlers.clear();
     }
-}
-
-function parseTraceparent(
-    traceparent: string | null,
-): { traceId: string; parentSpanId: string } | null {
-    if (!traceparent) return null;
-    const parts = traceparent.split('-');
-    if (parts.length !== 4) return null;
-    const [, traceId, parentSpanId] = parts;
-    if (!/^[a-f0-9]{32}$/.test(traceId) || !/^[a-f0-9]{16}$/.test(parentSpanId)) {
-        return null;
-    }
-    return { traceId, parentSpanId };
 }
