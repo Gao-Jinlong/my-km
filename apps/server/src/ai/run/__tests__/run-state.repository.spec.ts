@@ -207,6 +207,10 @@ describe('RunStateRepository', () => {
             (prisma.run.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
             const alive = await repo.heartbeat('r1', 'A');
             expect(alive).toBe(true);
+            expect(prisma.run.updateMany).toHaveBeenCalledWith({
+                where: { id: 'r1', ownerId: 'A' },
+                data: { leaseUntil: expect.any(Date) },
+            });
         });
 
         it('returns false when lease lost', async () => {
