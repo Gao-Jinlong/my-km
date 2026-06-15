@@ -18,6 +18,7 @@
  */
 
 import type { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
+import type { EventBus } from '../event/event-bus';
 import type { LLMConfig } from '../llm/provider.types';
 import type { RunEventStore } from '../store/run-event-store';
 import { snapshotValue } from '../utils/snapshot';
@@ -27,6 +28,8 @@ export interface RunContextOpts {
     checkpointer: BaseCheckpointSaver;
     /** Run 事件流存储器 */
     eventStore: RunEventStore;
+    /** 跨副本事件总线（owner publish，非 owner 订阅续实时，spec 3.2/3.4） */
+    eventBus: EventBus;
     /** LLM 配置快照（run 创建时冻结） */
     llmConfig: LLMConfig;
 }
@@ -36,12 +39,15 @@ export class RunContext {
     readonly checkpointer: BaseCheckpointSaver;
     /** Run 事件流存储器 */
     readonly eventStore: RunEventStore;
+    /** 跨副本事件总线（spec 3.2/3.4） */
+    readonly eventBus: EventBus;
     /** LLM 配置快照（run 创建时冻结，后续不可修改） */
     readonly llmConfig: Readonly<LLMConfig>;
 
     constructor(opts: RunContextOpts) {
         this.checkpointer = opts.checkpointer;
         this.eventStore = opts.eventStore;
+        this.eventBus = opts.eventBus;
         this.llmConfig = snapshotValue(opts.llmConfig);
     }
 }

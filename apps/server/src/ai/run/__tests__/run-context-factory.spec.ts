@@ -1,4 +1,5 @@
 import type { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
+import type { EventBus } from '../../event/event-bus';
 import type { RunEventStore } from '../../store/run-event-store';
 
 // Mock langgraph checkpoint ESM to prevent uuid ESM error in Jest
@@ -21,16 +22,18 @@ describe('RunContextFactory', () => {
     let mockCheckpointer: BaseCheckpointSaver;
     let mockCheckpointerProvider: CheckpointerProvider;
     let mockEventStore: RunEventStore;
+    let mockEventBus: EventBus;
 
     beforeEach(() => {
         mockCheckpointer = { type: 'memory-saver' } as unknown as BaseCheckpointSaver;
         mockEventStore = { append: jest.fn() } as unknown as RunEventStore;
+        mockEventBus = { publish: jest.fn().mockResolvedValue(undefined) } as unknown as EventBus;
 
         mockCheckpointerProvider = {
             getCheckpointer: jest.fn().mockResolvedValue(mockCheckpointer),
         } as unknown as CheckpointerProvider;
 
-        factory = new RunContextFactory(mockCheckpointerProvider, mockEventStore);
+        factory = new RunContextFactory(mockCheckpointerProvider, mockEventStore, mockEventBus);
     });
 
     describe('create', () => {
@@ -96,6 +99,19 @@ describe('RunContextFactory', () => {
             const badConfig = { provider: 'zhipu', model: 'glm-5', fn: () => {} };
 
             await expect(factory.create({ llmConfig: badConfig as any })).rejects.toThrow();
+        });
+
+        it('should return a RunContext with the singleton eventBus', async () => {
+            const ctx = await factory.create({ llmConfig: { provider: 'zhipu', model: 'glm-5' } });
+            expect(ctx.eventBus).toBe(mockEventBus);
+        });
+
+        it('should share eventBus reference across contexts', async () => {
+            const ctx1 = await factory.create({ llmConfig: { provider: 'zhipu', model: 'glm-5' } });
+            const ctx2 = await factory.create({
+                llmConfig: { provider: 'openai', model: 'gpt-4' },
+            });
+            expect(ctx1.eventBus).toBe(ctx2.eventBus);
         });
     });
 });

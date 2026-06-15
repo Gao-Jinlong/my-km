@@ -7,6 +7,7 @@
 
 import { Injectable } from '@nestjs/common';
 import { CheckpointerProvider } from '../checkpointer/checkpointer.provider';
+import { EventBus } from '../event/event-bus';
 import type { LLMConfig } from '../llm/provider.types';
 import { RunEventStore } from '../store/run-event-store';
 import { RunContext, type RunContextOpts } from './run-context';
@@ -21,6 +22,7 @@ export class RunContextFactory {
     constructor(
         private readonly checkpointerProvider: CheckpointerProvider,
         private readonly eventStore: RunEventStore,
+        private readonly eventBus: EventBus,
     ) {}
 
     /**
@@ -35,6 +37,7 @@ export class RunContextFactory {
         return new RunContext({
             checkpointer,
             eventStore: this.eventStore,
+            eventBus: this.eventBus,
             llmConfig: opts.llmConfig,
         } satisfies RunContextOpts);
     }
