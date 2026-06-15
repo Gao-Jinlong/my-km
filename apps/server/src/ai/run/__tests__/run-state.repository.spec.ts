@@ -191,4 +191,28 @@ describe('RunStateRepository', () => {
             if (!result.acquired) expect(result.conflict).toBeNull();
         });
     });
+
+    describe('releaseLease', () => {
+        it('clears ownerId only when caller is owner', async () => {
+            await repo.releaseLease('r1', 'A');
+            expect(prisma.run.updateMany).toHaveBeenCalledWith({
+                where: { id: 'r1', ownerId: 'A' },
+                data: { ownerId: null, leaseUntil: null },
+            });
+        });
+    });
+
+    describe('heartbeat', () => {
+        it('returns true when caller still owns', async () => {
+            (prisma.run.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+            const alive = await repo.heartbeat('r1', 'A');
+            expect(alive).toBe(true);
+        });
+
+        it('returns false when lease lost', async () => {
+            (prisma.run.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+            const alive = await repo.heartbeat('r1', 'A');
+            expect(alive).toBe(false);
+        });
+    });
 });

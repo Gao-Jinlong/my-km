@@ -10,6 +10,9 @@ import type { LeaseResult, RunRow } from './lease.types';
 
 const ACTIVE_STATUSES = ['pending', 'running', 'interrupted'];
 
+/** 默认租约 TTL（spec 2.4：30s 租约）—— acquireLease 与 heartbeat 共用 */
+const DEFAULT_LEASE_TTL_MS = 30_000;
+
 export interface CreateRunInput {
     id: string;
     threadId: string;
@@ -87,7 +90,11 @@ export class RunStateRepository {
      * count===0 即抢占失败（有活跃的他人 owner）。Prisma updateMany 无 RETURNING，
      * 故成功后再 findUnique 取最新 run 行。
      */
-    async acquireLease(runId: string, replicaId: string, ttlMs = 30_000): Promise<LeaseResult> {
+    async acquireLease(
+        runId: string,
+        replicaId: string,
+        ttlMs = DEFAULT_LEASE_TTL_MS,
+    ): Promise<LeaseResult> {
         const leaseUntil = new Date(Date.now() + ttlMs);
         const result = await this.prisma.run.updateMany({
             where: {
@@ -111,5 +118,26 @@ export class RunStateRepository {
         }
         const run = await this.prisma.run.findUnique({ where: { id: runId } });
         return { acquired: true, run, conflict: null };
+    }
+
+    /** 释放租约：仅当调用方仍是 owner 时清空（ownerId/leaseUntil）。 */
+    async releaseLease(runId: string, replicaId: string): Promise<void> {
+        await this.prisma.run.updateMany({
+            where: { id: runId, ownerId: replicaId },
+            data: { ownerId: null, leaseUntil: null },
+        });
+    }
+
+    /** 心跳续租：仅当调用方仍是 owner 时续期 leaseUntil。返回 false 表示租约已被抢占，调用方应停止执行。 */
+    async heartbeat(
+        runId: string,
+        replicaId: string,
+        ttlMs = DEFAULT_LEASE_TTL_MS,
+    ): Promise<boolean> {
+        const result = await this.prisma.run.updateMany({
+            where: { id: runId, ownerId: replicaId },
+            data: { leaseUntil: new Date(Date.now() + ttlMs) },
+        });
+        return result.count > 0;
     }
 }
