@@ -18,17 +18,20 @@
 
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { Command } from '@langchain/langgraph';
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { context as otelContext, SpanStatusCode, trace } from '@opentelemetry/api';
 import { CheckpointReaderService } from './checkpointer/checkpoint-reader.service';
 import { ChatGraph } from './langgraph/graphs/chat-graph';
 import { LLMFactory } from './llm/llm-factory';
 import type { LLMConfig } from './llm/provider.types';
 import { ProviderRegistry } from './llm/provider-registry';
+import type { LeaseResult } from './run/lease.types';
+import { REPLICA_ID } from './run/replica-id';
 import type { RunContext } from './run/run-context';
 import { RunContextFactory } from './run/run-context-factory';
 import { RunManager } from './run/run-manager';
 import { RunRecord } from './run/run-record';
+import { RunStateRepository } from './run/run-state.repository';
 import { ThreadService } from './thread/thread.service';
 import { frontendTools } from './tools/tool-definitions';
 import { type MultitaskStrategy, RunStatus } from './types/run.types';
@@ -55,6 +58,8 @@ export class AiChatService {
         private readonly llmFactory: LLMFactory,
         // checkpointReader 保留供 GET /state 等用途；本服务不再依赖它读取消息
         private readonly _checkpointReader: CheckpointReaderService,
+        private readonly runStateRepo: RunStateRepository,
+        @Inject(REPLICA_ID) private readonly replicaId: string,
     ) {
         // 避免 TS unused 警告，保持构造依赖以便测试与未来用途
         void this._checkpointReader;
@@ -91,33 +96,52 @@ export class AiChatService {
     }
 
     /**
-     * 通过 LangGraph SDK 的 command.resume 机制恢复 Run
+     * 进程外 resume：任意副本可恢复一个 interrupted run。
      *
-     * 标准 LangGraph 协议：SDK 调用 POST /runs/stream 并携带
-     * `{ command: { resume: ... } }`。服务端将 resume payload 注入 RunRecord，
-     * executeRunProtocol 用 `new Command({ resume })` 作为 graph 输入恢复执行。
+     * 流程：查 PG active run → 校验 interrupted → acquireLease 抢占 →
+     * saveResumePayload → 从 RunRow 重建 RunContext/RunRecord → adoptRun → setStatus(running)。
+     * 不依赖内存里已有 RunRecord。
      */
     async resumeFromCommand(threadId: string, command: { resume?: unknown }): Promise<RunRecord> {
-        const record = this.runManager.getActiveRunForThread(threadId);
-        if (!record) {
+        const runRow = await this.runStateRepo.findActiveRunByThread(threadId);
+        if (!runRow) {
             throw new NotFoundException(`No active run for thread: ${threadId}`);
         }
-
-        if (record.status !== RunStatus.Interrupted) {
+        if (runRow.status !== RunStatus.Interrupted) {
             throw new ConflictException(
-                `Run ${record.id} is not interrupted (status: ${record.status})`,
+                `Run ${runRow.id} is not interrupted (status: ${runRow.status})`,
             );
         }
 
-        this.logger.log(
-            `Run ${record.id} resuming with command: ${JSON.stringify(command.resume)}`,
-        );
+        const lease: LeaseResult = await this.runStateRepo.acquireLease(runRow.id, this.replicaId);
+        if (!lease.acquired) {
+            throw new ConflictException(
+                `Run ${runRow.id} is busy (owner: ${lease.conflict?.ownerId ?? 'unknown'})`,
+            );
+        }
 
-        // 注入 resume payload，让 executeRunProtocol 用 Command({resume}) 恢复
+        this.logger.log(`Run ${runRow.id} resumed by replica ${this.replicaId}`);
+
+        await this.runStateRepo.saveResumePayload(runRow.id, command.resume);
+
+        const llmConfig = (runRow.llmConfig as LLMConfig | null) ?? this.resolveDefaultLlmConfig();
+        const runContext = await this.runContextFactory.create({ llmConfig });
+        const record = new RunRecord({
+            id: runRow.id,
+            threadId,
+            runContext,
+            snapshot: {
+                content: runRow.content ?? '',
+                requestContext:
+                    (runRow.requestContext as Record<string, unknown> | null) ?? undefined,
+            },
+            lastSeq: runRow.lastSeq,
+        });
         record.setResumePayload(command.resume);
 
+        this.runManager.adoptRun(record);
+        await this.runStateRepo.setStatus(record.id, RunStatus.Running);
         record.setStatus(RunStatus.Running);
-        await this.runManager.setStatus(record.id, RunStatus.Running);
         return record;
     }
 
@@ -394,6 +418,13 @@ export class AiChatService {
 
         // 已经是 plain dict（来自 reducer / checkpoint）
         return m;
+    }
+
+    /** 返回 provider 注册的默认 LLMConfig（resume 时 RunRow.llmConfig 缺失的兜底） */
+    private resolveDefaultLlmConfig(): LLMConfig {
+        const cfg = this.providerRegistry.defaultConfig;
+        if (!cfg) throw new Error('No LLM provider configured');
+        return cfg;
     }
 
     /**

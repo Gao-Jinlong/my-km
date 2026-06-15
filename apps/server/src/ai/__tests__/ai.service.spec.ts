@@ -6,10 +6,12 @@ import { CheckpointReaderService } from '../checkpointer/checkpoint-reader.servi
 import { LLMFactory } from '../llm/llm-factory';
 import type { LLMConfig } from '../llm/provider.types';
 import { ProviderRegistry } from '../llm/provider-registry';
+import { REPLICA_ID } from '../run/replica-id';
 import type { RunContext } from '../run/run-context';
 import { RunContextFactory } from '../run/run-context-factory';
 import { RunManager } from '../run/run-manager';
 import { RunRecord } from '../run/run-record';
+import { RunStateRepository } from '../run/run-state.repository';
 import type { RunEventStore } from '../store/run-event-store';
 import { ThreadService } from '../thread/thread.service';
 import { RunStatus } from '../types/run.types';
@@ -161,7 +163,22 @@ describe('AiChatService', () => {
                 const r = runStore.get(id);
                 if (r) r.abort();
             }),
+            adoptRun: jest.fn().mockImplementation((record: RunRecord) => {
+                runStore.set(record.id, record);
+            }),
             cleanup: jest.fn(),
+        };
+
+        // P1: mock RunStateRepository — resume 路径的 PG 权威源
+        const mockRunStateRepo = {
+            findActiveRunByThread: jest.fn(),
+            acquireLease: jest.fn(),
+            saveResumePayload: jest.fn(),
+            setStatus: jest.fn(),
+            updateLastSeq: jest.fn(),
+            releaseLease: jest.fn(),
+            heartbeat: jest.fn().mockResolvedValue(true),
+            findById: jest.fn(),
         };
 
         const module: TestingModule = await Test.createTestingModule({
@@ -184,6 +201,8 @@ describe('AiChatService', () => {
                 { provide: ProviderRegistry, useValue: mockRegistry },
                 { provide: 'ProviderRegistry', useValue: mockRegistry },
                 { provide: LLMFactory, useValue: mockLLM },
+                { provide: RunStateRepository, useValue: mockRunStateRepo },
+                { provide: REPLICA_ID, useValue: 'replica-test' },
                 {
                     provide: CheckpointReaderService,
                     useValue: {
@@ -205,6 +224,9 @@ describe('AiChatService', () => {
         runManager = module.get<RunManager>(RunManager);
         mockRunContextFactory = module.get<RunContextFactory>(RunContextFactory);
         mockProviderRegistry = module.get<ProviderRegistry>(ProviderRegistry);
+
+        // 暴露 repo mock 给 resumeFromCommand 测试
+        (service as unknown as { __runStateRepo: unknown }).__runStateRepo = mockRunStateRepo;
 
         // A1 默认 stream: yield [mode, payload] tuple — values 模式带 messages
         mockStreamImpl = () => ({
@@ -397,34 +419,77 @@ describe('AiChatService', () => {
     });
 
     describe('resumeFromCommand', () => {
+        function getRepo() {
+            return (service as unknown as { __runStateRepo: Record<string, jest.Mock> })
+                .__runStateRepo;
+        }
+
         it('should throw NotFoundException when no active run for thread', async () => {
+            getRepo().findActiveRunByThread.mockResolvedValue(null);
             await expect(
                 service.resumeFromCommand('nonexistent-thread', { resume: { foo: 'bar' } }),
             ).rejects.toThrow(NotFoundException);
         });
 
         it('should throw ConflictException when run is not interrupted', async () => {
-            // ThreadService.findOrCreate mock 始终返回 { id: 'thread-1' }，
-            // 所以 startRun({threadId: 't1'}) 创建的 record.threadId 仍是 'thread-1'。
-            const record = await service.startRun({ content: 'test', threadId: 't1' });
-            // status is Running, not Interrupted
-            expect(record.status).toBe(RunStatus.Running);
-
+            getRepo().findActiveRunByThread.mockResolvedValue({
+                id: 'r1',
+                threadId: 'thread-1',
+                status: 'running',
+                ownerId: 'replica-test',
+            });
             await expect(
                 service.resumeFromCommand('thread-1', { resume: { ok: true } }),
             ).rejects.toThrow(ConflictException);
         });
 
-        it('should set status to Running and return record when resume succeeds', async () => {
-            const record = await service.startRun({ content: 'test', threadId: 't1' });
-            record.setStatus(RunStatus.Interrupted);
+        it('should throw ConflictException when lease cannot be acquired (busy)', async () => {
+            getRepo().findActiveRunByThread.mockResolvedValue({
+                id: 'r1',
+                threadId: 'thread-1',
+                status: 'interrupted',
+                ownerId: 'replica-B',
+            });
+            getRepo().acquireLease.mockResolvedValue({
+                acquired: false,
+                conflict: { ownerId: 'replica-B', leaseUntil: new Date() },
+            });
+            await expect(
+                service.resumeFromCommand('thread-1', { resume: { tool_call_id: 'tc-1' } }),
+            ).rejects.toThrow(ConflictException);
+            expect(getRepo().saveResumePayload).not.toHaveBeenCalled();
+        });
+
+        it('should rebuild RunRecord from RunRow, adopt it, and set Running on success', async () => {
+            getRepo().findActiveRunByThread.mockResolvedValue({
+                id: 'r1',
+                threadId: 'thread-1',
+                status: 'interrupted',
+                ownerId: null,
+                content: 'prior user msg',
+                requestContext: { selectedText: 'x' },
+                llmConfig: { provider: 'zhipu', model: 'glm-5' },
+                lastSeq: 7,
+            });
+            getRepo().acquireLease.mockResolvedValue({
+                acquired: true,
+                run: { id: 'r1' },
+                conflict: null,
+            });
 
             const resumed = await service.resumeFromCommand('thread-1', {
                 resume: { tool_call_id: 'tc-1', tool_result: 'ok' },
             });
 
-            expect(resumed).toBe(record);
+            expect(getRepo().saveResumePayload).toHaveBeenCalledWith('r1', {
+                tool_call_id: 'tc-1',
+                tool_result: 'ok',
+            });
+            expect(getRepo().setStatus).toHaveBeenCalledWith('r1', 'running');
+            expect(resumed.id).toBe('r1');
             expect(resumed.status).toBe(RunStatus.Running);
+            expect(resumed.isResume).toBe(true);
+            expect(resumed.currentSeq).toBe(7);
         });
     });
 
