@@ -1,23 +1,29 @@
-export const getDocumentContentTool = {
-    name: 'get_document_content',
-    description: 'Get document content',
-    input_schema: { type: 'object', properties: {} },
+/**
+ * Jest manual mock for @my-km/shared AI tool definitions.
+ *
+ * Keep this aligned with packages/shared/src/ai/tools/* exports. Server AI tests only need
+ * name/description/inputSchema shape so tool-definitions.ts can build LangChain tools.
+ */
+export const fileOpsTool = {
+    name: 'file_ops',
+    description: 'Mock file operations tool',
+    inputSchema: { type: 'object', properties: {}, required: [] },
 };
 
-export const getChildItemsTool = {
-    name: 'get_child_items',
-    description: 'Get child items',
-    input_schema: { type: 'object', properties: {} },
+export const docReadTool = {
+    name: 'doc_read',
+    description: 'Mock document read tool',
+    inputSchema: { type: 'object', properties: {}, required: [] },
 };
 
-export const insertTextTool = {
-    name: 'insert_text',
-    description: 'Insert text',
-    input_schema: { type: 'object', properties: {} },
+export const docEditTool = {
+    name: 'doc_edit',
+    description: 'Mock document edit tool',
+    inputSchema: { type: 'object', properties: {}, required: [] },
 };
 
-export const spliceTextTool = {
-    name: 'splice_text',
-    description: 'Splice text',
-    input_schema: { type: 'object', properties: {} },
+export const searchTool = {
+    name: 'search',
+    description: 'Mock search tool',
+    inputSchema: { type: 'object', properties: {}, required: [] },
 };
