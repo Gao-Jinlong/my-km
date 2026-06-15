@@ -141,3 +141,127 @@ describe('JoinStreamService — terminal replay', () => {
         expect(typeof cleanup).toBe('function');
     });
 });
+
+describe('JoinStreamService — live resume (running/interrupted)', () => {
+    let eventBus: InProcessEventBus;
+
+    beforeEach(() => {
+        eventBus = new InProcessEventBus();
+    });
+
+    it('subscribes EventBus and delivers live events after replay (running run)', async () => {
+        const run = { id: 'r1', status: 'running' } as RunRow;
+        // PG 空（run 刚开始，无持久化）
+        const service = new JoinStreamService(eventBus, mockRunStateRepo(run), mockEventStore([]));
+        const sink = collectorSink();
+
+        const cleanup = await service.joinStream('r1', 0, sink);
+        // 模拟 owner 端 publish 实时事件
+        await eventBus.publish(runChannel('r1'), {
+            seq: 1,
+            eventType: 'values',
+            payload: { n: 1 },
+        });
+        await eventBus.publish(runChannel('r1'), {
+            seq: 2,
+            eventType: 'messages',
+            payload: { chunk: 'hi' },
+        });
+        await eventBus.publish(runChannel('r1'), { seq: 3, eventType: 'end', payload: {} });
+
+        expect(sink.events).toEqual([
+            { seq: 1, eventType: 'values', payload: { n: 1 } },
+            { seq: 2, eventType: 'messages', payload: { chunk: 'hi' } },
+            { seq: 3, eventType: 'end', payload: {} },
+        ]);
+        expect(sink.closed).toBe(true); // end → close
+        cleanup();
+    });
+
+    it('dedups overlapping replay + live events by seq', async () => {
+        const run = { id: 'r1', status: 'running' } as RunRow;
+        // PG 已持久化 seq 1（values）；since=0
+        const events = [{ seq: 1, eventType: 'values', payload: { n: 1 } }];
+        const service = new JoinStreamService(
+            eventBus,
+            mockRunStateRepo(run),
+            mockEventStore(events),
+        );
+        const sink = collectorSink();
+
+        await service.joinStream('r1', 0, sink);
+        // 模拟 owner 重新 publish seq 1（重叠，应去重）+ 新 seq 2
+        await eventBus.publish(runChannel('r1'), {
+            seq: 1,
+            eventType: 'values',
+            payload: { n: 1 },
+        });
+        await eventBus.publish(runChannel('r1'), { seq: 2, eventType: 'end', payload: {} });
+
+        expect(sink.events).toEqual([
+            { seq: 1, eventType: 'values', payload: { n: 1 } }, // 回放
+            { seq: 2, eventType: 'end', payload: {} }, // 实时（seq 1 实时被去重）
+        ]);
+        expect(sink.closed).toBe(true);
+    });
+
+    it('replays persisted events then continues live for a running run', async () => {
+        const run = { id: 'r1', status: 'running' } as RunRow;
+        const events = [{ seq: 1, eventType: 'values', payload: { n: 1 } }];
+        const service = new JoinStreamService(
+            eventBus,
+            mockRunStateRepo(run),
+            mockEventStore(events),
+        );
+        const sink = collectorSink();
+
+        await service.joinStream('r1', 0, sink);
+        await eventBus.publish(runChannel('r1'), { seq: 2, eventType: 'end', payload: {} });
+
+        expect(sink.events).toEqual([
+            { seq: 1, eventType: 'values', payload: { n: 1 } }, // 回放
+            { seq: 2, eventType: 'end', payload: {} }, // 实时续
+        ]);
+        expect(sink.closed).toBe(true);
+    });
+
+    it('keeps the stream open for interrupted runs (no end event)', async () => {
+        const run = { id: 'r1', status: 'interrupted' } as RunRow;
+        const events = [{ seq: 1, eventType: 'tasks', payload: { interrupt: true } }];
+        const service = new JoinStreamService(
+            eventBus,
+            mockRunStateRepo(run),
+            mockEventStore(events),
+        );
+        const sink = collectorSink();
+
+        const cleanup = await service.joinStream('r1', 0, sink);
+        // interrupted 无 end，stream 保持开
+        expect(sink.closed).toBe(false);
+        expect(sink.events).toEqual([{ seq: 1, eventType: 'tasks', payload: { interrupt: true } }]);
+
+        // client 断开 → cleanup 关闭
+        cleanup();
+        expect(sink.closed).toBe(true);
+    });
+
+    it('cleanup stops live delivery (no further events after cleanup)', async () => {
+        const run = { id: 'r1', status: 'running' } as RunRow;
+        const service = new JoinStreamService(eventBus, mockRunStateRepo(run), mockEventStore([]));
+        const sink = collectorSink();
+
+        const cleanup = await service.joinStream('r1', 0, sink);
+        await eventBus.publish(runChannel('r1'), {
+            seq: 1,
+            eventType: 'values',
+            payload: { n: 1 },
+        });
+        expect(sink.events).toHaveLength(1);
+
+        cleanup(); // client 断
+        await eventBus.publish(runChannel('r1'), { seq: 2, eventType: 'end', payload: {} });
+        // cleanup 后不再收到
+        expect(sink.events).toHaveLength(1);
+        expect(sink.closed).toBe(true);
+    });
+});

@@ -1,5 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { EventBus, type RunStreamEvent, runChannel } from '../event/event-bus';
+import {
+    EventBus,
+    type EventBusSubscription,
+    type RunStreamEvent,
+    runChannel,
+} from '../event/event-bus';
 import type { RunEventStore } from '../store/run-event-store';
 import type { RunEventSink } from './run-event-sink';
 import type { RunStateRepository } from './run-state.repository';
@@ -39,32 +44,49 @@ export class JoinStreamService {
         }
 
         const isTerminal = TERMINAL_STATUSES.includes(run.status);
-        if (!isTerminal) {
-            // running/interrupted —— Task 2 实现
-            throw new Error(
-                `joinStream for non-terminal status (${run.status}) not yet implemented`,
-            );
-        }
 
-        // terminal：纯回放 seq > since，遇终态 close
+        // seq 去重游标：回放与实时回调共用，event.seq <= lastSeq 丢弃（spec 3.5）
+        let lastSeq = since;
         let closed = false;
+        let subscription: EventBusSubscription | null = null;
+
         const close = () => {
-            if (!closed) {
-                closed = true;
-                sink.close();
-            }
+            if (closed) return;
+            closed = true;
+            subscription?.unsubscribe();
+            sink.close();
         };
 
+        // running/interrupted：先 subscribe（防漏），回调按 seq 去重 + push + 终态 close
+        if (!isTerminal) {
+            subscription = this.eventBus.subscribe(runChannel(runId), event => {
+                if (closed || event.seq <= lastSeq) return;
+                lastSeq = event.seq;
+                sink.push(event);
+                if (event.eventType === 'end' || event.eventType === 'error') {
+                    close();
+                }
+            });
+        }
+
+        // 回放 PG（先 subscribe 再回放，spec 3.5 Step 3）：seq > since 且 seq > lastSeq（实时可能已 push）
         const events = (await this.eventStore.replay(runId)).filter(e => e.seq > since);
         for (const e of events) {
+            if (closed) break;
+            if (e.seq <= lastSeq) continue; // 实时回调已 push
+            lastSeq = e.seq;
             sink.push(toRunStreamEvent(e));
             if (e.eventType === 'end' || e.eventType === 'error') {
                 close();
                 break;
             }
         }
-        close(); // 防御：无终态事件也 close
 
-        return () => close(); // terminal 已 close，cleanup 幂等 no-op
+        // terminal：回放完必 close（无续实时）；running/interrupted：若回放含终态已 close，否则持续续实时
+        if (isTerminal) {
+            close();
+        }
+
+        return close; // cleanup（幂等）
     }
 }
