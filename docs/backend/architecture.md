@@ -61,7 +61,7 @@ Response
 
 ## AI 模块架构（多 LLM + LangGraph）
 
-详细架构文档见 [AI Architecture v2](./ai-architecture-v2.md)。
+详细架构文档见 [LLM 对话协议设计 spec](../superpowers/specs/2026-06-15-llm-conversation-protocol-design.md)。
 
 以下为概览。
 
@@ -200,8 +200,8 @@ apps/server/src/ai/
 ## 相关文件
 
 - [前端架构](../frontend/architecture.md) - 前端模块文档
-- [AI 后端架构](./ai-architecture-v2.md) - AI/LLM/LangGraph 详细架构
-- [LLM 对接文档](./llm-integration-guide.md) - 前端对接 LLM 对话流程
+- [AI 前端 runtime](../frontend/langgraph-runtime.md) - SSE/LangGraph SDK 前端链路
+- [LLM 对话协议设计](../superpowers/specs/2026-06-15-llm-conversation-protocol-design.md) - Thread/Run/租约/resume 完整协议规范
 
 ---
 

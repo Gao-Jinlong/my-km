@@ -70,7 +70,7 @@
 **状态**: Resolved
 **日期**: 2026-05-19
 **描述**: 从单类 `AiService` (343 行) 重构为分层架构 (gateway → dispatch → workflow → LLM provider)。
-所有 Phase 1-4 已完成。详见 [backend/ai-architecture-v2.md](./backend/ai-architecture-v2.md)。
+所有 Phase 1-4 已完成。后续协议重构（PG 权威源 + LangGraph SSE 对齐）详见 [LLM 对话协议设计 spec](./superpowers/specs/2026-06-15-llm-conversation-protocol-design.md)。
 
 ### ✅ RES-002: LangGraph 包合并
 

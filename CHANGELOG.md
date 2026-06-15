@@ -12,7 +12,7 @@
   - LangGraph 隔离包：`packages/langgraph-workflows/`，纯函数式代码无 NestJS 依赖
   - 节点级 LLM 路由：工作流中每个节点可独立指定 LLM
   - WebSocket 网关支持传递 `llmConfigMap` 和 `graphName`
-  - 架构文档：`docs/backend/ai-architecture-v2.md`
+  - 架构文档：`docs/backend/ai-architecture-v2.md`（该文档已废弃，现行协议见 `docs/superpowers/specs/2026-06-15-llm-conversation-protocol-design.md`）
 
 ### Changed
 - **LangGraph 节点实现** — 节点处理器从占位实现改为实际 LLM 调用逻辑

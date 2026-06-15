@@ -96,8 +96,8 @@ my-km/
 | 前端 | [frontend/architecture.md](./frontend/architecture.md) |
 | 前端 Platform | [frontend/platform/services.md](./frontend/platform/services.md) |
 | 后端 | [backend/architecture.md](./backend/architecture.md) |
-| AI 后端 | [backend/ai-architecture-v2.md](./backend/ai-architecture-v2.md) |
-| LLM 对接 | [backend/llm-integration-guide.md](./backend/llm-integration-guide.md) |
+| AI 对话协议 | [LLM 对话协议设计 spec](../superpowers/specs/2026-06-15-llm-conversation-protocol-design.md) |
+| AI 前端 runtime | [frontend/langgraph-runtime.md](./frontend/langgraph-runtime.md) |
 
 ---
 

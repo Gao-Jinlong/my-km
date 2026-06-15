@@ -12,13 +12,11 @@ docs/
 │   └── overview.md         #   系统架构概览
 ├── frontend/               # 前端架构
 │   ├── architecture.md     #   前端模块架构
-│   ├── frontend-chat-refactor-plan.md  # 对话模块重构方案（进行中）
+│   ├── langgraph-runtime.md #  AI 对话前端 runtime（SSE + LangGraph SDK）
 │   └── platform/
 │       └── services.md     #   Platform DI 服务层
 ├── backend/                # 后端架构
-│   ├── architecture.md     #   后端模块概览
-│   ├── ai-architecture-v2.md  # AI 后端架构 (LLM + LangGraph)
-│   └── llm-integration-guide.md  # LLM 对话流程前端对接文档
+│   └── architecture.md     #   后端模块概览
 ├── guides/                 # 开发指南和参考
 │   ├── code-style.md       #   代码风格
 │   ├── debug-with-handoff.md
@@ -34,8 +32,6 @@ docs/
 ├── superpowers/plans/      # Superpowers 生成的计划
 │   └── archived/           #   已完成的计划（历史存档）
 ├── design-system/          # 设计系统（Pencil 设计稿）
-├── ai-backend-architecture.md  # ⚠️ 已归档 — 2026-05-06 重构设计稿，被 backend/ai-architecture-v2 替代
-├── ai-conversation-flow.md     # AI 对话流程 Mermaid 图
 └── tech-debt.md            # 技术债务追踪
 ```
 
