@@ -177,6 +177,7 @@ describe('RunStateRepository', () => {
             expect(result.acquired).toBe(false);
             if (!result.acquired) {
                 expect(result.conflict?.ownerId).toBe('B');
+                expect(result.conflict?.leaseUntil).toEqual(new Date(2000000));
             }
         });
 

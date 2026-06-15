@@ -81,6 +81,12 @@ export class RunStateRepository {
         await this.prisma.run.update({ where: { id: runId }, data: { lastSeq } });
     }
 
+    /**
+     * 乐观租约抢占：单条带条件 WHERE 的 updateMany 由 PG 行锁保证原子性。
+     * 仅当 row 当前可抢占（ownerId IS NULL | 是自己 | lease 已过期）时才写入 ownerId。
+     * count===0 即抢占失败（有活跃的他人 owner）。Prisma updateMany 无 RETURNING，
+     * 故成功后再 findUnique 取最新 run 行。
+     */
     async acquireLease(runId: string, replicaId: string, ttlMs = 30_000): Promise<LeaseResult> {
         const leaseUntil = new Date(Date.now() + ttlMs);
         const result = await this.prisma.run.updateMany({
