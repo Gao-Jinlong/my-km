@@ -219,4 +219,18 @@ describe('RunStateRepository', () => {
             expect(alive).toBe(false);
         });
     });
+
+    describe('updateTokenUsage', () => {
+        it('writes token counts', async () => {
+            await repo.updateTokenUsage('r1', {
+                promptTokens: 10,
+                completionTokens: 20,
+                totalTokens: 30,
+            });
+            expect(prisma.run.update).toHaveBeenCalledWith({
+                where: { id: 'r1' },
+                data: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
+            });
+        });
+    });
 });

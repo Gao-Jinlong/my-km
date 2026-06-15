@@ -1,20 +1,17 @@
 import type { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
-import type { PrismaService } from '../../../prisma/prisma.service';
 import type { RunEventStore } from '../../store/run-event-store';
 import { RunStatus } from '../../types/run.types';
 import type { RunContext } from '../run-context';
 import { RunManager } from '../run-manager';
+import { RunRecord } from '../run-record';
+import type { RunStateRepository } from '../run-state.repository';
 
-/**
- * 创建一个用于测试的 mock RunContext
- */
 function createMockRunContext(overrides?: {
     eventStore?: { append: jest.Mock };
     checkpointer?: { type: string };
 }): RunContext {
     const mockES = overrides?.eventStore ?? { append: jest.fn().mockResolvedValue({}) };
     const mockCP = overrides?.checkpointer ?? { type: 'memory' };
-
     return {
         checkpointer: mockCP as unknown as BaseCheckpointSaver,
         eventStore: mockES as unknown as RunEventStore,
@@ -22,117 +19,144 @@ function createMockRunContext(overrides?: {
     } as RunContext;
 }
 
-/**
- * mock PrismaService — RunManager 同步写 prisma.run.create/update
- */
-function createMockPrisma(): PrismaService {
-    return {
-        run: {
-            create: jest.fn().mockResolvedValue({}),
-            update: jest.fn().mockResolvedValue({}),
-        },
-    } as unknown as PrismaService;
+function createMockRunStateRepo(): {
+    repo: RunStateRepository;
+    store: Map<string, Record<string, unknown>>;
+} {
+    const store = new Map<string, Record<string, unknown>>();
+    const repo = {
+        findById: jest.fn(async (id: string) => store.get(id) ?? null),
+        findActiveRunByThread: jest.fn(async (threadId: string) => {
+            for (const row of store.values()) {
+                if (
+                    row.threadId === threadId &&
+                    ['pending', 'running', 'interrupted'].includes(row.status as string)
+                ) {
+                    return row;
+                }
+            }
+            return null;
+        }),
+        createRun: jest.fn(async (input: Record<string, unknown>) => {
+            const row = { ...input, lastSeq: 0 };
+            store.set(input.id as string, row);
+            return row;
+        }),
+        setStatus: jest.fn(async (id: string, status: string) => {
+            const row = store.get(id);
+            if (row) row.status = status;
+        }),
+        acquireLease: jest.fn(async () => ({ acquired: true })),
+        releaseLease: jest.fn(),
+        heartbeat: jest.fn(async () => true),
+        saveResumePayload: jest.fn(),
+        updateLastSeq: jest.fn(),
+        updateTokenUsage: jest.fn(),
+    } as unknown as RunStateRepository;
+    return { repo, store };
 }
 
 describe('RunManager', () => {
     let manager: RunManager;
-    let prisma: PrismaService;
+    let runStateRepo: RunStateRepository;
 
     beforeEach(() => {
-        prisma = createMockPrisma();
-        manager = new RunManager(prisma);
+        const { repo } = createMockRunStateRepo();
+        runStateRepo = repo;
+        manager = new RunManager(runStateRepo);
     });
 
     describe('createRun', () => {
-        it('should create a run with runContext and snapshot', async () => {
+        it('creates a run and persists authoritative fields via repo', async () => {
             const ctx = createMockRunContext();
             const snapshot = { content: 'Hello' };
 
-            const run = await manager.createRun('thread-1', ctx, snapshot);
+            const run = await manager.createRun('thread-1', ctx, snapshot, { replicaId: 'A' });
+
             expect(run).toBeDefined();
             expect(run.threadId).toBe('thread-1');
             expect(run.status).toBe(RunStatus.Pending);
-            expect(run.runContext).toBe(ctx);
-            expect(run.snapshot).toBe(snapshot);
+            expect(runStateRepo.createRun).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    threadId: 'thread-1',
+                    ownerId: 'A',
+                    inputKind: 'message',
+                    content: 'Hello',
+                }),
+            );
         });
 
-        it('should track the run by ID', async () => {
+        it('tracks the run by ID in memory cache', async () => {
             const ctx = createMockRunContext();
-            const run = await manager.createRun('thread-1', ctx, { content: 'test' });
-            const found = manager.getRun(run.id);
-            expect(found).toBe(run);
+            const run = await manager.createRun(
+                'thread-1',
+                ctx,
+                { content: 'test' },
+                { replicaId: 'A' },
+            );
+            expect(manager.getRun(run.id)).toBe(run);
         });
 
-        it('should return undefined for unknown run ID', () => {
+        it('returns undefined for unknown run ID', () => {
             expect(manager.getRun('nonexistent')).toBeUndefined();
-        });
-
-        it('should create distinct records for each call', async () => {
-            const ctx1 = createMockRunContext();
-            const ctx2 = createMockRunContext();
-
-            const r1 = await manager.createRun('t1', ctx1, { content: 'a' });
-            const r2 = await manager.createRun('t2', ctx2, { content: 'b' });
-
-            expect(r1).not.toBe(r2);
-            expect(r1.runContext).toBe(ctx1);
-            expect(r2.runContext).toBe(ctx2);
         });
     });
 
-    describe('getActiveRunForThread', () => {
-        it('should return active run for a thread', async () => {
+    describe('getActiveRunByThread (delegated to PG)', () => {
+        it('returns the active RunRow from repository', async () => {
             const ctx = createMockRunContext();
-            const run = await manager.createRun('thread-1', ctx, { content: 'test' });
-            run.setStatus(RunStatus.Running);
-            const active = manager.getActiveRunForThread('thread-1');
-            expect(active).toBe(run);
+            await manager.createRun('thread-1', ctx, { content: 'test' }, { replicaId: 'A' });
+
+            const active = await manager.getActiveRunByThread('thread-1');
+            expect(active?.threadId).toBe('thread-1');
+            expect(runStateRepo.findActiveRunByThread).toHaveBeenCalledWith('thread-1');
         });
 
-        it('should return undefined when no active run exists', () => {
-            expect(manager.getActiveRunForThread('thread-1')).toBeUndefined();
+        it('returns null when no active run', async () => {
+            expect(await manager.getActiveRunByThread('none')).toBeNull();
         });
+    });
 
-        it('should not return completed runs', async () => {
+    describe('adoptRun', () => {
+        it('injects a rebuilt record into memory cache (resume path)', () => {
             const ctx = createMockRunContext();
-            const run = await manager.createRun('thread-1', ctx, { content: 'test' });
-            run.setStatus(RunStatus.Completed);
-            expect(manager.getActiveRunForThread('thread-1')).toBeUndefined();
-        });
-
-        it('should return interrupted runs as active', async () => {
-            const ctx = createMockRunContext();
-            const run = await manager.createRun('thread-1', ctx, { content: 'test' });
-            run.setStatus(RunStatus.Interrupted);
-            const active = manager.getActiveRunForThread('thread-1');
-            expect(active).toBe(run);
+            const record = new RunRecord({
+                id: 'recovered-1',
+                threadId: 'thread-1',
+                runContext: ctx,
+                snapshot: { content: '' },
+            });
+            manager.adoptRun(record);
+            expect(manager.getRun('recovered-1')).toBe(record);
         });
     });
 
     describe('cancelRun', () => {
-        it('should cancel a run by ID', async () => {
+        it('cancels an in-memory run owned by this process', async () => {
             const ctx = createMockRunContext();
-            const run = await manager.createRun('thread-1', ctx, { content: 'test' });
+            const run = await manager.createRun(
+                'thread-1',
+                ctx,
+                { content: 'test' },
+                { replicaId: 'A' },
+            );
             await manager.cancelRun(run.id);
             expect(run.status).toBe(RunStatus.Cancelled);
         });
 
-        it('should do nothing for unknown run ID', async () => {
+        it('does nothing for unknown run ID', async () => {
             await expect(manager.cancelRun('nonexistent')).resolves.not.toThrow();
         });
     });
 
     describe('cleanup', () => {
-        it('should remove completed/failed/cancelled runs', async () => {
-            const ctx1 = createMockRunContext();
-            const ctx2 = createMockRunContext();
-            const r1 = await manager.createRun('t1', ctx1, { content: 'a' });
-            const r2 = await manager.createRun('t2', ctx2, { content: 'b' });
+        it('removes completed/failed/cancelled runs from memory cache', async () => {
+            const ctx = createMockRunContext();
+            const r1 = await manager.createRun('t1', ctx, { content: 'a' }, { replicaId: 'A' });
+            const r2 = await manager.createRun('t2', ctx, { content: 'b' }, { replicaId: 'A' });
             r1.setStatus(RunStatus.Completed);
             r2.setStatus(RunStatus.Running);
-
             manager.cleanup();
-
             expect(manager.getRun(r1.id)).toBeUndefined();
             expect(manager.getRun(r2.id)).toBe(r2);
         });

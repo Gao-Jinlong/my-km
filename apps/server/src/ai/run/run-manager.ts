@@ -1,76 +1,66 @@
 /**
- * RunManager — Run 生命周期管理
+ * RunManager — owner 副本的执行态缓存 + 委托 PG 权威。
  *
- * 负责：
- * - 创建和追踪活跃的 RunRecord（内存）
- * - 同步写入 Prisma Run 表（持久化）
- * - 按 thread 查找活跃 Run（用于并发控制）
- * - 取消 Run（内存 + DB）
- * - 清理已完成的 Run（释放内存，DB 记录保留）
+ * P1 重构后职责：
+ * - 内存缓存 Map<string, RunRecord> 仅是 owner 副本的执行态（abortController/graphIterator）
+ * - run 状态/租约/查询的权威读写委托 RunStateRepository（PG）
+ * - getActiveRunByThread 委托 PG，返回 RunRow（非 RunRecord）
+ * - adoptRun: resume 时把从 RunRow 重建的 RunRecord 注入内存，标记本副本为 owner
  *
- * 双写策略：
- * - 内存 Map<string, RunRecord> 用于进程内状态管理和并发控制
- * - Prisma Run 表用于持久化和历史查询
- * - createRun → prisma.run.create()
- * - setStatus → prisma.run.update()
- * - finalize  → prisma.run.update()（token 用量 + completedAt）
+ * 缓存可随时丢弃，重建只需读 PG + checkpoint。
  */
-
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
 import { RunStatus } from '../types/run.types';
+import type { LeaseResult, RunRow } from './lease.types';
 import type { RunContext } from './run-context';
 import { type RunExecutionSnapshot, RunRecord } from './run-record';
+import { RunStateRepository } from './run-state.repository';
 
 const ACTIVE_STATUSES: RunStatus[] = [RunStatus.Pending, RunStatus.Running, RunStatus.Interrupted];
+
+export interface CreateRunOpts {
+    /** 抢占租约的副本 ID（owner） */
+    replicaId: string;
+    /** 运行 traceId（可选，写入 Run.traceId） */
+    traceId?: string | null;
+}
 
 @Injectable()
 export class RunManager {
     private readonly logger = new Logger(RunManager.name);
+    /** owner 执行态缓存：runId → RunRecord（仅 owner 副本持有） */
     private readonly runs = new Map<string, RunRecord>();
 
-    constructor(private readonly prisma: PrismaService) {}
+    constructor(private readonly runStateRepo: RunStateRepository) {}
 
-    /**
-     * 创建新的 RunRecord
-     *
-     * 同步写入 Prisma Run 表和内存 Map。
-     *
-     * @param threadId Thread ID
-     * @param runContext per-run 上下文快照
-     * @param snapshot 执行输入快照
-     */
     async createRun(
         threadId: string,
         runContext: RunContext,
         snapshot: RunExecutionSnapshot,
+        opts: CreateRunOpts,
     ): Promise<RunRecord> {
         const id = crypto.randomUUID();
+        const record = new RunRecord({ id, threadId, runContext, snapshot });
 
-        const record = new RunRecord({
-            id,
-            threadId,
-            runContext,
-            snapshot,
-        });
-
-        // 写入内存 Map
         this.runs.set(id, record);
 
-        // 同步写入 DB
         try {
-            await this.prisma.run.create({
-                data: {
-                    id,
-                    threadId,
-                    status: RunStatus.Pending,
-                    model: runContext.llmConfig.model ?? null,
-                    provider: runContext.llmConfig.provider ?? null,
-                },
+            await this.runStateRepo.createRun({
+                id,
+                threadId,
+                status: RunStatus.Pending,
+                model: runContext.llmConfig.model ?? null,
+                provider: runContext.llmConfig.provider ?? null,
+                inputKind: 'message',
+                content: snapshot.content,
+                requestContext: snapshot.requestContext ?? null,
+                llmConfig: runContext.llmConfig,
+                ownerId: opts.replicaId,
+                leaseUntil: new Date(Date.now() + 30_000),
+                traceId: opts.traceId ?? null,
             });
         } catch (err) {
-            this.logger.error(`Failed to persist Run ${id} to DB: ${(err as Error).message}`);
-            // DB 写入失败不阻塞内存创建，RunRecord 仍然可用
+            this.logger.error(`Failed to persist Run ${id}: ${(err as Error).message}`);
         }
 
         this.logger.log(`Run created: ${id} for thread: ${threadId}`);
@@ -78,87 +68,55 @@ export class RunManager {
     }
 
     /**
-     * 更新 Run 状态（内存 + DB 同步）
+     * 把外部重建的 RunRecord 注入缓存（resume 路径）。
+     * 调用方负责确保本副本已成功 acquireLease 成为 owner。
      */
+    adoptRun(record: RunRecord): void {
+        this.runs.set(record.id, record);
+    }
+
     async setStatus(runId: string, status: RunStatus): Promise<void> {
         const record = this.runs.get(runId);
-        if (record) {
-            record.setStatus(status);
-        }
-
-        // 同步写入 DB
+        if (record) record.setStatus(status);
         try {
-            const updateData: Record<string, unknown> = { status };
-
-            if (status === RunStatus.Running) {
-                updateData.startedAt = new Date();
-            }
-            if (
-                status === RunStatus.Completed ||
-                status === RunStatus.Failed ||
-                status === RunStatus.Cancelled
-            ) {
-                updateData.completedAt = new Date();
-            }
-
-            await this.prisma.run.update({
-                where: { id: runId },
-                data: updateData,
-            });
+            await this.runStateRepo.setStatus(runId, status);
         } catch (err) {
-            this.logger.error(
-                `Failed to update Run ${runId} status in DB: ${(err as Error).message}`,
-            );
+            this.logger.error(`Failed to update Run ${runId} status: ${(err as Error).message}`);
         }
     }
 
-    /**
-     * 完成 Run，写入最终 token 用量
-     */
-    async finalize(runId: string): Promise<void> {
+    async finalize(
+        runId: string,
+        tokenUsage?: { promptTokens: number; completionTokens: number; totalTokens: number },
+    ): Promise<void> {
         const record = this.runs.get(runId);
-        if (!record) return;
-
-        const tokenUsage = record.finalize();
-
+        const usage =
+            tokenUsage ??
+            (record ? record.finalize() : { promptTokens: 0, completionTokens: 0, totalTokens: 0 });
         try {
-            await this.prisma.run.update({
-                where: { id: runId },
-                data: {
-                    promptTokens: tokenUsage.promptTokens,
-                    completionTokens: tokenUsage.completionTokens,
-                    totalTokens: tokenUsage.totalTokens,
-                },
-            });
+            await this.runStateRepo.updateTokenUsage(runId, usage);
         } catch (err) {
-            this.logger.error(
-                `Failed to finalize Run ${runId} token usage in DB: ${(err as Error).message}`,
-            );
+            this.logger.error(`Failed to finalize Run ${runId}: ${(err as Error).message}`);
         }
     }
 
-    /**
-     * 获取 RunRecord by ID（内存查找）
-     */
     getRun(runId: string): RunRecord | undefined {
         return this.runs.get(runId);
     }
 
-    /**
-     * 获取指定 thread 的活跃 Run（内存查找）
-     */
-    getActiveRunForThread(threadId: string): RunRecord | undefined {
-        for (const run of this.runs.values()) {
-            if (run.threadId === threadId && ACTIVE_STATUSES.includes(run.status)) {
-                return run;
-            }
-        }
-        return undefined;
+    /** 委托 PG：返回 thread 上的活跃 RunRow（owner 可能不是本副本）。 */
+    async getActiveRunByThread(threadId: string): Promise<RunRow | null> {
+        return this.runStateRepo.findActiveRunByThread(threadId);
     }
 
-    /**
-     * 取消指定 Run（内存 + DB）
-     */
+    async acquireLease(runId: string, replicaId: string): Promise<LeaseResult> {
+        return this.runStateRepo.acquireLease(runId, replicaId);
+    }
+
+    async releaseLease(runId: string, replicaId: string): Promise<void> {
+        return this.runStateRepo.releaseLease(runId, replicaId);
+    }
+
     async cancelRun(runId: string): Promise<void> {
         const run = this.runs.get(runId);
         if (run) {
@@ -168,9 +126,6 @@ export class RunManager {
         }
     }
 
-    /**
-     * 清理已完成的 Run（仅释放内存，DB 记录保留）
-     */
     cleanup(): void {
         for (const [id, run] of this.runs.entries()) {
             if (!ACTIVE_STATUSES.includes(run.status)) {

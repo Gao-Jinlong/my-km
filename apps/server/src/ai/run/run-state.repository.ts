@@ -140,4 +140,12 @@ export class RunStateRepository {
         });
         return result.count > 0;
     }
+
+    /** 写入最终 token 用量（finalize 委托 PG）。 */
+    async updateTokenUsage(
+        runId: string,
+        usage: { promptTokens: number; completionTokens: number; totalTokens: number },
+    ): Promise<void> {
+        await this.prisma.run.update({ where: { id: runId }, data: usage });
+    }
 }
