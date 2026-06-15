@@ -1,4 +1,5 @@
 import type { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
+import type { EventBus } from '../../event/event-bus';
 import type { RunEventStore } from '../../store/run-event-store';
 import { RunStatus } from '../../types/run.types';
 import type { RunContext } from '../run-context';
@@ -9,12 +10,15 @@ import type { RunStateRepository } from '../run-state.repository';
 function createMockRunContext(overrides?: {
     eventStore?: { append: jest.Mock };
     checkpointer?: { type: string };
+    eventBus?: { publish: jest.Mock };
 }): RunContext {
     const mockES = overrides?.eventStore ?? { append: jest.fn().mockResolvedValue({}) };
     const mockCP = overrides?.checkpointer ?? { type: 'memory' };
+    const mockEB = overrides?.eventBus ?? { publish: jest.fn().mockResolvedValue(undefined) };
     return {
         checkpointer: mockCP as unknown as BaseCheckpointSaver,
         eventStore: mockES as unknown as RunEventStore,
+        eventBus: mockEB as unknown as EventBus,
         llmConfig: { provider: 'zhipu', model: 'glm-5' },
     } as RunContext;
 }

@@ -3,6 +3,7 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { AiChatService } from '../ai.service';
 import { CheckpointReaderService } from '../checkpointer/checkpoint-reader.service';
+import type { EventBus } from '../event/event-bus';
 import { LLMFactory } from '../llm/llm-factory';
 import type { LLMConfig } from '../llm/provider.types';
 import { ProviderRegistry } from '../llm/provider-registry';
@@ -102,6 +103,9 @@ describe('AiChatService', () => {
                         append: jest.fn().mockResolvedValue({}),
                         flushRun: jest.fn().mockResolvedValue(undefined),
                     } as unknown as RunEventStore,
+                    eventBus: {
+                        publish: jest.fn().mockResolvedValue(undefined),
+                    } as unknown as EventBus,
                     llmConfig: { ...opts.llmConfig },
                 } as RunContext;
             }),

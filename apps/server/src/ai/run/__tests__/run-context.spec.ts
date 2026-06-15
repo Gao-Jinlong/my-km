@@ -1,4 +1,5 @@
 import type { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
+import type { EventBus } from '../../event/event-bus';
 import type { LLMConfig } from '../../llm/provider.types';
 import type { RunEventStore } from '../../store/run-event-store';
 import { RunContext } from '../run-context';
@@ -6,6 +7,7 @@ import { RunContext } from '../run-context';
 describe('RunContext', () => {
     const mockCheckpointer = { type: 'memory-saver' } as unknown as BaseCheckpointSaver;
     const mockEventStore = { append: jest.fn() } as unknown as RunEventStore;
+    const mockEventBus = { publish: jest.fn().mockResolvedValue(undefined) } as unknown as EventBus;
     const baseLlmConfig: LLMConfig = { provider: 'zhipu', model: 'glm-5' };
 
     describe('constructor', () => {
@@ -13,6 +15,7 @@ describe('RunContext', () => {
             const ctx = new RunContext({
                 checkpointer: mockCheckpointer,
                 eventStore: mockEventStore,
+                eventBus: mockEventBus,
                 llmConfig: baseLlmConfig,
             });
 
@@ -24,6 +27,7 @@ describe('RunContext', () => {
             const ctx = new RunContext({
                 checkpointer: mockCheckpointer,
                 eventStore: mockEventStore,
+                eventBus: mockEventBus,
                 llmConfig: baseLlmConfig,
             });
 
@@ -37,6 +41,7 @@ describe('RunContext', () => {
             const ctx = new RunContext({
                 checkpointer: mockCheckpointer,
                 eventStore: mockEventStore,
+                eventBus: mockEventBus,
                 llmConfig: config,
             });
 
@@ -52,6 +57,7 @@ describe('RunContext', () => {
             const ctx = new RunContext({
                 checkpointer: mockCheckpointer,
                 eventStore: mockEventStore,
+                eventBus: mockEventBus,
                 llmConfig: { provider: 'zhipu', model: 'glm-5' },
             });
 
@@ -66,6 +72,7 @@ describe('RunContext', () => {
             const ctx = new RunContext({
                 checkpointer: mockCheckpointer,
                 eventStore: mockEventStore,
+                eventBus: mockEventBus,
                 llmConfig: baseLlmConfig,
             });
 
