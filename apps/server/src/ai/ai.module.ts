@@ -17,6 +17,8 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { AiChatService } from './ai.service';
 import { CheckpointReaderService } from './checkpointer/checkpoint-reader.service';
 import { CheckpointerProvider } from './checkpointer/checkpointer.provider';
+import { EventBus } from './event/event-bus';
+import { InProcessEventBus } from './event/in-process.event-bus';
 import { ThreadsController } from './langgraph/threads.controller';
 import { AnthropicProvider } from './llm/anthropic.provider';
 import { DashscopeProvider } from './llm/dashscope.provider';
@@ -42,6 +44,9 @@ import { ThreadService } from './thread/thread.service';
         RunEventStore,
         CheckpointerProvider,
         CheckpointReaderService,
+        // EventBus — abstract token 绑定单进程降级实现（spec 6.3）；
+        // 多副本部署改 useClass: RedisEventBus（P2 后续）
+        { provide: EventBus, useClass: InProcessEventBus },
 
         // LLM 层
         ProviderRegistry,
@@ -59,7 +64,7 @@ import { ThreadService } from './thread/thread.service';
         // 业务逻辑层
         AiChatService,
     ],
-    exports: [AiChatService, ThreadService],
+    exports: [AiChatService, ThreadService, EventBus],
 })
 export class AiModule implements OnModuleInit {
     private readonly logger = new Logger(AiModule.name);

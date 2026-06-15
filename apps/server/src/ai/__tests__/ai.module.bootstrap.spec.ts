@@ -61,6 +61,8 @@ import { ConfigModule } from '../../config/config.module';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiModule } from '../ai.module';
 import { AiChatService } from '../ai.service';
+import { EventBus, runChannel } from '../event/event-bus';
+import { InProcessEventBus } from '../event/in-process.event-bus';
 import { ProviderRegistry } from '../llm/provider-registry';
 import { REPLICA_ID } from '../run/replica-id';
 import { RunManager } from '../run/run-manager';
@@ -200,6 +202,23 @@ describe('AiModule bootstrap', () => {
         expect(module.get(RunStateRepository)).toBeInstanceOf(RunStateRepository);
         expect(module.get(RunManager)).toBeInstanceOf(RunManager);
         expect(module.get(AiChatService)).toBeInstanceOf(AiChatService);
+        await module.close();
+    });
+
+    it('binds EventBus to InProcessEventBus through Nest DI', async () => {
+        const module = await compileAiModuleForDi();
+        const bus = module.get(EventBus);
+        expect(bus).toBeInstanceOf(InProcessEventBus);
+        await module.close();
+    });
+
+    it('EventBus delivers events end-to-end after DI wiring', async () => {
+        const module = await compileAiModuleForDi();
+        const bus = module.get(EventBus);
+        const received: number[] = [];
+        bus.subscribe(runChannel('r1'), e => received.push(e.seq));
+        await bus.publish(runChannel('r1'), { seq: 5, eventType: 'values', payload: {} });
+        expect(received).toEqual([5]);
         await module.close();
     });
 });
