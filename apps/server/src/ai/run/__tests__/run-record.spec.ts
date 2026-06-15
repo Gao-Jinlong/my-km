@@ -1,5 +1,5 @@
 import type { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
-import type { EventBus } from '../../event/event-bus';
+import type { EventBus, RunStreamEvent } from '../../event/event-bus';
 import type { RunEventStore } from '../../store/run-event-store';
 import { RunStatus } from '../../types/run.types';
 import type { RunContext } from '../run-context';
@@ -184,6 +184,26 @@ describe('RunRecord', () => {
             // PG 仍写
             expect(eventStore.append).toHaveBeenCalled();
         });
+
+        it('uses the SAME seq for PG append and eventBus publish', async () => {
+            const eventStore = { append: jest.fn().mockResolvedValue({}) };
+            const eventBus = { publish: jest.fn().mockResolvedValue(undefined) };
+            const rec = new RunRecord({
+                id: 'r1',
+                threadId: 't1',
+                runContext: createMockRunContext({ eventStore, eventBus }),
+                snapshot: { content: '' },
+                lastSeq: 7,
+            });
+
+            await rec.emitEvent({ event: 'values', data: {} });
+
+            const pgSeq = (eventStore.append.mock.calls[0][2] as { seq: number }).seq;
+            const pubSeq = (eventBus.publish.mock.calls[0][1] as RunStreamEvent).seq;
+            expect(pgSeq).toBe(7);
+            expect(pubSeq).toBe(7);
+            expect(pgSeq).toBe(pubSeq);
+        });
     });
 
     describe('finalize', () => {
@@ -302,6 +322,26 @@ describe('RunRecord', () => {
 
             rec.emitSSEOnly({ event: 'messages', data: { chunk: 'x' } });
 
+            expect(captured).toHaveLength(1);
+            expect(captured[0].event).toBe('messages');
+        });
+
+        it('does not throw when eventBus.publish rejects (catch prevents unhandled rejection)', () => {
+            const eventBus = { publish: jest.fn().mockRejectedValue(new Error('bus down')) };
+            const captured: Array<{ event: string; data: unknown }> = [];
+            const rec = new RunRecord({
+                id: 'r1',
+                threadId: 't1',
+                runContext: createMockRunContext({ eventBus }),
+                snapshot: { content: '' },
+            });
+            rec.setSseWriter(e => captured.push(e));
+
+            // emitSSEOnly is synchronous; the rejected publish is fire-and-forget + .catch'd,
+            // so the synchronous call must not throw and SSE must still be written.
+            expect(() =>
+                rec.emitSSEOnly({ event: 'messages', data: { chunk: 'x' } }),
+            ).not.toThrow();
             expect(captured).toHaveLength(1);
             expect(captured[0].event).toBe('messages');
         });
