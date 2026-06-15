@@ -75,9 +75,9 @@ export class AiChatService {
             title: content.slice(0, 20) || 'New Chat',
         });
 
-        const activeRun = this.runManager.getActiveRunForThread(thread.id);
-        if (activeRun) {
-            await this.handleConcurrency(activeRun, multitaskStrategy);
+        const activeRow = await this.runManager.getActiveRunByThread(thread.id);
+        if (activeRow) {
+            await this.handleConcurrency(activeRow, multitaskStrategy);
         }
 
         const llmConfig = this.resolveLlmConfig(opts.llmConfig);
@@ -86,10 +86,12 @@ export class AiChatService {
             llmConfig,
         });
 
-        const record = await this.runManager.createRun(thread.id, runContext, {
-            content,
-            requestContext: opts.context,
-        });
+        const record = await this.runManager.createRun(
+            thread.id,
+            runContext,
+            { content, requestContext: opts.context },
+            { replicaId: this.replicaId },
+        );
         await this.runManager.setStatus(record.id, RunStatus.Running);
 
         return record;
@@ -482,10 +484,16 @@ export class AiChatService {
     }
 
     /**
-     * 并发控制处理（LangGraph multitask_strategy 对齐）
+     * 并发控制（P1）。
+     *
+     * - reject: 409
+     * - interrupt: 仅当 active run 由本副本持有（内存可 abort）时生效；
+     *   跨副本无法 abort，退化为 reject + warn（完整跨副本 interrupt 留 P3）
+     * - rollback: 同 interrupt（checkpoint 回滚留 P3）
+     * - enqueue: 未实现，reject + warn
      */
     private async handleConcurrency(
-        activeRun: RunRecord,
+        activeRow: { id: string; ownerId: string | null },
         strategy: MultitaskStrategy,
     ): Promise<void> {
         switch (strategy) {
@@ -493,14 +501,20 @@ export class AiChatService {
                 throw new ConflictException('Run already in progress for this thread');
 
             case 'interrupt':
-                activeRun.abort();
-                await new Promise(resolve => setTimeout(resolve, 100));
-                break;
-
-            case 'rollback':
-                activeRun.abort();
-                await new Promise(resolve => setTimeout(resolve, 100));
-                break;
+            case 'rollback': {
+                if (activeRow.ownerId === this.replicaId) {
+                    const record = this.runManager.getRun(activeRow.id);
+                    if (record) {
+                        record.abort();
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        break;
+                    }
+                }
+                this.logger.warn(
+                    `multitask_strategy '${strategy}' cannot abort cross-replica run ${activeRow.id} (owner: ${activeRow.ownerId}); falling back to 'reject'`,
+                );
+                throw new ConflictException('Run already in progress for this thread');
+            }
 
             case 'enqueue':
                 this.logger.warn(

@@ -125,46 +125,65 @@ describe('AiChatService', () => {
             }),
         };
 
-        // Functional mock RunManager — stores runs in-memory like the real one
-        const runStore = new Map<string, RunRecord>();
+        // Functional mock RunManager — P1: getActiveRunByThread 返回 PG RunRow
+        const runStore = new Map<string, { record: RunRecord; row: Record<string, unknown> }>();
         const mockRunManager = {
             createRun: jest
                 .fn()
                 .mockImplementation(
-                    async (threadId: string, runContext: RunContext, snapshot: any) => {
+                    async (threadId: string, runContext: RunContext, snapshot: any, opts: any) => {
                         const record = new RunRecord({
                             id: `run-${runStore.size + 1}`,
                             threadId,
                             runContext,
                             snapshot,
                         });
-                        runStore.set(record.id, record);
+                        const row = {
+                            id: record.id,
+                            threadId,
+                            status: 'pending',
+                            ownerId: opts?.replicaId ?? 'replica-test',
+                        };
+                        runStore.set(record.id, { record, row });
                         return record;
                     },
                 ),
-            setStatus: jest.fn().mockImplementation((_runId: string, status: RunStatus) => {
-                const r = runStore.get(_runId);
-                if (r) r.setStatus(status);
-            }),
-            finalize: jest.fn(),
-            getRun: jest.fn().mockImplementation((id: string) => runStore.get(id)),
-            getActiveRunForThread: jest.fn().mockImplementation((threadId: string) => {
-                for (const r of runStore.values()) {
-                    if (
-                        r.threadId === threadId &&
-                        ['pending', 'running', 'interrupted'].includes(r.status)
-                    ) {
-                        return r;
-                    }
+            setStatus: jest.fn().mockImplementation(async (_runId: string, status: RunStatus) => {
+                const entry = runStore.get(_runId);
+                if (entry) {
+                    entry.record.setStatus(status);
+                    entry.row.status = status;
                 }
-                return undefined;
-            }),
-            cancelRun: jest.fn().mockImplementation(async (id: string) => {
-                const r = runStore.get(id);
-                if (r) r.abort();
             }),
             adoptRun: jest.fn().mockImplementation((record: RunRecord) => {
-                runStore.set(record.id, record);
+                runStore.set(record.id, {
+                    record,
+                    row: {
+                        id: record.id,
+                        threadId: record.threadId,
+                        status: 'running',
+                        ownerId: 'replica-test',
+                    },
+                });
+            }),
+            finalize: jest.fn(),
+            getRun: jest.fn().mockImplementation((id: string) => runStore.get(id)?.record),
+            getActiveRunByThread: jest.fn().mockImplementation(async (threadId: string) => {
+                for (const { record, row } of runStore.values()) {
+                    if (
+                        record.threadId === threadId &&
+                        ['pending', 'running', 'interrupted'].includes(record.status)
+                    ) {
+                        return row;
+                    }
+                }
+                return null;
+            }),
+            acquireLease: jest.fn(),
+            releaseLease: jest.fn(),
+            cancelRun: jest.fn().mockImplementation(async (id: string) => {
+                const entry = runStore.get(id);
+                if (entry) entry.record.abort();
             }),
             cleanup: jest.fn(),
         };
@@ -292,8 +311,10 @@ describe('AiChatService', () => {
         it('should not create RunContext when concurrency is rejected', async () => {
             // Create first run
             await service.startRun({ content: 'First', threadId: 't1' });
-            const activeRun = runManager.getActiveRunForThread('t1');
-            if (activeRun) activeRun.setStatus(RunStatus.Running);
+            const activeRow = await runManager.getActiveRunByThread('t1');
+            if (activeRow) {
+                await runManager.setStatus('run-1', RunStatus.Running);
+            }
 
             // Reset call count
             (mockRunContextFactory.create as jest.Mock).mockClear();
@@ -349,6 +370,17 @@ describe('AiChatService', () => {
                 expect.any(String),
                 expect.any(Object),
                 expect.objectContaining({ requestContext: ctx }),
+                expect.objectContaining({ replicaId: 'replica-test' }),
+            );
+        });
+
+        it('should pass replicaId to RunManager.createRun', async () => {
+            await service.startRun({ content: 'Hello' });
+            expect(runManager.createRun).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.any(Object),
+                expect.any(Object),
+                expect.objectContaining({ replicaId: 'replica-test' }),
             );
         });
     });
@@ -356,8 +388,10 @@ describe('AiChatService', () => {
     describe('multitask_strategy (concurrency control)', () => {
         it('should reject when active run exists and strategy is "reject"', async () => {
             await service.startRun({ content: 'First', threadId: 't1' });
-            const activeRun = runManager.getActiveRunForThread('t1');
-            if (activeRun) activeRun.setStatus(RunStatus.Running);
+            const activeRow = await runManager.getActiveRunByThread('t1');
+            if (activeRow) {
+                await runManager.setStatus('run-1', RunStatus.Running);
+            }
 
             await expect(
                 service.startRun({
@@ -370,8 +404,10 @@ describe('AiChatService', () => {
 
         it('should default to "reject" when multitaskStrategy omitted', async () => {
             await service.startRun({ content: 'First', threadId: 't1' });
-            const activeRun = runManager.getActiveRunForThread('t1');
-            if (activeRun) activeRun.setStatus(RunStatus.Running);
+            const activeRow = await runManager.getActiveRunByThread('t1');
+            if (activeRow) {
+                await runManager.setStatus('run-1', RunStatus.Running);
+            }
 
             await expect(service.startRun({ content: 'Second', threadId: 't1' })).rejects.toThrow(
                 ConflictException,
@@ -384,8 +420,10 @@ describe('AiChatService', () => {
                 .mockImplementation(() => undefined);
 
             await service.startRun({ content: 'First', threadId: 't1' });
-            const activeRun = runManager.getActiveRunForThread('t1');
-            if (activeRun) activeRun.setStatus(RunStatus.Running);
+            const activeRow = await runManager.getActiveRunByThread('t1');
+            if (activeRow) {
+                await runManager.setStatus('run-1', RunStatus.Running);
+            }
 
             await expect(
                 service.startRun({
