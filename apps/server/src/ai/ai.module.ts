@@ -11,6 +11,7 @@
  *     并 logger.warn 提示首次请求会失败，除非设置 DASHSCOPE_API_KEY
  */
 
+import * as crypto from 'node:crypto';
 import { Logger, Module, type OnModuleInit } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AiChatService } from './ai.service';
@@ -24,8 +25,10 @@ import { LLMFactory } from './llm/llm-factory';
 import { OpenAIProvider } from './llm/openai.provider';
 import { ProviderRegistry } from './llm/provider-registry';
 import { ZhipuProvider } from './llm/zhipu.provider';
+import { REPLICA_ID } from './run/replica-id';
 import { RunContextFactory } from './run/run-context-factory';
 import { RunManager } from './run/run-manager';
+import { RunStateRepository } from './run/run-state.repository';
 import { RunsController } from './run/runs.controller';
 import { RunEventStore } from './store/run-event-store';
 import { ThreadService } from './thread/thread.service';
@@ -45,6 +48,11 @@ import { ThreadService } from './thread/thread.service';
         LLMFactory,
 
         // Run 层
+        RunStateRepository,
+        {
+            provide: REPLICA_ID,
+            useFactory: () => process.env.AI_REPLICA_ID ?? crypto.randomUUID(),
+        },
         RunManager,
         RunContextFactory,
 
