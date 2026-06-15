@@ -264,4 +264,34 @@ describe('JoinStreamService — live resume (running/interrupted)', () => {
         expect(sink.events).toHaveLength(1);
         expect(sink.closed).toBe(true);
     });
+
+    it('closes when end arrives via replay (not live) for a running run', async () => {
+        const run = { id: 'r1', status: 'running' } as RunRow;
+        // PG 已含 end（owner 已 end + persist，client 后连）
+        const events = [
+            { seq: 1, eventType: 'values', payload: { n: 1 } },
+            { seq: 2, eventType: 'end', payload: {} },
+        ];
+        const service = new JoinStreamService(
+            eventBus,
+            mockRunStateRepo(run),
+            mockEventStore(events),
+        );
+        const sink = collectorSink();
+
+        const cleanup = await service.joinStream('r1', 0, sink);
+
+        expect(sink.closed).toBe(true); // 回放含 end → close
+        // 回放已 close，后续 publish 不应投递（subscription 已 unsubscribe，无 leak）
+        await eventBus.publish(runChannel('r1'), {
+            seq: 3,
+            eventType: 'values',
+            payload: { n: 3 },
+        });
+        expect(sink.events).toEqual([
+            { seq: 1, eventType: 'values', payload: { n: 1 } },
+            { seq: 2, eventType: 'end', payload: {} },
+        ]);
+        cleanup();
+    });
 });

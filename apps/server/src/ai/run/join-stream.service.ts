@@ -27,7 +27,7 @@ function toRunStreamEvent(e: { seq: number; eventType: string; payload: unknown 
  * 返回 cleanup 函数：调用后 unsubscribe + close（幂等）。controller 必须在
  * res.on('close') 调用，否则 interrupted（无 end）连接的 subscription 泄漏。
  *
- * Task 1 只实现 terminal 分支；running/interrupted 在后续 task 实现。
+ * 实现规格：spec 第 3.5 节（joinStream 五步）+ 4.2 节（interrupted 无 end）。
  */
 @Injectable()
 export class JoinStreamService {
