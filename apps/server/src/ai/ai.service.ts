@@ -122,27 +122,42 @@ export class AiChatService {
 
         this.logger.log(`Run ${runRow.id} resumed by replica ${this.replicaId}`);
 
-        await this.runStateRepo.saveResumePayload(runRow.id, command.resume);
+        // Lease acquired — any failure in the setup steps below must release the lease,
+        // otherwise the interrupted run would stay blocked until the 30s lease expires
+        // (busy lease branch above is intentionally NOT released).
+        try {
+            await this.runStateRepo.saveResumePayload(runRow.id, command.resume);
 
-        const llmConfig = (runRow.llmConfig as LLMConfig | null) ?? this.resolveDefaultLlmConfig();
-        const runContext = await this.runContextFactory.create({ llmConfig });
-        const record = new RunRecord({
-            id: runRow.id,
-            threadId,
-            runContext,
-            snapshot: {
-                content: runRow.content ?? '',
-                requestContext:
-                    (runRow.requestContext as Record<string, unknown> | null) ?? undefined,
-            },
-            lastSeq: runRow.lastSeq,
-        });
-        record.setResumePayload(command.resume);
+            const llmConfig =
+                (runRow.llmConfig as LLMConfig | null) ?? this.resolveDefaultLlmConfig();
+            const runContext = await this.runContextFactory.create({ llmConfig });
+            const record = new RunRecord({
+                id: runRow.id,
+                threadId,
+                runContext,
+                snapshot: {
+                    content: runRow.content ?? '',
+                    requestContext:
+                        (runRow.requestContext as Record<string, unknown> | null) ?? undefined,
+                },
+                lastSeq: runRow.lastSeq,
+            });
+            record.setResumePayload(command.resume);
 
-        this.runManager.adoptRun(record);
-        await this.runStateRepo.setStatus(record.id, RunStatus.Running);
-        record.setStatus(RunStatus.Running);
-        return record;
+            this.runManager.adoptRun(record);
+            await this.runStateRepo.setStatus(record.id, RunStatus.Running);
+            record.setStatus(RunStatus.Running);
+            return record;
+        } catch (error) {
+            try {
+                await this.runStateRepo.releaseLease(runRow.id, this.replicaId);
+            } catch (releaseError) {
+                this.logger.warn(
+                    `Failed to release lease for run ${runRow.id}: ${(releaseError as Error).message}`,
+                );
+            }
+            throw error;
+        }
     }
 
     /**

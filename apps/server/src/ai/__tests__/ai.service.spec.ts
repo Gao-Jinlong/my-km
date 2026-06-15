@@ -491,6 +491,34 @@ describe('AiChatService', () => {
             expect(resumed.isResume).toBe(true);
             expect(resumed.currentSeq).toBe(7);
         });
+
+        it('should release lease and rethrow when resume setup fails after lease acquisition', async () => {
+            getRepo().findActiveRunByThread.mockResolvedValue({
+                id: 'r1',
+                threadId: 'thread-1',
+                status: 'interrupted',
+                ownerId: null,
+                content: 'prior user msg',
+                requestContext: null,
+                llmConfig: { provider: 'zhipu', model: 'glm-5' },
+                lastSeq: 0,
+            });
+            getRepo().acquireLease.mockResolvedValue({
+                acquired: true,
+                run: { id: 'r1' },
+                conflict: null,
+            });
+            getRepo().saveResumePayload.mockRejectedValueOnce(new Error('DB write failed'));
+
+            await expect(
+                service.resumeFromCommand('thread-1', {
+                    resume: { tool_call_id: 'tc-1', tool_result: 'ok' },
+                }),
+            ).rejects.toThrow('DB write failed');
+
+            expect(getRepo().releaseLease).toHaveBeenCalledWith('r1', 'replica-test');
+            expect(runManager.adoptRun).not.toHaveBeenCalled();
+        });
     });
 
     describe('executeRunProtocol', () => {
