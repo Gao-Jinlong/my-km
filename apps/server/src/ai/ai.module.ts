@@ -13,12 +13,15 @@
 
 import { randomUUID } from 'node:crypto';
 import { Logger, Module, type OnModuleInit } from '@nestjs/common';
+import Redis from 'ioredis';
+import { EnvConfig } from '../config/env.config';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AiChatService } from './ai.service';
 import { CheckpointReaderService } from './checkpointer/checkpoint-reader.service';
 import { CheckpointerProvider } from './checkpointer/checkpointer.provider';
 import { EventBus } from './event/event-bus';
 import { InProcessEventBus } from './event/in-process.event-bus';
+import { RedisEventBus } from './event/redis.event-bus';
 import { ThreadsController } from './langgraph/threads.controller';
 import { AnthropicProvider } from './llm/anthropic.provider';
 import { DashscopeProvider } from './llm/dashscope.provider';
@@ -44,9 +47,20 @@ import { ThreadService } from './thread/thread.service';
         RunEventStore,
         CheckpointerProvider,
         CheckpointReaderService,
-        // EventBus — abstract token 绑定单进程降级实现（spec 6.3）；
-        // 多副本部署改 useClass: RedisEventBus（P2 后续）
-        { provide: EventBus, useClass: InProcessEventBus },
+        // EventBus — abstract token 按 AI_EVENT_BUS 切换实现（spec 6.3）：
+        //   in-process（默认，单进程降级）→ InProcessEventBus
+        //   redis（多副本）→ RedisEventBus，两条独立连接（publisher + subscriber）
+        {
+            provide: EventBus,
+            inject: [EnvConfig],
+            useFactory: (config: EnvConfig) => {
+                if (config.eventBusMode !== 'redis') {
+                    return new InProcessEventBus();
+                }
+                const url = config.redisUrl;
+                return new RedisEventBus(new Redis(url), new Redis(url));
+            },
+        },
 
         // LLM 层
         ProviderRegistry,
