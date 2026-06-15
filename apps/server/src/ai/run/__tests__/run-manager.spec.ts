@@ -209,4 +209,23 @@ describe('RunManager', () => {
             expect(manager.getRun(r2.id)).toBe(r2);
         });
     });
+
+    describe('setStatus', () => {
+        it('rethrows when repository status update fails', async () => {
+            const ctx = createMockRunContext();
+            const run = await manager.createRun(
+                'thread-1',
+                ctx,
+                { content: 'test' },
+                { replicaId: 'A' },
+            );
+            (runStateRepo.setStatus as jest.Mock).mockRejectedValueOnce(
+                new Error('DB status failed'),
+            );
+
+            await expect(manager.setStatus(run.id, RunStatus.Running)).rejects.toThrow(
+                'DB status failed',
+            );
+        });
+    });
 });

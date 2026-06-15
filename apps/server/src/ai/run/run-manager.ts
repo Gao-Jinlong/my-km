@@ -83,7 +83,11 @@ export class RunManager {
         try {
             await this.runStateRepo.setStatus(runId, status);
         } catch (err) {
+            // P1: PG is the authoritative source for run status. A failed write must
+            // surface to the caller — silently swallowing it would let executeRunProtocol
+            // release the lease while PG retains the prior status, leaving the run wedged.
             this.logger.error(`Failed to update Run ${runId} status: ${(err as Error).message}`);
+            throw err;
         }
     }
 

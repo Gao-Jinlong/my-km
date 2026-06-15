@@ -777,6 +777,32 @@ describe('AiChatService', () => {
             expect(record.status).toBe(RunStatus.Cancelled);
         });
 
+        it('should keep cancelled status when aborted stream throws', async () => {
+            mockStreamImpl = () => ({
+                async *[Symbol.asyncIterator]() {
+                    throw new Error('AbortError: aborted');
+                    // biome-ignore lint/correctness/noUnreachable: required to satisfy AsyncIterable signature
+                    yield;
+                },
+            });
+
+            const record = await service.startRun({ content: 'Hi', threadId: 't1' });
+            const capture = createEventCapture();
+            record.setSseWriter(capture.sseWriter);
+            record.abort();
+
+            await service.executeRunProtocol(record);
+
+            expect(record.status).toBe(RunStatus.Cancelled);
+            expect(capture.events.some(e => e.event === 'error')).toBe(false);
+            expect(capture.events).toContainEqual(
+                expect.objectContaining({
+                    event: 'end',
+                    data: expect.objectContaining({ finish_reason: 'cancelled' }),
+                }),
+            );
+        });
+
         it('should write all events to EventStore via emitEvent', async () => {
             const record = await service.startRun({ content: 'Hi', threadId: 't1' });
             const capture = createEventCapture();

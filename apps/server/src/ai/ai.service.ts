@@ -359,6 +359,20 @@ export class AiChatService {
                 await record.emitEvent({ event: 'end', data: {} });
             });
         } catch (error) {
+            // If the run was aborted (cancel / lost-lease heartbeat), the underlying
+            // stream may surface an AbortError. Don't overwrite the Cancelled status
+            // with Failed — the abort path already represents the truthful terminal
+            // state. Emit a graceful end and let finally{} flush/release.
+            if (record.abortSignal.aborted) {
+                langgraphSpan.addEvent('stream_cancelled', {
+                    message: (error as Error).message,
+                });
+                langgraphSpan.setStatus({ code: SpanStatusCode.OK });
+                record.setStatus(RunStatus.Cancelled);
+                await this.runManager.setStatus(record.id, RunStatus.Cancelled);
+                await record.emitEvent({ event: 'end', data: { finish_reason: 'cancelled' } });
+                return;
+            }
             this.logger.error(`Run ${record.id} failed: ${error}`, (error as Error).stack);
             langgraphSpan.setStatus({
                 code: SpanStatusCode.ERROR,
