@@ -123,6 +123,21 @@ model Run {
   model          String?
   provider       String?
 
+  // P1 权威源：执行输入与上下文快照
+  assistantId    String    @default("default")
+  inputKind      String    @default("message")   // message | resume
+  content        String?   @db.Text              // 用户输入(仅 message kind)
+  requestContext Json?                           // 编辑器上下文快照
+  resumePayload  Json?                           // command.resume (仅 resume kind)
+  llmConfig      Json?                           // provider/model 快照(重建 RunContext 用)
+  traceId        String?
+
+  // P1 权威源：多副本租约
+  ownerId        String?                          // 持有执行的副本 ID
+  leaseUntil     DateTime?                        // 租约过期时间
+  lastSeq        Int       @default(0)            // 已持久化最大事件 seq
+  error          String?   @db.Text               // 失败原因
+
   // Token 用量
   promptTokens     Int  @default(0)
   completionTokens Int  @default(0)
@@ -154,6 +169,7 @@ model RunEvent {
   @@index([runId, seq])
   @@index([threadId, createdAt])
   @@index([runId])
+  @@unique([runId, seq])
 }
 
 model OtelTrace {
