@@ -1,9 +1,7 @@
 /**
  * 前端 LLM 工具执行相关类型
  *
- * 注意：与 apps/web/src/features/ai/types/ai.types.ts 中的 ToolHandler 不同。
- * 那个接口面向通用的前端工具注册（含 description、inputSchema），
- * 本类型专为 LLM 工具的 interrupt/resume 执行流程设计。
+ * 本类型专为 LangGraph interrupt/resume 协议中的前端工具执行流程设计。
  */
 
 /**

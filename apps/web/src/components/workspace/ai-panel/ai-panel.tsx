@@ -1,49 +1,21 @@
 /**
  * AIPanel — AI 聊天 UI 主组件
  *
- * 通过 useLangGraphStream hook（基于 @langchain/langgraph-sdk 的 useStream）
- * 订阅 LangGraph Platform 协议 SSE 流，渲染消息列表和输入区域。
+ * 通过 useLangGraphStream 订阅 LangGraph runtime 快照，渲染消息列表和输入区域。
  */
 
 import { Loader2, Send } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { collectEditorContext } from '@/features/ai/sdk/editor-context';
-import { FrontendToolExecutor } from '@/features/ai/tools/frontend-tool-executor';
-import { DocEditHandler } from '@/features/ai/tools/handlers/doc-edit';
-import { DocReadHandler } from '@/features/ai/tools/handlers/doc-read';
-import { FileOpsHandler } from '@/features/ai/tools/handlers/file-ops';
-import { SearchHandler } from '@/features/ai/tools/handlers/search';
 import type { ConfirmationRequest } from '@/features/ai/tools/types';
-import type { MessageWire } from '@/features/ai/types/ai.types';
-import { EditorContainer } from '@/features/editor';
-import { type ChatMessage, useLangGraphStream } from '@/hooks/use-langgraph-stream';
-import { container } from '@/platform/bootstrap';
-import { DocumentStore } from '@/platform/document-store';
-import { FileSystemService } from '@/platform/file-system';
+import { useLangGraphStream } from '@/hooks/use-langgraph-stream';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import { AIHeader } from './ai-header';
 import { ContextBadge } from './context-badge';
 import { ConversationList } from './conversation-list';
 import { MessageBubble } from './message-bubble';
 import { ToolConfirmationDialog } from './tool-confirmation-dialog';
-
-/**
- * ChatMessage → MessageWire 格式映射
- *
- * useLangGraphStream 使用 LangGraph SDK 的 role 名称（human/ai），
- * MessageBubble 使用旧的 role 名称（user/assistant）。
- */
-function toMessageWire(msg: ChatMessage): MessageWire {
-    return {
-        id: msg.id,
-        role: msg.role === 'human' ? 'user' : msg.role === 'ai' ? 'assistant' : msg.role,
-        content: msg.content,
-        toolCalls: msg.toolCalls?.map(tc => ({ id: tc.id, name: tc.name })),
-        toolCallId: msg.toolCallId,
-        createdAt: new Date(msg.timestamp ?? Date.now()).toISOString(),
-    };
-}
 
 export function AIPanel() {
     const { toggleAIPanel, aiViewMode, setAIPanelViewMode } = useWorkspaceStore();
@@ -58,35 +30,11 @@ export function AIPanel() {
         error,
         threadId,
         interrupt,
-        traceContext,
+        openThread,
         sendMessage,
-        resumeWithToolResult,
         stop,
+        onConfirmationRequest,
     } = useLangGraphStream();
-    const traceContextRef = useRef(traceContext);
-    const dispatchedToolCallIdsRef = useRef(new Set<string>());
-
-    // 工具执行器（单例 per panel）— 注册 4 个 handler
-    const toolExecutor = useMemo(() => {
-        const documentStore = container.get(DocumentStore);
-        const editorContainer = container.get(EditorContainer);
-        const fileSystemService = container.get(FileSystemService);
-
-        const getProjectRoot = () => {
-            const project = useWorkspaceStore.getState().project.currentProject;
-            if (!project) return null;
-            return 'file://';
-        };
-
-        const exec = new FrontendToolExecutor('confirm-write');
-        exec.register(new FileOpsHandler(fileSystemService, getProjectRoot));
-        exec.register(new DocReadHandler(documentStore, editorContainer, fileSystemService));
-        exec.register(new DocEditHandler(documentStore, editorContainer, fileSystemService));
-        exec.register(
-            new SearchHandler(documentStore, editorContainer, fileSystemService, getProjectRoot),
-        );
-        return exec;
-    }, []);
 
     // 当前等待用户确认的请求
     const [pendingConfirmation, setPendingConfirmation] = useState<ConfirmationRequest | null>(
@@ -94,43 +42,16 @@ export function AIPanel() {
     );
 
     useEffect(() => {
-        const sub = toolExecutor.onConfirmationRequest(req => {
+        if (!onConfirmationRequest) return;
+        const sub = onConfirmationRequest(req => {
             setPendingConfirmation(req);
         });
         return () => sub.dispose();
-    }, [toolExecutor]);
-
-    useEffect(() => {
-        traceContextRef.current = traceContext;
-    }, [traceContext]);
-
-    // interrupt 到来时自动分发到执行器
-    useEffect(() => {
-        if (!interrupt) return;
-        if (dispatchedToolCallIdsRef.current.has(interrupt.toolCallId)) return;
-        dispatchedToolCallIdsRef.current.add(interrupt.toolCallId);
-
-        let cancelled = false;
-        toolExecutor
-            .dispatch(interrupt.toolName, interrupt.input, {
-                toolCallId: interrupt.toolCallId,
-                traceContext: traceContextRef.current ?? undefined,
-            })
-            .then(result => {
-                if (cancelled) return;
-                resumeWithToolResult(interrupt.toolCallId, result);
-            });
-        return () => {
-            cancelled = true;
-        };
-    }, [interrupt, toolExecutor, resumeWithToolResult]);
+    }, [onConfirmationRequest]);
 
     // Track which thread is currently generating
     const [generatingThreadId, setGeneratingThreadId] = useState<string | undefined>();
     const [activeThreadId, setActiveThreadId] = useState<string | undefined>();
-
-    // 映射消息格式给 MessageBubble
-    const wireMessages = useMemo(() => messages.map(toMessageWire), [messages]);
 
     // Track generating state
     useEffect(() => {
@@ -186,17 +107,18 @@ export function AIPanel() {
         (id: string) => {
             setActiveThreadId(id);
             setAIPanelViewMode('chat');
-            // TODO: 实现切换 thread 逻辑 — 需要用 threadId 发送消息
+            void openThread(id);
         },
-        [setAIPanelViewMode],
+        [openThread, setAIPanelViewMode],
     );
 
     const handleCreateNewThread = useCallback(
         (id: string) => {
             setActiveThreadId(id);
             setAIPanelViewMode('chat');
+            void openThread(id);
         },
-        [setAIPanelViewMode],
+        [openThread, setAIPanelViewMode],
     );
 
     // 获取编辑器上下文（用于 ContextBadge 显示）
@@ -248,7 +170,7 @@ export function AIPanel() {
 
                     {/* 消息列表 */}
                     <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
-                        {wireMessages.length === 0 && (
+                        {messages.length === 0 && (
                             <div className="flex h-full items-center justify-center">
                                 <div className="text-center">
                                     <h3 className="font-semibold text-sm text-ws-fg-primary">
@@ -261,14 +183,14 @@ export function AIPanel() {
                             </div>
                         )}
 
-                        {wireMessages.map((msg, idx) => (
+                        {messages.map((msg, idx) => (
                             <MessageBubble
                                 key={msg.id}
                                 message={msg}
                                 isStreaming={
                                     isLastMessageStreaming &&
-                                    idx === wireMessages.length - 1 &&
-                                    msg.role === 'assistant'
+                                    idx === messages.length - 1 &&
+                                    msg.role === 'ai'
                                 }
                             />
                         ))}

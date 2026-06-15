@@ -89,8 +89,9 @@ BlockRegistry 管理 8 种基础块类型：
 ## 相关文件
 
 - [Platform 服务层](./platform/services.md) - DI 容器和服务注册
+- [LangGraph Chat Runtime](./langgraph-runtime.md) - 前端 AI 消息处理链路（LangGraph Platform/SSE-only）
 - [后端 API 设计](../backend/architecture.md) - API 端点文档
 
 ---
 
-**最后更新**: 2026-03-30
+**最后更新**: 2026-06-15

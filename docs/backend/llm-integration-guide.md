@@ -3,6 +3,10 @@
 > 基于当前后端实现（NestJS + Socket.io + LangGraph），供前端开发对接 LLM 功能参考。
 > 最后更新：2026-05-20
 
+> **状态更新（2026-06-15）**：前端消息处理已切换为 LangGraph Platform/SSE-only。
+> 新前端实现见 [前端 LangGraph Chat Runtime](../frontend/langgraph-runtime.md)。
+> 本文中 Socket.io / `ClientMessage` / `ServerMessage` 自建协议内容仅作为历史背景，不再作为前端对接依据。
+
 ---
 
 ## 1. 架构概览

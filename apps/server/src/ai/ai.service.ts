@@ -3,8 +3,8 @@
  *
  * 重构(Plan A1):
  * - 使用 LangChain `BaseChatModel` 替代自定义 LLMOutput 流
- * - 通过 `graph.stream({...}, { streamMode: ['messages', 'values'] })`
- *   让 LangGraph 运行时按 Platform 协议自然发出 messages-tuple / values 事件
+ * - 通过 `graph.stream({...}, { streamMode: ['messages', 'values', 'tasks'] })`
+ *   让 LangGraph 运行时按 Platform 协议自然发出 messages / values / tasks 事件
  * - 直接将 `[mode, payload]` 透传为 SSE 事件 `{event: mode, data: payload}`
  * - 节点和 service 不再手动累积 chunk / 推送 messages/partial
  *
@@ -128,16 +128,17 @@ export class AiChatService {
      *   1. metadata {run_id, thread_id}         — run 开始
      *   2. messages  [BaseMessageChunk, meta]   — token 级流式（来自 streamMode 'messages'）
      *   3. values    {messages: [...]}          — 节点完成后状态快照
-     *   4. end       {}                         — 流结束
+     *   4. tasks     {interrupts: [...]}        — task lifecycle / interrupts
+     *   5. end       {}                         — 流结束
      *   或
-     *   4. error     {error, message}           — 失败
+     *   5. error     {error, message}           — 失败
      *
      * 关键设计：
-     * - `streamMode: ['messages', 'values']` + 多模式 → 每个 chunk 形如 `[mode, payload]`
+     * - `streamMode: ['messages', 'values', 'tasks']` + 多模式 → 每个 chunk 形如 `[mode, payload]`
      * - LangGraph 内置 callbacks 通过 `StreamMessagesHandler` 自动捕获 LLM token chunk
      * - SDK 端 `MessageTupleManager` 通过稳定 message id 拼接同组 chunk →
      *   前端 useStream() 自动呈现打字效果
-     * - interrupt 通过 values payload 中的 `__interrupt__` 字段感知
+     * - interrupt 通过 tasks payload 中的 `interrupts` 字段感知
      */
     async executeRunProtocol(record: RunRecord): Promise<void> {
         const tracer = trace.getTracer('my-km-server');
@@ -199,7 +200,7 @@ export class AiChatService {
 
                 // 4. 流式执行 — 多 streamMode 时 chunk 形如 [mode, payload]
                 const stream = await graph.stream(input, {
-                    streamMode: ['messages', 'values'],
+                    streamMode: ['messages', 'values', 'tasks'],
                     configurable: {
                         thread_id: record.threadId,
                         chatModel,
@@ -266,6 +267,18 @@ export class AiChatService {
                                 : 0,
                         });
                         await record.emitEvent({ event: 'values', data });
+                    }
+
+                    if (mode === 'tasks') {
+                        const data = payload;
+                        const hasInterruptOnChunk = this.hasTaskInterrupts(data);
+                        if (hasInterruptOnChunk) {
+                            hasInterrupt = true;
+                        }
+                        langgraphSpan.addEvent('tasks_emitted', {
+                            hasInterrupt: hasInterruptOnChunk,
+                        });
+                        await record.emitEvent({ event: 'tasks', data });
                     }
                     // TODO 其他 streamMode 暂不处理
                 }
@@ -345,6 +358,18 @@ export class AiChatService {
             result.messages = obj.messages.map(m => this.serializeMessage(m));
         }
         return result;
+    }
+
+    private hasTaskInterrupts(payload: unknown): boolean {
+        if (Array.isArray(payload)) {
+            return payload.some(item => this.hasTaskInterrupts(item));
+        }
+        if (!payload || typeof payload !== 'object') {
+            return false;
+        }
+
+        const interrupts = (payload as { interrupts?: unknown }).interrupts;
+        return Array.isArray(interrupts) && interrupts.length > 0;
     }
 
     /**

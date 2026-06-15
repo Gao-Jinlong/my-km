@@ -5,17 +5,17 @@
  * streaming 模式下在文本末尾显示闪烁光标 ▊。
  */
 
-import type { MessageWire } from '@/features/ai/types/ai.types';
+import type { LangGraphChatMessage } from '@/features/ai/langgraph/types';
 import { cn } from '@/lib/utils';
 
 interface MessageBubbleProps {
-    message: MessageWire;
+    message: LangGraphChatMessage;
     /** AI 正在流式生成此消息（显示打字光标） */
     isStreaming?: boolean;
 }
 
 export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
-    const isUser = message.role === 'user';
+    const isUser = message.role === 'human';
     const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
 
     return (

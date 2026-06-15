@@ -50,14 +50,16 @@ let mockStreamImpl: () => AsyncIterable<unknown> = () => ({
 // Capture the most recent graph.stream() input — tests can assert on what
 // executeRunProtocol() passed in (e.g. SystemMessage with hide_from_ui kwargs).
 let capturedStreamInput: unknown;
+let capturedStreamOptions: unknown;
 
 jest.mock('../langgraph/graphs/chat-graph', () => ({
     ChatGraph: jest.fn().mockImplementation(() => ({
         name: 'chat',
         createGraph: jest.fn().mockReturnValue({
             compile: jest.fn().mockReturnValue({
-                stream: jest.fn().mockImplementation((input: unknown) => {
+                stream: jest.fn().mockImplementation((input: unknown, options: unknown) => {
                     capturedStreamInput = input;
+                    capturedStreamOptions = options;
                     return mockStreamImpl();
                 }),
             }),
@@ -219,6 +221,7 @@ describe('AiChatService', () => {
             },
         });
         capturedStreamInput = undefined;
+        capturedStreamOptions = undefined;
     });
 
     describe('startRun', () => {
@@ -511,6 +514,60 @@ describe('AiChatService', () => {
 
             await service.executeRunProtocol(record);
 
+            expect(record.status).toBe(RunStatus.Interrupted);
+        });
+
+        it('should request tasks stream mode for LangGraph interrupts', async () => {
+            const record = await service.startRun({ content: 'Hi', threadId: 't1' });
+            const capture = createEventCapture();
+            record.setSseWriter(capture.sseWriter);
+
+            await service.executeRunProtocol(record);
+
+            expect((capturedStreamOptions as { streamMode?: string[] }).streamMode).toEqual([
+                'messages',
+                'values',
+                'tasks',
+            ]);
+        });
+
+        it('should emit tasks events and interrupt the run when LangGraph reports tool interrupts', async () => {
+            mockStreamImpl = () => ({
+                async *[Symbol.asyncIterator]() {
+                    yield [
+                        'tasks',
+                        {
+                            id: 'task-1',
+                            name: 'tools',
+                            interrupts: [
+                                {
+                                    id: 'interrupt-1',
+                                    value: {
+                                        tool_call_id: 'tc-1',
+                                        tool_name: 'file_ops',
+                                        args: { path: 'notes/a.km' },
+                                    },
+                                },
+                            ],
+                        },
+                    ];
+                },
+            });
+
+            const record = await service.startRun({ content: 'Hi', threadId: 't1' });
+            const capture = createEventCapture();
+            record.setSseWriter(capture.sseWriter);
+
+            await service.executeRunProtocol(record);
+
+            expect(capture.events).toContainEqual(
+                expect.objectContaining({
+                    event: 'tasks',
+                    data: expect.objectContaining({
+                        interrupts: expect.any(Array),
+                    }),
+                }),
+            );
             expect(record.status).toBe(RunStatus.Interrupted);
         });
 
