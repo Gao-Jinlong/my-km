@@ -14,6 +14,7 @@ import { NotFoundException } from '@nestjs/common';
 import type { Response } from 'express';
 import type { AiChatService } from '../../ai.service';
 import type { CheckpointReaderService } from '../../checkpointer/checkpoint-reader.service';
+import type { JoinStreamService } from '../../run/join-stream.service';
 import type { ThreadService } from '../../thread/thread.service';
 
 // Mock langgraph ESM modules to prevent uuid ESM error in Jest.
@@ -67,6 +68,7 @@ function createMockResponse(): {
         flushHeaders: jest.fn(),
         status: jest.fn().mockReturnThis(),
         json: jest.fn().mockReturnThis(),
+        on: jest.fn(),
     } as unknown as Response;
     return { res, writes };
 }
@@ -76,6 +78,7 @@ describe('ThreadsController', () => {
     let mockAiService: jest.Mocked<AiChatService>;
     let mockThreadService: jest.Mocked<ThreadService>;
     let mockCheckpointReader: jest.Mocked<CheckpointReaderService>;
+    let mockJoinStreamService: jest.Mocked<JoinStreamService>;
 
     const sampleThread = {
         id: 'thread-1',
@@ -112,7 +115,16 @@ describe('ThreadsController', () => {
             }),
         } as unknown as jest.Mocked<CheckpointReaderService>;
 
-        controller = new ThreadsController(mockAiService, mockThreadService, mockCheckpointReader);
+        mockJoinStreamService = {
+            joinStream: jest.fn().mockResolvedValue(jest.fn()),
+        } as unknown as jest.Mocked<JoinStreamService>;
+
+        controller = new ThreadsController(
+            mockAiService,
+            mockThreadService,
+            mockCheckpointReader,
+            mockJoinStreamService,
+        );
     });
 
     describe('createThread', () => {
@@ -324,14 +336,106 @@ describe('ThreadsController', () => {
     });
 
     describe('joinStream', () => {
-        it('returns 501 not_implemented', () => {
-            const { res } = createMockResponse();
-            controller.joinStream(res);
+        it('delegates to JoinStreamService with parsed since and SSE sink', async () => {
+            const { res, writes } = createMockResponse();
+            const cleanup = jest.fn();
+            mockJoinStreamService.joinStream.mockResolvedValueOnce(cleanup);
 
-            expect(res.status).toHaveBeenCalledWith(501);
-            expect(res.json).toHaveBeenCalledWith(
-                expect.objectContaining({ error: 'not_implemented' }),
+            await controller.joinStream('thread-1', 'run-1', '5', res);
+
+            // since parsed to number
+            expect(mockJoinStreamService.joinStream).toHaveBeenCalledWith(
+                'run-1',
+                5,
+                expect.objectContaining({
+                    push: expect.any(Function),
+                    close: expect.any(Function),
+                }),
             );
+
+            // sink.push drives writeSSE onto res
+            const sink = mockJoinStreamService.joinStream.mock.calls[0][2];
+            sink.push({ seq: 6, eventType: 'values', payload: { v: 1 } });
+            expect(writes.some(w => w.startsWith('event: values'))).toBe(true);
+
+            // sink.close ends res exactly once
+            expect(res.end).not.toHaveBeenCalled();
+            sink.close();
+            expect(res.end).toHaveBeenCalledTimes(1);
+        });
+
+        it('defaults since to 0 when missing or non-numeric', async () => {
+            const { res } = createMockResponse();
+            mockJoinStreamService.joinStream.mockResolvedValueOnce(jest.fn());
+
+            await controller.joinStream('thread-1', 'run-1', undefined, res);
+            expect(mockJoinStreamService.joinStream).toHaveBeenLastCalledWith(
+                'run-1',
+                0,
+                expect.anything(),
+            );
+
+            await controller.joinStream('thread-1', 'run-1', 'abc', res);
+            expect(mockJoinStreamService.joinStream).toHaveBeenLastCalledWith(
+                'run-1',
+                0,
+                expect.anything(),
+            );
+        });
+
+        it('treats negative since as 0', async () => {
+            const { res } = createMockResponse();
+            mockJoinStreamService.joinStream.mockResolvedValueOnce(jest.fn());
+
+            await controller.joinStream('thread-1', 'run-1', '-3', res);
+            expect(mockJoinStreamService.joinStream).toHaveBeenLastCalledWith(
+                'run-1',
+                0,
+                expect.anything(),
+            );
+        });
+
+        it('maps NotFoundException to 404 JSON before stream starts', async () => {
+            const { res } = createMockResponse();
+            mockJoinStreamService.joinStream.mockRejectedValueOnce(
+                new NotFoundException('Run not found: run-1'),
+            );
+
+            await controller.joinStream('thread-1', 'run-1', undefined, res);
+
+            expect(res.status).toHaveBeenCalledWith(404);
+            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: 'not_found' }));
+            // SSE error path NOT taken
+            expect(res.write).not.toHaveBeenCalled();
+        });
+
+        it('writes SSE execution_error event when service throws non-NotFound error', async () => {
+            const { res, writes } = createMockResponse();
+            mockJoinStreamService.joinStream.mockRejectedValueOnce(new Error('boom'));
+
+            await controller.joinStream('thread-1', 'run-1', undefined, res);
+
+            const errorWrite = writes.find(w => w.startsWith('event: error'));
+            expect(errorWrite).toBeDefined();
+            expect(errorWrite).toContain('execution_error');
+            expect(errorWrite).toContain('boom');
+        });
+
+        it('registers res.on(close) cleanup to avoid subscription leak', async () => {
+            const { res } = createMockResponse();
+            const cleanup = jest.fn();
+            mockJoinStreamService.joinStream.mockResolvedValueOnce(cleanup);
+
+            await controller.joinStream('thread-1', 'run-1', undefined, res);
+
+            // res.on('close', ...) registered
+            const onClose = (res as unknown as { on: jest.Mock }).on;
+            expect(onClose).toHaveBeenCalledWith('close', expect.any(Function));
+
+            // invoking the close handler runs the cleanup returned by the service
+            const handler = onClose.mock.calls[0][1];
+            handler();
+            expect(cleanup).toHaveBeenCalledTimes(1);
         });
     });
 });

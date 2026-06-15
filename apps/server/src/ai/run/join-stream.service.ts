@@ -5,9 +5,9 @@ import {
     type RunStreamEvent,
     runChannel,
 } from '../event/event-bus';
-import type { RunEventStore } from '../store/run-event-store';
+import { RunEventStore } from '../store/run-event-store';
 import type { RunEventSink } from './run-event-sink';
-import type { RunStateRepository } from './run-state.repository';
+import { RunStateRepository } from './run-state.repository';
 
 /** 终态：纯回放，不续实时 */
 const TERMINAL_STATUSES = ['completed', 'failed', 'cancelled'];

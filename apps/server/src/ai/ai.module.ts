@@ -30,6 +30,7 @@ import { LLMFactory } from './llm/llm-factory';
 import { OpenAIProvider } from './llm/openai.provider';
 import { ProviderRegistry } from './llm/provider-registry';
 import { ZhipuProvider } from './llm/zhipu.provider';
+import { JoinStreamService } from './run/join-stream.service';
 import { REPLICA_ID } from './run/replica-id';
 import { RunContextFactory } from './run/run-context-factory';
 import { RunManager } from './run/run-manager';
@@ -74,6 +75,7 @@ import { ThreadService } from './thread/thread.service';
         },
         RunManager,
         RunContextFactory,
+        JoinStreamService,
 
         // 业务逻辑层
         AiChatService,

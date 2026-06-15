@@ -64,6 +64,7 @@ import { AiChatService } from '../ai.service';
 import { EventBus, runChannel } from '../event/event-bus';
 import { InProcessEventBus } from '../event/in-process.event-bus';
 import { ProviderRegistry } from '../llm/provider-registry';
+import { JoinStreamService } from '../run/join-stream.service';
 import { REPLICA_ID } from '../run/replica-id';
 import { RunManager } from '../run/run-manager';
 import { RunStateRepository } from '../run/run-state.repository';
@@ -219,6 +220,12 @@ describe('AiModule bootstrap', () => {
         bus.subscribe(runChannel('r1'), e => received.push(e.seq));
         await bus.publish(runChannel('r1'), { seq: 5, eventType: 'values', payload: {} });
         expect(received).toEqual([5]);
+        await module.close();
+    });
+
+    it('wires JoinStreamService through Nest DI', async () => {
+        const module = await compileAiModuleForDi();
+        expect(module.get(JoinStreamService)).toBeInstanceOf(JoinStreamService);
         await module.close();
     });
 });

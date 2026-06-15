@@ -10,7 +10,7 @@
  *   GET    /api/threads/:id/state                    → getThreadState
  *   POST   /api/threads/:tid/runs/stream             → streamRun (SSE)
  *   POST   /api/threads/:tid/runs/:rid/cancel        → cancelRun
- *   GET    /api/threads/:tid/runs/:rid/stream        → joinStream (501，后续实现)
+ *   GET    /api/threads/:tid/runs/:rid/stream        → joinStream (SSE 重连)
  *
  * 关键设计：
  * - `@Controller('threads')` + 全局前缀 `/api` → 路由为 `/api/threads/...`
@@ -30,13 +30,17 @@ import {
     Param,
     Patch,
     Post,
+    Query,
     Res,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { SkipResponseWrap } from '../../common/decorators/skip-response-wrap.decorator';
 import { AiChatService } from '../ai.service';
 import { CheckpointReaderService } from '../checkpointer/checkpoint-reader.service';
+import type { RunStreamEvent } from '../event/event-bus';
 import { writeSSE } from '../langgraph/langgraph-protocol';
+import { JoinStreamService } from '../run/join-stream.service';
+import type { RunEventSink } from '../run/run-event-sink';
 import { RunRecord } from '../run/run-record';
 import { ThreadService } from '../thread/thread.service';
 import type { MultitaskStrategy } from '../types/run.types';
@@ -114,6 +118,7 @@ export class ThreadsController {
         private readonly aiService: AiChatService,
         private readonly threadService: ThreadService,
         private readonly checkpointReader: CheckpointReaderService,
+        private readonly joinStreamService: JoinStreamService,
     ) {}
 
     // ========== Thread CRUD ==========
@@ -268,16 +273,51 @@ export class ThreadsController {
     }
 
     /**
-     * GET /api/threads/:threadId/runs/:runId/stream — 重新加入正在进行的 run
+     * GET /api/threads/:threadId/runs/:runId/stream — 重新加入正在进行的 run（spec 3.5）
      *
-     * 当前未实现（流重连功能延后）。返回 501 Not Implemented。
+     * 回放 PG 持久化事件（seq > since）+ 续收 EventBus 实时事件，按 seq 去重衔接，
+     * 终态（end/error）关闭 SSE。since=0 从头回放。
      */
     @Get(':threadId/runs/:runId/stream')
-    joinStream(@Res() res: Response): void {
-        res.status(501).json({
-            error: 'not_implemented',
-            message: 'Stream rejoin is not yet supported',
-        });
+    async joinStream(
+        @Param('threadId') _threadId: string,
+        @Param('runId') runId: string,
+        @Query('since') sinceParam: string | undefined,
+        @Res() res: Response,
+    ): Promise<void> {
+        const since = Number.parseInt(sinceParam ?? '0', 10);
+        const safeSince = Number.isFinite(since) && since >= 0 ? since : 0;
+
+        this.setSseHeaders(res);
+
+        const sink: RunEventSink = {
+            push: (event: RunStreamEvent) => {
+                writeSSE(res, event.eventType, event.payload);
+            },
+            close: () => {
+                if (!res.writableEnded) {
+                    res.end();
+                }
+            },
+        };
+
+        let cleanup: () => void = () => {};
+        // 客户端断开时清理（防 interrupted 连接 subscription 泄漏）
+        res.on('close', () => cleanup());
+
+        try {
+            cleanup = await this.joinStreamService.joinStream(runId, safeSince, sink);
+        } catch (error) {
+            if (!res.writableEnded) {
+                // NotFoundException → 404；其他 → SSE error 事件
+                if (error instanceof NotFoundException) {
+                    res.status(404).json({ error: 'not_found', message: (error as Error).message });
+                } else {
+                    this.logger.error(`joinStream failed: ${(error as Error).message}`);
+                    this.sendProtocolError(res, 'execution_error', (error as Error).message);
+                }
+            }
+        }
     }
 
     // ========== Private Helpers ==========
