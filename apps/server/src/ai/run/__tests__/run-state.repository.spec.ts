@@ -6,6 +6,7 @@ function createMockPrisma(): PrismaService {
     return {
         run: {
             findUnique: jest.fn(),
+            findUniqueOrThrow: jest.fn(),
             findFirst: jest.fn(),
             create: jest.fn(),
             update: jest.fn(),
@@ -134,7 +135,10 @@ describe('RunStateRepository', () => {
 
         it('acquires when ownerId is null', async () => {
             (prisma.run.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
-            (prisma.run.findUnique as jest.Mock).mockResolvedValue({ id: 'r1', ownerId: 'A' });
+            (prisma.run.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+                id: 'r1',
+                ownerId: 'A',
+            });
 
             const result = await repo.acquireLease('r1', 'A');
 
@@ -150,7 +154,10 @@ describe('RunStateRepository', () => {
 
         it('re-acquires when same replica already owns', async () => {
             (prisma.run.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
-            (prisma.run.findUnique as jest.Mock).mockResolvedValue({ id: 'r1', ownerId: 'A' });
+            (prisma.run.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+                id: 'r1',
+                ownerId: 'A',
+            });
 
             const result = await repo.acquireLease('r1', 'A');
             expect(result.acquired).toBe(true);
@@ -158,7 +165,10 @@ describe('RunStateRepository', () => {
 
         it('acquires when lease expired (other owner stale)', async () => {
             (prisma.run.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
-            (prisma.run.findUnique as jest.Mock).mockResolvedValue({ id: 'r1', ownerId: 'B' });
+            (prisma.run.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+                id: 'r1',
+                ownerId: 'B',
+            });
 
             const result = await repo.acquireLease('r1', 'A');
             expect(result.acquired).toBe(true);

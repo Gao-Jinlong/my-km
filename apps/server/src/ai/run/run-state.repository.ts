@@ -116,7 +116,7 @@ export class RunStateRepository {
                     : null,
             };
         }
-        const run = await this.prisma.run.findUnique({ where: { id: runId } });
+        const run = await this.prisma.run.findUniqueOrThrow({ where: { id: runId } });
         return { acquired: true, run, conflict: null };
     }
 
