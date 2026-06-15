@@ -36,6 +36,8 @@ export interface RunRecordOpts {
     threadId: string;
     runContext: RunContext;
     snapshot: RunExecutionSnapshot;
+    /** seq 起点（resume 时从 Run.lastSeq 恢复，默认 0） */
+    lastSeq?: number;
 }
 
 export class RunRecord {
@@ -55,7 +57,7 @@ export class RunRecord {
         totalTokens: 0,
     };
 
-    private seq = 0;
+    private seq: number;
 
     /** SSE response writer（由 controller 设置） */
     private sseWriter?: (event: { event: string; data: unknown }) => void;
@@ -72,6 +74,7 @@ export class RunRecord {
         this.runContext = opts.runContext;
         this.snapshot = opts.snapshot;
         this.abortSignal = this.abortController.signal;
+        this.seq = opts.lastSeq ?? 0;
     }
 
     get status(): RunStatus {
@@ -97,6 +100,16 @@ export class RunRecord {
     /** 获取 resume payload */
     get pendingResume(): unknown {
         return this._pendingResume;
+    }
+
+    /** 当前已分配的最大 seq（执行结束回写 Run.lastSeq） */
+    get currentSeq(): number {
+        return this.seq;
+    }
+
+    /** 重置 seq 起点（resume 路径从 RunRow.lastSeq 锚定） */
+    setLastSeq(seq: number): void {
+        this.seq = seq;
     }
 
     /**

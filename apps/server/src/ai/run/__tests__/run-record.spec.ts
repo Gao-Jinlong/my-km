@@ -168,4 +168,38 @@ describe('RunRecord', () => {
             });
         });
     });
+
+    describe('lastSeq anchoring', () => {
+        it('defaults seq to 0 for a new run', () => {
+            const record = new RunRecord({
+                id: 'r1',
+                threadId: 't1',
+                runContext: createMockRunContext(),
+                snapshot: { content: 'hi' },
+            });
+            expect(record.currentSeq).toBe(0);
+        });
+
+        it('starts seq from provided lastSeq (resume path)', () => {
+            const record = new RunRecord({
+                id: 'r1',
+                threadId: 't1',
+                runContext: createMockRunContext(),
+                snapshot: { content: '' },
+                lastSeq: 41,
+            });
+            expect(record.currentSeq).toBe(41);
+        });
+
+        it('setLastSeq resets the seq counter', () => {
+            const record = new RunRecord({
+                id: 'r1',
+                threadId: 't1',
+                runContext: createMockRunContext(),
+                snapshot: { content: '' },
+            });
+            record.setLastSeq(99);
+            expect(record.currentSeq).toBe(99);
+        });
+    });
 });
