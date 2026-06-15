@@ -56,8 +56,15 @@ jest.mock('../llm/dashscope.provider', () => ({
     DashscopeProvider: jest.fn().mockImplementation(() => ({ name: 'dashscope' })),
 }));
 
+import { Test, type TestingModule } from '@nestjs/testing';
+import { ConfigModule } from '../../config/config.module';
+import { PrismaService } from '../../prisma/prisma.service';
 import { AiModule } from '../ai.module';
+import { AiChatService } from '../ai.service';
 import { ProviderRegistry } from '../llm/provider-registry';
+import { REPLICA_ID } from '../run/replica-id';
+import { RunManager } from '../run/run-manager';
+import { RunStateRepository } from '../run/run-state.repository';
 
 describe('AiModule bootstrap', () => {
     const originalEnv = process.env;
@@ -73,6 +80,7 @@ describe('AiModule bootstrap', () => {
         delete process.env.DASHSCOPE_API_KEY;
         delete process.env.DEFAULT_LLM_PROVIDER;
         delete process.env.DEFAULT_LLM_MODEL;
+        delete process.env.AI_REPLICA_ID;
 
         registry = new ProviderRegistry();
         aiModule = new AiModule(registry);
@@ -81,6 +89,22 @@ describe('AiModule bootstrap', () => {
     afterAll(() => {
         process.env = originalEnv;
     });
+
+    async function compileAiModuleForDi(): Promise<TestingModule> {
+        // EnvConfig 校验需要 DATABASE_URL / JWT_SECRET 存在
+        process.env.DATABASE_URL ??= 'postgresql://test:test@localhost:5432/test';
+        process.env.JWT_SECRET ??= 'test-secret-test-secret-test-secret';
+        return Test.createTestingModule({ imports: [ConfigModule, AiModule] })
+            .overrideProvider(PrismaService)
+            .useValue({
+                run: {},
+                runEvent: {},
+                thread: {},
+                $connect: jest.fn(),
+                $disconnect: jest.fn(),
+            })
+            .compile();
+    }
 
     it('registers all 4 provider factories', () => {
         aiModule.onModuleInit();
@@ -152,5 +176,30 @@ describe('AiModule bootstrap', () => {
 
         warnSpy.mockRestore();
         logSpy.mockRestore();
+    });
+
+    it('provides REPLICA_ID from AI_REPLICA_ID when set', async () => {
+        process.env.AI_REPLICA_ID = 'replica-env';
+        const module = await compileAiModuleForDi();
+        expect(module.get(REPLICA_ID)).toBe('replica-env');
+        await module.close();
+    });
+
+    it('generates a non-empty REPLICA_ID when env is missing or blank', async () => {
+        process.env.AI_REPLICA_ID = '   ';
+        const module = await compileAiModuleForDi();
+        const replicaId = module.get<string>(REPLICA_ID);
+        expect(replicaId).toEqual(expect.any(String));
+        expect(replicaId.length).toBeGreaterThan(0);
+        expect(replicaId).not.toBe('   ');
+        await module.close();
+    });
+
+    it('wires RunStateRepository into RunManager and AiChatService through Nest DI', async () => {
+        const module = await compileAiModuleForDi();
+        expect(module.get(RunStateRepository)).toBeInstanceOf(RunStateRepository);
+        expect(module.get(RunManager)).toBeInstanceOf(RunManager);
+        expect(module.get(AiChatService)).toBeInstanceOf(AiChatService);
+        await module.close();
     });
 });
