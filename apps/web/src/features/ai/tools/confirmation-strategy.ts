@@ -12,7 +12,11 @@ export type ConfirmationMode = 'bypass' | 'confirm-write' | 'confirm-all' | 'con
 
 export interface ConfirmationStrategy {
     readonly mode: ConfirmationMode;
-    needsConfirmation(toolName: string, operation: Record<string, unknown>): boolean;
+    needsConfirmation(
+        toolName: string,
+        operation: Record<string, unknown>,
+        category?: 'read' | 'write',
+    ): boolean;
 }
 
 function isDestructiveOperation(toolName: string, input: Record<string, unknown>): boolean {
@@ -31,24 +35,33 @@ function isDestructiveOperation(toolName: string, input: Record<string, unknown>
     return false;
 }
 
-function isWriteOperation(toolName: string, input: Record<string, unknown>): boolean {
+function isWriteOperation(
+    toolName: string,
+    input: Record<string, unknown>,
+    category?: 'read' | 'write',
+): boolean {
     if (toolName === 'doc_edit') return true;
     if (toolName === 'file_ops') {
         const op = input.operation as string;
         return op !== 'list';
     }
+    if (category === 'write') return true;
     return false;
 }
 
 export function createConfirmationStrategy(mode: ConfirmationMode): ConfirmationStrategy {
     return {
         mode,
-        needsConfirmation(toolName: string, input: Record<string, unknown>): boolean {
+        needsConfirmation(
+            toolName: string,
+            input: Record<string, unknown>,
+            category?: 'read' | 'write',
+        ): boolean {
             switch (mode) {
                 case 'bypass':
                     return false;
                 case 'confirm-write':
-                    return isWriteOperation(toolName, input);
+                    return isWriteOperation(toolName, input, category);
                 case 'confirm-all':
                     return true;
                 case 'confirm-destructive':

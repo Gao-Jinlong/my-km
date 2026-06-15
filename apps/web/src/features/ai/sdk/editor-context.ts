@@ -17,6 +17,7 @@ export interface EditorContext {
     selectedText: string | null;
     fullContent: string | null;
     cursorPosition: { blockId: string; offset: number } | null;
+    [key: string]: unknown;
 }
 
 /**

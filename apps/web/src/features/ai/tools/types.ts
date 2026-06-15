@@ -52,4 +52,8 @@ export type ToolCategory = 'read' | 'write';
 /**
  * 判断工具是否为只读操作
  */
-export type NeedsConfirmationFn = (toolName: string, input: Record<string, unknown>) => boolean;
+export type NeedsConfirmationFn = (
+    toolName: string,
+    input: Record<string, unknown>,
+    category?: ToolCategory,
+) => boolean;

@@ -6,7 +6,7 @@ export const fileOpsTool = {
     name: 'file_ops',
     description:
         '对文件和文件夹进行操作：列出目录(list)、创建(create)、删除(delete)、移动(move)、重命名(rename)、复制(copy)。' +
-        '所有路径相对于项目根目录，使用 memory:// 前缀。',
+        '路径可以使用 file:// 前缀，也可以使用相对于当前项目根目录的路径；不要使用 memory://。',
     inputSchema: {
         type: 'object',
         properties: {
@@ -17,11 +17,12 @@ export const fileOpsTool = {
             },
             path: {
                 type: 'string',
-                description: '目标路径（包含 scheme 前缀，如 memory://folder/file.km）',
+                description: '目标路径（如 file://folder/file.km 或 folder/file.km）',
             },
             destination: {
                 type: 'string',
-                description: 'move/copy 操作的目标路径',
+                description:
+                    'move/copy 操作的目标路径（如 file://folder/file.km 或 folder/file.km）',
             },
             type: {
                 type: 'string',

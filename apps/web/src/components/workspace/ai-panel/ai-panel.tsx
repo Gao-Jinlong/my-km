@@ -16,8 +16,11 @@ import { FileOpsHandler } from '@/features/ai/tools/handlers/file-ops';
 import { SearchHandler } from '@/features/ai/tools/handlers/search';
 import type { ConfirmationRequest } from '@/features/ai/tools/types';
 import type { MessageWire } from '@/features/ai/types/ai.types';
+import { EditorContainer } from '@/features/editor';
 import { type ChatMessage, useLangGraphStream } from '@/hooks/use-langgraph-stream';
 import { container } from '@/platform/bootstrap';
+import { DocumentStore } from '@/platform/document-store';
+import { FileSystemService } from '@/platform/file-system';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import { AIHeader } from './ai-header';
 import { ContextBadge } from './context-badge';
@@ -60,15 +63,19 @@ export function AIPanel() {
         resumeWithToolResult,
         stop,
     } = useLangGraphStream();
+    const traceContextRef = useRef(traceContext);
+    const dispatchedToolCallIdsRef = useRef(new Set<string>());
 
     // 工具执行器（单例 per panel）— 注册 4 个 handler
     const toolExecutor = useMemo(() => {
-        const { documentStore, editorContainer, fileSystemService } = container;
+        const documentStore = container.get(DocumentStore);
+        const editorContainer = container.get(EditorContainer);
+        const fileSystemService = container.get(FileSystemService);
 
         const getProjectRoot = () => {
             const project = useWorkspaceStore.getState().project.currentProject;
             if (!project) return null;
-            return `memory://${project.name}`;
+            return 'file://';
         };
 
         const exec = new FrontendToolExecutor('confirm-write');
@@ -93,14 +100,21 @@ export function AIPanel() {
         return () => sub.dispose();
     }, [toolExecutor]);
 
+    useEffect(() => {
+        traceContextRef.current = traceContext;
+    }, [traceContext]);
+
     // interrupt 到来时自动分发到执行器
     useEffect(() => {
         if (!interrupt) return;
+        if (dispatchedToolCallIdsRef.current.has(interrupt.toolCallId)) return;
+        dispatchedToolCallIdsRef.current.add(interrupt.toolCallId);
+
         let cancelled = false;
         toolExecutor
             .dispatch(interrupt.toolName, interrupt.input, {
                 toolCallId: interrupt.toolCallId,
-                traceContext: traceContext ?? undefined,
+                traceContext: traceContextRef.current ?? undefined,
             })
             .then(result => {
                 if (cancelled) return;
@@ -109,7 +123,7 @@ export function AIPanel() {
         return () => {
             cancelled = true;
         };
-    }, [interrupt, toolExecutor, resumeWithToolResult, traceContext]);
+    }, [interrupt, toolExecutor, resumeWithToolResult]);
 
     // Track which thread is currently generating
     const [generatingThreadId, setGeneratingThreadId] = useState<string | undefined>();

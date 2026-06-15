@@ -42,7 +42,10 @@ export class SearchHandler implements FrontendToolHandler {
         }
     }
 
-    private async handleTextSearch(query: string, args: Record<string, unknown>): Promise<ToolResult> {
+    private async handleTextSearch(
+        query: string,
+        args: Record<string, unknown>,
+    ): Promise<ToolResult> {
         const documentId = args.documentId as string | undefined;
         const path = args.path as string | undefined;
 

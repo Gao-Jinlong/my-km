@@ -86,7 +86,7 @@ export class FrontendToolExecutor {
         toolSpan.addEvent('tool.execution_started');
 
         try {
-            if (handler.type === 'write' || this.strategy.needsConfirmation(toolName, input)) {
+            if (this.strategy.needsConfirmation(toolName, input, handler.type)) {
                 const approved = await this.requestConfirmation(handler, input);
                 if (!approved) {
                     toolSpan.setAttribute('tool.status', 'rejected');

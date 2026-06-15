@@ -10,7 +10,7 @@ interface TreeItem {
 
 export class FileOpsHandler implements FrontendToolHandler {
     readonly name = 'file_ops';
-    readonly type = 'read';
+    readonly type = 'write';
 
     constructor(
         private readonly fileSystemService: FileSystemService,
@@ -33,28 +33,53 @@ export class FileOpsHandler implements FrontendToolHandler {
 
     async execute(args: Record<string, unknown>): Promise<ToolResult> {
         const operation = args.operation as string;
-        const path = (args.path as string) || this.getProjectRoot();
+        const rawPath = (args.path as string) || this.getProjectRoot();
 
-        if (!path) {
+        if (!rawPath) {
             return { success: false, error: 'No path provided and no project root available' };
         }
 
+        const resolvedPath = this.resolveProjectPath(rawPath);
+        if (typeof resolvedPath !== 'string') return resolvedPath;
+
         switch (operation) {
             case 'list':
-                return this.handleList(path, args);
+                return this.handleList(resolvedPath, args);
             case 'create':
-                return this.handleCreate(path, args);
+                return this.handleCreate(resolvedPath, args);
             case 'delete':
-                return this.handleDelete(path);
+                return this.handleDelete(resolvedPath);
             case 'move':
-                return this.handleMove(path, args);
+                return this.handleMove(resolvedPath, args);
             case 'rename':
-                return this.handleRename(path, args);
+                return this.handleRename(resolvedPath, args);
             case 'copy':
-                return this.handleCopy(path, args);
+                return this.handleCopy(resolvedPath, args);
             default:
                 return { success: false, error: `Unknown operation: ${operation}` };
         }
+    }
+
+    private resolveProjectPath(path: string): string | ToolResult {
+        if (path.startsWith('memory://')) {
+            return {
+                success: false,
+                error: 'memory:// paths are not available for the current project. Use file:// or a project-relative path instead.',
+            };
+        }
+
+        if (path.includes('://')) return path;
+
+        const root = this.getProjectRoot();
+        if (!root) {
+            return { success: false, error: 'No project root available for relative path' };
+        }
+
+        const trimmedPath = path.replace(/^\/+/, '');
+        if (root.endsWith('://')) return `${root}${trimmedPath}`;
+
+        const trimmedRoot = root.replace(/\/+$/, '');
+        return `${trimmedRoot}/${trimmedPath}`;
     }
 
     private async handleList(path: string, args: Record<string, unknown>): Promise<ToolResult> {
@@ -62,7 +87,9 @@ export class FileOpsHandler implements FrontendToolHandler {
         const depth = typeof args.depth === 'number' && args.depth > 0 ? args.depth : 1;
 
         try {
-            const items = recursive ? await this.walk(path, depth) : await this.listSingleLevel(path);
+            const items = recursive
+                ? await this.walk(path, depth)
+                : await this.listSingleLevel(path);
             return { success: true, path, items };
         } catch (err) {
             return {
@@ -106,7 +133,11 @@ export class FileOpsHandler implements FrontendToolHandler {
             } else {
                 const emptyKm = JSON.stringify({
                     version: 1,
-                    metadata: { title: '', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+                    metadata: {
+                        title: '',
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString(),
+                    },
                     blocks: [],
                 });
                 await this.fileSystemService.writeFile(path, emptyKm);
@@ -136,12 +167,16 @@ export class FileOpsHandler implements FrontendToolHandler {
         if (!destination) {
             return { success: false, error: 'destination is required for move operation' };
         }
+        const resolvedDestination = this.resolveProjectPath(destination);
+        if (typeof resolvedDestination !== 'string') return resolvedDestination;
+
         try {
             const content = await this.fileSystemService.readFile(path);
-            const contentStr = typeof content === 'string' ? content : new TextDecoder().decode(content);
-            await this.fileSystemService.writeFile(destination, contentStr);
+            const contentStr =
+                typeof content === 'string' ? content : new TextDecoder().decode(content);
+            await this.fileSystemService.writeFile(resolvedDestination, contentStr);
             await this.fileSystemService.deleteFile(path);
-            return { success: true, newPath: destination };
+            return { success: true, newPath: resolvedDestination };
         } catch (err) {
             return { success: false, error: `Failed to move: ${(err as Error).message}` };
         }
@@ -171,11 +206,15 @@ export class FileOpsHandler implements FrontendToolHandler {
         if (!destination) {
             return { success: false, error: 'destination is required for copy operation' };
         }
+        const resolvedDestination = this.resolveProjectPath(destination);
+        if (typeof resolvedDestination !== 'string') return resolvedDestination;
+
         try {
             const content = await this.fileSystemService.readFile(path);
-            const contentStr = typeof content === 'string' ? content : new TextDecoder().decode(content);
-            await this.fileSystemService.writeFile(destination, contentStr);
-            return { success: true, newPath: destination };
+            const contentStr =
+                typeof content === 'string' ? content : new TextDecoder().decode(content);
+            await this.fileSystemService.writeFile(resolvedDestination, contentStr);
+            return { success: true, newPath: resolvedDestination };
         } catch (err) {
             return { success: false, error: `Failed to copy: ${(err as Error).message}` };
         }
