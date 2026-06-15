@@ -19,6 +19,7 @@
  */
 
 import { Logger } from '@nestjs/common';
+import { type RunStreamEvent, runChannel } from '../event/event-bus';
 import type { TokenUsage } from '../types/ai.types';
 import { RunStatus } from '../types/run.types';
 import type { RunContext } from './run-context';
@@ -147,40 +148,66 @@ export class RunRecord {
     }
 
     /**
-     * 发射事件：同时写入 SSE response + EventStore
-     *
-     * EventStore 通过 runContext.eventStore 统一来源
+     * 发射状态边界事件：SSE 即时推 + EventStore 落盘 + EventBus 广播（spec 3.2/3.3）。
+     * seq 在入口分配，供三路共用（PG append 与 EventBus publish 同一 seq）。
+     * publish 失败不阻塞 SSE/PG（降级 warn，spec 3.3 [2]）。
      */
     async emitEvent(event: { event: string; data: unknown }) {
-        // 写 SSE
+        const seq = this.seq++;
+        const streamEvent: RunStreamEvent = {
+            seq,
+            eventType: event.event,
+            payload: event.data,
+        };
+
+        // [1] SSE 即时推
         if (this.sseWriter) {
             this.sseWriter(event);
         }
 
-        // 写 EventStore（通过 runContext.eventStore 统一来源）
+        // [3] PG 落盘（状态边界）
         try {
             await this.runContext.eventStore.append(this.id, this.threadId, {
-                seq: this.seq++,
+                seq,
                 eventType: event.event,
                 // biome-ignore lint/suspicious/noExplicitAny: LangGraph stream event data is untyped
                 eventName: (event.data as any)?.event ?? '',
                 payload: event.data as Record<string, unknown>,
             });
         } catch (err) {
-            // EventStore 写入失败不应阻塞 SSE 流
             this.logger.warn(`EventStore append failed: ${(err as Error).message}`);
+        }
+
+        // [2] EventBus 广播（非 owner 副本续实时，spec 3.3）
+        try {
+            await this.runContext.eventBus.publish(runChannel(this.id), streamEvent);
+        } catch (err) {
+            this.logger.warn(`EventBus publish failed: ${(err as Error).message}`);
         }
     }
 
     /**
-     * 仅写 SSE，不持久化到 EventStore。
-     * 用于 messages/partial 等高频流式事件（量大，不应写入 DB）。
+     * 发射临时事件（messages token）：SSE 即时推 + EventBus 广播，不落盘（spec 3.2）。
+     * 仍分配 seq（供续实时去重）。publish fire-and-forget（高频，不 await），
+     * 但 rejection 必须 catch 防 unhandled rejection。
      */
     emitSSEOnly(event: { event: string; data: unknown }) {
+        const seq = this.seq++;
+        const streamEvent: RunStreamEvent = {
+            seq,
+            eventType: event.event,
+            payload: event.data,
+        };
+
+        // [1] SSE 即时推
         if (this.sseWriter) {
             this.sseWriter(event);
         }
-        // 不写 EventStore — 不调用 this.runContext.eventStore.append
+
+        // [2] EventBus 广播（不落盘 [3]）
+        void this.runContext.eventBus.publish(runChannel(this.id), streamEvent).catch(err => {
+            this.logger.warn(`EventBus publish failed: ${(err as Error).message}`);
+        });
     }
 
     /**

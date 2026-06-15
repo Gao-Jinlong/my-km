@@ -1,4 +1,5 @@
 import type { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
+import type { EventBus } from '../../event/event-bus';
 import type { RunEventStore } from '../../store/run-event-store';
 import { RunStatus } from '../../types/run.types';
 import type { RunContext } from '../run-context';
@@ -10,13 +11,16 @@ import { RunRecord } from '../run-record';
 function createMockRunContext(overrides?: {
     eventStore?: { append: jest.Mock };
     checkpointer?: { type: string };
+    eventBus?: { publish: jest.Mock };
 }): RunContext {
     const mockES = overrides?.eventStore ?? { append: jest.fn().mockResolvedValue({}) };
     const mockCP = overrides?.checkpointer ?? { type: 'memory' };
+    const mockEB = overrides?.eventBus ?? { publish: jest.fn().mockResolvedValue(undefined) };
 
     return {
         checkpointer: mockCP as unknown as BaseCheckpointSaver,
         eventStore: mockES as unknown as RunEventStore,
+        eventBus: mockEB as unknown as EventBus,
         llmConfig: { provider: 'zhipu', model: 'glm-5' },
     } as RunContext;
 }
@@ -142,6 +146,44 @@ describe('RunRecord', () => {
                 expect.objectContaining({ eventType: 'end' }),
             );
         });
+
+        it('should publish state-boundary events to eventBus with seq + eventType + payload', async () => {
+            const eventBus = { publish: jest.fn().mockResolvedValue(undefined) };
+            const rec = new RunRecord({
+                id: 'r1',
+                threadId: 't1',
+                runContext: createMockRunContext({ eventBus }),
+                snapshot: { content: '' },
+                lastSeq: 10,
+            });
+
+            await rec.emitEvent({ event: 'values', data: { messages: [] } });
+
+            expect(eventBus.publish).toHaveBeenCalledWith('run:r1', {
+                seq: 10,
+                eventType: 'values',
+                payload: { messages: [] },
+            });
+        });
+
+        it('should not block SSE/PG when eventBus.publish rejects', async () => {
+            const eventStore = { append: jest.fn().mockResolvedValue({}) };
+            const eventBus = { publish: jest.fn().mockRejectedValue(new Error('bus down')) };
+            const captured: Array<{ event: string; data: unknown }> = [];
+            const rec = new RunRecord({
+                id: 'r1',
+                threadId: 't1',
+                runContext: createMockRunContext({ eventStore, eventBus }),
+                snapshot: { content: '' },
+            });
+            rec.setSseWriter(e => captured.push(e));
+
+            await expect(rec.emitEvent({ event: 'end', data: {} })).resolves.toBeUndefined();
+            // SSE 仍写
+            expect(captured).toHaveLength(1);
+            // PG 仍写
+            expect(eventStore.append).toHaveBeenCalled();
+        });
     });
 
     describe('finalize', () => {
@@ -220,6 +262,48 @@ describe('RunRecord', () => {
                 expect.objectContaining({ seq: 41 }),
             );
             expect(record.currentSeq).toBe(42);
+        });
+    });
+
+    describe('emitSSEOnly', () => {
+        it('should publish messages events with seq (no PG persist)', async () => {
+            const eventStore = { append: jest.fn().mockResolvedValue({}) };
+            const eventBus = { publish: jest.fn().mockResolvedValue(undefined) };
+            const rec = new RunRecord({
+                id: 'r1',
+                threadId: 't1',
+                runContext: createMockRunContext({ eventStore, eventBus }),
+                snapshot: { content: '' },
+                lastSeq: 5,
+            });
+
+            rec.emitSSEOnly({ event: 'messages', data: { chunk: 'hi' } });
+
+            expect(eventBus.publish).toHaveBeenCalledWith('run:r1', {
+                seq: 5,
+                eventType: 'messages',
+                payload: { chunk: 'hi' },
+            });
+            // messages 不落盘
+            expect(eventStore.append).not.toHaveBeenCalled();
+            // seq 已分配（currentSeq 推进）
+            expect(rec.currentSeq).toBe(6);
+        });
+
+        it('should write to sseWriter when set', () => {
+            const captured: Array<{ event: string; data: unknown }> = [];
+            const rec = new RunRecord({
+                id: 'r1',
+                threadId: 't1',
+                runContext: createMockRunContext(),
+                snapshot: { content: '' },
+            });
+            rec.setSseWriter(e => captured.push(e));
+
+            rec.emitSSEOnly({ event: 'messages', data: { chunk: 'x' } });
+
+            expect(captured).toHaveLength(1);
+            expect(captured[0].event).toBe('messages');
         });
     });
 });
