@@ -67,6 +67,77 @@ Token categories: `color` / `typography` / `spacing` / `radius` / `shadow` / `mo
 3. **Add primitive/pattern**: Verify `design-system.pen` has a matching spec section -> create component in `packages/design-system/src/`
 4. **ADR required** for: new Tier 2 token, new primitive, pattern promotion/demotion, API convention changes
 
+## 编辑 `.pen` 设计稿的布局规范
+
+> 通过 Pencil MCP 修改设计稿时**必须遵守**。违反这些规则会导致坐标偏移、内容被裁切、布局坍塌。
+
+### 核心原则：像组织 HTML 一样组织节点
+
+`.pen` 文件的 frame + flex 布局等价于 HTML 的 `<div>` + CSS flexbox。**用语义化嵌套组织层级，让布局系统自动计算位置——绝不手动写坐标。**
+
+### 必须遵守的规则
+
+| # | 规则 | 原因 |
+|---|------|------|
+| P1 | **用 frame 嵌套组织内容**，绝不把所有元素扁平散落在同一个容器里 | 扁平结构等于把 HTML 全写成 body 的直接子元素，违背语义层级 |
+| P2 | **全程用 flex 布局**（`layout: "vertical"` / `"horizontal"`），禁用 `layout: "none"` 手写坐标 | `layout:"none"` 的绝对定位会出现坐标偏移，难以预测；flex 让布局系统自动计算 |
+| P3 | **尺寸用 `fit_content` / `fill_container`**，绝不用固定像素硬编码子元素宽高（除非固定尺寸的图标/徽章） | 固定像素在内容变化时会溢出或留白；自适应尺寸永远正确 |
+| P4 | **文本用 `textGrowth: "fixed-width"` + `width: "fill_container"`** 实现自动换行 | 不设 `textGrowth` 的宽高会被忽略，长文本溢出容器 |
+| P5 | **`alignItems` 只接受 `start` / `center` / `end`**，不支持 `stretch` | 传 `"stretch"` 会报错并回滚整个操作 |
+| P6 | **新增顶层 frame 时设 `placeholder: true`**，完成后再 `Update(..., {placeholder: false})` | 标记进行中的工作，避免留下半成品 |
+| P7 | **改完每个 section 立即用 `snapshot_layout(problemsOnly: true)` 验证**，有 clip 就地修复 | 堆到最后再查，问题会交叉感染难以定位 |
+
+### 正确的结构示例
+
+新增一个 pattern card 时，按 HTML 语义嵌套：
+
+```
+Pattern Card (frame, vertical, padding, gap)     ← 外层容器，vertical flex
+├── Header (frame, horizontal, gap)              ← 横向排列的 header
+│   ├── Chip (frame, horizontal): dot + label
+│   └── Ownership note (text)
+├── Title (text, fill_container, fixed-width)
+├── Content Row (frame, horizontal, gap)         ← 子区域横向并排
+│   ├── Card A (frame, horizontal, fill_container): icon + info + badge
+│   ├── Card B (frame, horizontal, fill_container)
+│   └── Card C (frame, horizontal, fill_container)
+└── Token Chips (frame, horizontal, gap)
+```
+
+每个 frame 的子元素由 flex 自动定位，**不写任何 `x` / `y`**。
+
+### 反面案例（全部会导致布局坍塌）
+
+```js
+// ❌ 反模式 1：扁平散落，所有元素都是同一容器的直接子元素
+parent = Insert(document, {type:"frame", layout:"none"})
+Insert(parent, {type:"text", x:0, y:0, content:"title"})
+Insert(parent, {type:"text", x:0, y:30, content:"desc"})
+Insert(parent, {type:"frame", x:0, y:60, ...})
+
+// ❌ 反模式 2：layout:"none" + 手写坐标（会出现不可预测的偏移）
+card = Insert(parent, {type:"frame", layout:"none", width:300, height:100})
+Insert(card, {type:"text", x:14, y:14, ...})  // 实际渲染 y 可能变成 64
+
+// ❌ 反模式 3：固定像素宽高容纳动态内容（溢出或留白）
+info = Insert(card, {type:"frame", width:200, height:50, layout:"vertical"})
+Insert(info, {type:"text", content:"很长的文本会溢出..."})
+
+// ✅ 正确：flex 嵌套 + 自适应尺寸
+info = Insert(card, {type:"frame", width:"fill_container", height:"fit_content", layout:"vertical", gap:4})
+Insert(info, {type:"text", textGrowth:"fixed-width", width:"fill_container", content:"自动换行"})
+```
+
+### 父容器注意事项
+
+- 新增的顶层 pattern frame 应插入到对应的 section 容器（如 `03 Product Patterns` 的 `Vvj25`）中，不要直接插到 document 根。
+- 如果父容器是 `layout:"none"`（历史遗留的扁平布局），**不要继承这种模式**——你的新内容内部仍然用 flex 嵌套。新 frame 作为父容器的子元素时，用 `x`/`y` 定位到空闲区域即可（通过 `FindEmptySpace` 查找），但 frame 内部全部用 flex。
+- 完成后扩大父容器 `height` 容纳新内容，避免被 clip。
+
+### 字体注意
+
+Pencil 的 `fontFamily` 不接受带引号的 CSS 字体栈（如 `'SF Mono', monospace`）。mono 字体用 `JetBrains Mono`；sans 字体用 `Inter` 或省略（用 token 变量 `$typography.family.sans` 作为变量引用也不可靠，直接写字体名）。
+
 ## Source of truth
 
 | What | Where |

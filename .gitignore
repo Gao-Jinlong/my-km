@@ -68,3 +68,7 @@ apps/server/prisma/migrations/
 # AI code intelligence tools
 .serena/
 .codegraph/
+.superpowers
+
+# Design file exports (temporary verification screenshots)
+docs/design-system/exports/

@@ -389,13 +389,13 @@
                           "cornerRadius": "$radius.md",
                           "id": "lzPj3",
                           "layoutPosition": "absolute",
-                          "x": 0,
+                          "x": -0.024225163678539857,
                           "y": 0,
                           "name": "Rail Item Home",
                           "rotation": -0.240835035347455,
                           "fill": "$color.bg.tertiary",
-                          "width": 40,
-                          "height": 40
+                          "width": 22.92511726011105,
+                          "height": 16.80582246040918
                         },
                         {
                           "type": "group",
@@ -410,7 +410,7 @@
                               "id": "a4Qra",
                               "layoutPosition": "absolute",
                               "x": 0,
-                              "y": 15,
+                              "y": 6.200169260302652,
                               "name": "Rail Label Home",
                               "fill": "$color.accent.default",
                               "content": "Home",
@@ -422,11 +422,11 @@
                               "type": "icon",
                               "id": "WOAP9",
                               "layoutPosition": "absolute",
-                              "x": 2.5,
+                              "x": 1.4105699370409859,
                               "y": 0,
                               "name": "Home Icon",
-                              "width": 18,
-                              "height": 18,
+                              "width": 10.156103546695096,
+                              "height": 7.440203112363184,
                               "icon": "house",
                               "library": "lucide",
                               "fill": "$color.accent.default"
@@ -727,7 +727,8 @@
                       "width": 190,
                       "content": "Linked to tokens and editor chrome",
                       "fontFamily": "Inter",
-                      "fontSize": 11
+                      "fontSize": 11,
+                      "fontWeight": "normal"
                     }
                   ]
                 },
@@ -881,7 +882,8 @@
                           "width": 560,
                           "content": "A working brief for moving my-km from scattered UI decisions into a design-first system that remains practical for daily writing.",
                           "fontFamily": "Inter",
-                          "fontSize": 14
+                          "fontSize": 14,
+                          "fontWeight": "normal"
                         },
                         {
                           "type": "rectangle",
@@ -922,7 +924,8 @@
                           "width": 520,
                           "content": "Selection state uses editor.selection.bg without overpowering body text.",
                           "fontFamily": "Inter",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         },
                         {
                           "type": "text",
@@ -936,7 +939,8 @@
                           "width": 560,
                           "content": "Product surfaces should feel dense enough for research work but not noisy. Navigation stays compact, editor content gets priority, and assistant context remains visible without taking over the page.",
                           "fontFamily": "Inter",
-                          "fontSize": 14
+                          "fontSize": 14,
+                          "fontWeight": "normal"
                         },
                         {
                           "type": "text",
@@ -948,7 +952,8 @@
                           "fill": "$editor.text.body",
                           "content": "Use",
                           "fontFamily": "Inter",
-                          "fontSize": 14
+                          "fontSize": 14,
+                          "fontWeight": "normal"
                         },
                         {
                           "type": "rectangle",
@@ -985,7 +990,8 @@
                           "fill": "$editor.text.body",
                           "content": "for token references inside prose.",
                           "fontFamily": "Inter",
-                          "fontSize": 14
+                          "fontSize": 14,
+                          "fontWeight": "normal"
                         },
                         {
                           "type": "rectangle",
@@ -1026,7 +1032,8 @@
                           "width": 520,
                           "content": "Implementation note",
                           "fontFamily": "Inter",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         },
                         {
                           "type": "rectangle",
@@ -1271,7 +1278,8 @@
                           "width": 260,
                           "content": "Confidence 84% / 3 linked decisions",
                           "fontFamily": "Inter",
-                          "fontSize": 11
+                          "fontSize": 11,
+                          "fontWeight": "normal"
                         },
                         {
                           "type": "rectangle",
@@ -1985,7 +1993,8 @@
                       "width": "fill_container",
                       "content": "Mode-aware surface roles shown as implementation surfaces instead of a flat token list.",
                       "fontFamily": "Inter",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     }
                   ]
                 },
@@ -2303,7 +2312,8 @@
                           "width": "fill_container",
                           "content": "Viewport and app chrome behind product workspaces.",
                           "fontFamily": "Inter",
-                          "fontSize": 13
+                          "fontSize": 13,
+                          "fontWeight": "normal"
                         }
                       ]
                     }
@@ -2503,7 +2513,8 @@
                           "width": "fill_container",
                           "content": "Primary product shell: navigation, editor frame, and persistent panes.",
                           "fontFamily": "Inter",
-                          "fontSize": 13
+                          "fontSize": 13,
+                          "fontWeight": "normal"
                         }
                       ]
                     }
@@ -2703,7 +2714,8 @@
                           "width": "fill_container",
                           "content": "Dense side panels, inspectors, properties, and settings groups.",
                           "fontFamily": "Inter",
-                          "fontSize": 13
+                          "fontSize": 13,
+                          "fontWeight": "normal"
                         }
                       ]
                     }
@@ -2903,7 +2915,8 @@
                           "width": "fill_container",
                           "content": "Contained records, snippets, and reusable content modules.",
                           "fontFamily": "Inter",
-                          "fontSize": 13
+                          "fontSize": 13,
+                          "fontWeight": "normal"
                         }
                       ]
                     }
@@ -3103,7 +3116,8 @@
                           "width": "fill_container",
                           "content": "Menus, popovers, and command results. Pair with shadow.overlay for elevation.",
                           "fontFamily": "Inter",
-                          "fontSize": 13
+                          "fontSize": 13,
+                          "fontWeight": "normal"
                         }
                       ]
                     }
@@ -3303,7 +3317,8 @@
                           "width": "fill_container",
                           "content": "Focused interruption over scrim, with strongest separation.",
                           "fontFamily": "Inter",
-                          "fontSize": 13
+                          "fontSize": 13,
+                          "fontWeight": "normal"
                         }
                       ]
                     }
@@ -3354,7 +3369,8 @@
                       "width": "fill_container",
                       "content": "Feedback roles stay close to the blue/cyan/teal product palette while preserving state recognition.",
                       "fontFamily": "Inter",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     }
                   ]
                 },
@@ -4799,7 +4815,8 @@
                       "width": "fill_container",
                       "content": "Product copy demonstrates hierarchy for workbench UI, editor content, labels, and token references.",
                       "fontFamily": "Inter",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     }
                   ]
                 },
@@ -4868,7 +4885,8 @@
                           "width": "fill_container",
                           "content": "Use concise body copy for panels, cards, empty states, and editor-adjacent guidance.",
                           "fontFamily": "Inter",
-                          "fontSize": 14
+                          "fontSize": 14,
+                          "fontWeight": "normal"
                         },
                         {
                           "type": "text",
@@ -4879,7 +4897,8 @@
                           "width": "fill_container",
                           "content": "Updated just now by workspace index",
                           "fontFamily": "Inter",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         },
                         {
                           "type": "text",
@@ -4929,7 +4948,8 @@
                           "width": "fill_container",
                           "content": "Context assistant keeps local notes, files, and commands connected without changing the writing surface.",
                           "fontFamily": "Inter",
-                          "fontSize": 14
+                          "fontSize": 14,
+                          "fontWeight": "normal"
                         },
                         {
                           "type": "frame",
@@ -5041,7 +5061,8 @@
                           "width": "fill_container",
                           "content": "Section-level, not marketing scale",
                           "fontFamily": "Inter",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -5091,7 +5112,8 @@
                           "width": "fill_container",
                           "content": "Controls and compact metadata",
                           "fontFamily": "Inter",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -5141,7 +5163,8 @@
                           "width": "fill_container",
                           "content": "Readable product prose",
                           "fontFamily": "Inter",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -5191,7 +5214,8 @@
                           "width": "fill_container",
                           "content": "Secondary context",
                           "fontFamily": "Inter",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -5241,7 +5265,8 @@
                           "width": "fill_container",
                           "content": "Tokens and code",
                           "fontFamily": "Inter",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     }
@@ -5292,7 +5317,8 @@
                       "width": "fill_container",
                       "content": "Foundation values are shown as applied UI decisions, not isolated primitives.",
                       "fontFamily": "Inter",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     }
                   ]
                 },
@@ -5631,7 +5657,8 @@
                                   "width": "fill_container",
                                   "content": "panel elevation",
                                   "fontFamily": "Inter",
-                                  "fontSize": 11
+                                  "fontSize": 11,
+                                  "fontWeight": "normal"
                                 }
                               ]
                             },
@@ -5672,7 +5699,8 @@
                                   "width": "fill_container",
                                   "content": "floating surface",
                                   "fontFamily": "Inter",
-                                  "fontSize": 11
+                                  "fontSize": 11,
+                                  "fontWeight": "normal"
                                 }
                               ]
                             },
@@ -5713,7 +5741,8 @@
                                   "width": "fill_container",
                                   "content": "modal and command layers",
                                   "fontFamily": "Inter",
-                                  "fontSize": 11
+                                  "fontSize": 11,
+                                  "fontWeight": "normal"
                                 }
                               ]
                             }
@@ -6253,7 +6282,8 @@
                               "width": "fill_container",
                               "content": "Focused overlay uses scrim + modal layer separation.",
                               "fontFamily": "Inter",
-                              "fontSize": 12
+                              "fontSize": 12,
+                              "fontWeight": "normal"
                             }
                           ]
                         }
@@ -7170,7 +7200,8 @@
                                   "fill": "$color.fg.primary",
                                   "content": "Product research",
                                   "fontFamily": "Inter",
-                                  "fontSize": 10
+                                  "fontSize": 10,
+                                  "fontWeight": "normal"
                                 }
                               ]
                             },
@@ -7181,7 +7212,8 @@
                               "fill": "$color.feedback.error.fg",
                               "content": "Error message",
                               "fontFamily": "Inter",
-                              "fontSize": 8
+                              "fontSize": 8,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -7378,7 +7410,8 @@
                                   "fill": "$color.fg.primary",
                                   "content": "Product research",
                                   "fontFamily": "Inter",
-                                  "fontSize": 10
+                                  "fontSize": 10,
+                                  "fontWeight": "normal"
                                 }
                               ]
                             },
@@ -7389,7 +7422,8 @@
                               "fill": "$color.feedback.error.fg",
                               "content": "Error message",
                               "fontFamily": "Inter",
-                              "fontSize": 8
+                              "fontSize": 8,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -7586,7 +7620,8 @@
                                   "fill": "$color.fg.primary",
                                   "content": "Note",
                                   "fontFamily": "Inter",
-                                  "fontSize": 10
+                                  "fontSize": 10,
+                                  "fontWeight": "normal"
                                 },
                                 {
                                   "type": "icon",
@@ -7607,7 +7642,8 @@
                               "fill": "$color.fg.muted",
                               "content": "Helper text",
                               "fontFamily": "Inter",
-                              "fontSize": 8
+                              "fontSize": 8,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -8872,7 +8908,8 @@
                                   "fill": "$color.fg.primary",
                                   "content": "Product research",
                                   "fontFamily": "Inter",
-                                  "fontSize": 10
+                                  "fontSize": 10,
+                                  "fontWeight": "normal"
                                 }
                               ]
                             },
@@ -8883,7 +8920,8 @@
                               "fill": "$color.feedback.error.fg",
                               "content": "Error message",
                               "fontFamily": "Inter",
-                              "fontSize": 8
+                              "fontSize": 8,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -9268,7 +9306,8 @@
                                   "fill": "$color.fg.primary",
                                   "content": "Product research",
                                   "fontFamily": "Inter",
-                                  "fontSize": 10
+                                  "fontSize": 10,
+                                  "fontWeight": "normal"
                                 }
                               ]
                             },
@@ -9279,7 +9318,8 @@
                               "fill": "$color.fg.muted",
                               "content": "Helper text",
                               "fontFamily": "Inter",
-                              "fontSize": 8
+                              "fontSize": 8,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -17614,7 +17654,8 @@
                                   "fill": "$color.fg.muted",
                                   "content": "Search actions",
                                   "fontFamily": "Inter",
-                                  "fontSize": 10
+                                  "fontSize": 10,
+                                  "fontWeight": "normal"
                                 }
                               ]
                             },
@@ -17757,7 +17798,8 @@
               "width": 2032,
               "content": "Interaction states shared by primitives. Focus examples use color.border.focus with a simulated shadow.focus-ring token treatment.",
               "fontFamily": "Inter",
-              "fontSize": 12
+              "fontSize": 12,
+              "fontWeight": "normal"
             },
             {
               "type": "text",
@@ -19665,7 +19707,7 @@
       "y": -2700,
       "name": "03 Product Patterns",
       "width": 2000,
-      "height": 2240,
+      "height": 2850,
       "fill": "$color.bg.secondary",
       "stroke": "$color.border.default",
       "strokeWidth": 1,
@@ -19723,7 +19765,8 @@
               "content": "Reusable product-level compositions for editor, AI context, command surfaces, graph inspection, settings, and edge states. Pattern ownership is called out; primitive APIs stay in 02 Components & States.",
               "lineHeight": 1.35,
               "fontFamily": "Inter",
-              "fontSize": 14
+              "fontSize": 14,
+              "fontWeight": "normal"
             },
             {
               "type": "rectangle",
@@ -19884,7 +19927,7 @@
           "id": "Vvj25",
           "name": "Product Patterns Render Canvas",
           "width": 1904,
-          "height": 1830,
+          "height": 2400,
           "fill": "$color.bg.primary",
           "cornerRadius": "$radius.xl",
           "stroke": "$color.border.default",
@@ -19984,7 +20027,8 @@
               "content": "Mini rich-text workbench with toolbar, block selector, floating format menu, and tokenized document surface.",
               "lineHeight": 1.35,
               "fontFamily": "Inter",
-              "fontSize": 12
+              "fontSize": 12,
+              "fontWeight": "normal"
             },
             {
               "type": "rectangle",
@@ -20376,7 +20420,8 @@
               "content": "Capture decisions, unresolved questions, and source-linked follow-ups in a focused editor surface.",
               "lineHeight": 1.35,
               "fontFamily": "Inter",
-              "fontSize": 14
+              "fontSize": 14,
+              "fontWeight": "normal"
             },
             {
               "type": "rectangle",
@@ -20836,7 +20881,8 @@
               "content": "Deep AI panel for cited workspace reasoning, source chips, insight cards, streaming response, and prompt input.",
               "lineHeight": 1.35,
               "fontFamily": "Inter",
-              "fontSize": 12
+              "fontSize": 12,
+              "fontWeight": "normal"
             },
             {
               "type": "rectangle",
@@ -21076,7 +21122,8 @@
               "content": "The selected paragraph references an outdated migration path. Link it to the new bounded-context note before summarizing.",
               "lineHeight": 1.35,
               "fontFamily": "Inter",
-              "fontSize": 12
+              "fontSize": 12,
+              "fontWeight": "normal"
             },
             {
               "type": "rectangle",
@@ -21151,7 +21198,8 @@
               "content": "Ask about this note...",
               "lineHeight": 1.35,
               "fontFamily": "Inter",
-              "fontSize": 12
+              "fontSize": 12,
+              "fontWeight": "normal"
             },
             {
               "type": "icon",
@@ -21372,7 +21420,8 @@
               "content": "Raised command palette overlay with focus ring, grouped commands, visible shortcuts, and selected-row state.",
               "lineHeight": 1.35,
               "fontFamily": "Inter",
-              "fontSize": 12
+              "fontSize": 12,
+              "fontWeight": "normal"
             },
             {
               "type": "rectangle",
@@ -22036,7 +22085,8 @@
               "content": "Compact graph surface with selected cluster and a related-note list, so graph is inspectable rather than ornamental.",
               "lineHeight": 1.35,
               "fontFamily": "Inter",
-              "fontSize": 12
+              "fontSize": 12,
+              "fontWeight": "normal"
             },
             {
               "type": "rectangle",
@@ -22292,7 +22342,8 @@
               "content": "active cluster",
               "lineHeight": 1.35,
               "fontFamily": "Inter",
-              "fontSize": 12
+              "fontSize": 12,
+              "fontWeight": "normal"
             },
             {
               "type": "rectangle",
@@ -22334,7 +22385,8 @@
               "content": "2 hops away",
               "lineHeight": 1.35,
               "fontFamily": "Inter",
-              "fontSize": 12
+              "fontSize": 12,
+              "fontWeight": "normal"
             },
             {
               "type": "rectangle",
@@ -22376,7 +22428,8 @@
               "content": "2 hops away",
               "lineHeight": 1.35,
               "fontFamily": "Inter",
-              "fontSize": 12
+              "fontSize": 12,
+              "fontWeight": "normal"
             },
             {
               "type": "rectangle",
@@ -22585,7 +22638,8 @@
               "content": "Tabbed modal composition with fields, toggles, permission copy, and clear action hierarchy.",
               "lineHeight": 1.35,
               "fontFamily": "Inter",
-              "fontSize": 12
+              "fontSize": 12,
+              "fontWeight": "normal"
             },
             {
               "type": "rectangle",
@@ -23218,7 +23272,8 @@
               "content": "Edge states share primitives and product copy rules so empty, loading, error, and permission surfaces feel related.",
               "lineHeight": 1.35,
               "fontFamily": "Inter",
-              "fontSize": 12
+              "fontSize": 12,
+              "fontWeight": "normal"
             },
             {
               "type": "rectangle",
@@ -23283,7 +23338,8 @@
               "content": "No linked notes yet. Start from a template or import a source.",
               "lineHeight": 1.35,
               "fontFamily": "Inter",
-              "fontSize": 12
+              "fontSize": 12,
+              "fontWeight": "normal"
             },
             {
               "type": "rectangle",
@@ -23401,7 +23457,8 @@
               "content": "Skeleton blocks reserve space while graph context resolves.",
               "lineHeight": 1.35,
               "fontFamily": "Inter",
-              "fontSize": 12
+              "fontSize": 12,
+              "fontWeight": "normal"
             },
             {
               "type": "rectangle",
@@ -23519,7 +23576,8 @@
               "content": "Source failed to sync. Retry keeps the current draft intact.",
               "lineHeight": 1.35,
               "fontFamily": "Inter",
-              "fontSize": 12
+              "fontSize": 12,
+              "fontWeight": "normal"
             },
             {
               "type": "rectangle",
@@ -23637,7 +23695,8 @@
               "content": "Ask an owner for access before AI can cite this note.",
               "lineHeight": 1.35,
               "fontFamily": "Inter",
-              "fontSize": 12
+              "fontSize": 12,
+              "fontWeight": "normal"
             },
             {
               "type": "rectangle",
@@ -23810,7 +23869,7 @@
               "type": "text",
               "id": "R400Er",
               "x": 24,
-              "y": -24,
+              "y": 12,
               "name": "Render Safe Canvas Label",
               "fill": "$color.fg.muted",
               "textGrowth": "fixed-width",
@@ -23825,7 +23884,7 @@
               "type": "text",
               "id": "JfZYO",
               "x": 0,
-              "y": -2,
+              "y": 16,
               "name": "Pattern Row Label",
               "fill": "$color.fg.muted",
               "textGrowth": "fixed-width",
@@ -24048,6 +24107,959 @@
               "fontFamily": "Inter",
               "fontSize": 12,
               "fontWeight": "600"
+            },
+            {
+              "type": "frame",
+              "id": "OZbju",
+              "x": 0,
+              "y": 0,
+              "name": "Tool Call Card Pattern",
+              "width": 920,
+              "fill": "$color.bg.primary",
+              "cornerRadius": "$radius.xl",
+              "stroke": "$color.border.default",
+              "strokeWidth": 1,
+              "layout": "vertical",
+              "gap": 20,
+              "padding": 36,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Y6Yuz",
+                  "name": "Header",
+                  "width": "fill_container",
+                  "gap": 10,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "eeP5v",
+                      "name": "Chip",
+                      "fill": "$color.accent.subtle-bg",
+                      "cornerRadius": "$radius.full",
+                      "stroke": "$color.accent.default",
+                      "strokeWidth": 1,
+                      "gap": 6,
+                      "padding": [
+                        5,
+                        10
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "ellipse",
+                          "id": "qMj8Y",
+                          "name": "Dot",
+                          "fill": "$workspace.accent.default",
+                          "width": 6,
+                          "height": 6
+                        },
+                        {
+                          "type": "text",
+                          "id": "unyuw",
+                          "name": "Label",
+                          "fill": "$color.accent.subtle-fg",
+                          "content": "ai pattern",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "jeWiz",
+                      "name": "Ownership",
+                      "fill": "$color.fg.muted",
+                      "content": "tool_status driven 3-state card",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "uAQgz",
+                  "name": "Title",
+                  "fill": "$color.fg.primary",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "Tool Call Card",
+                  "lineHeight": 1.35,
+                  "fontFamily": "Inter",
+                  "fontSize": 20,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "UO6Jv",
+                  "name": "Description",
+                  "fill": "$color.fg.muted",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "Per tool_call card bound to ToolMessage.additional_kwargs.tool_status. Three states: pending, completed, rejected. Expandable details.",
+                  "lineHeight": 1.5,
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "G3IBd0",
+                  "name": "States Label",
+                  "fill": "$color.fg.muted",
+                  "content": "STATES",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "frame",
+                  "id": "J41QU",
+                  "name": "States Row",
+                  "width": "fill_container",
+                  "gap": 16,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "H3YBOD",
+                      "name": "Pending Card",
+                      "width": "fill_container",
+                      "fill": "$color.feedback.info.bg",
+                      "cornerRadius": "$radius.md",
+                      "stroke": "$color.feedback.info.default",
+                      "strokeWidth": 1,
+                      "gap": 12,
+                      "padding": 14,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "Ij8Sc",
+                          "name": "Icon Box",
+                          "width": 28,
+                          "height": 28,
+                          "fill": "$color.feedback.info.default",
+                          "cornerRadius": "$radius.full",
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "SmiFH",
+                              "name": "Icon",
+                              "width": 16,
+                              "height": 16,
+                              "icon": "loader",
+                              "library": "lucide",
+                              "fill": "$color.fg.on-accent"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "f42H4p",
+                          "name": "Info",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 4,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "Gav1x",
+                              "name": "Tool Name",
+                              "fill": "$color.feedback.info.default",
+                              "content": "search",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "text",
+                              "id": "YKF1k",
+                              "name": "Desc",
+                              "fill": "$color.fg.secondary",
+                              "content": "正在搜索工作区文档",
+                              "lineHeight": 1.35,
+                              "fontFamily": "Inter",
+                              "fontSize": 11
+                            },
+                            {
+                              "type": "text",
+                              "id": "v1ygs",
+                              "name": "Meta",
+                              "fill": "$color.fg.muted",
+                              "content": "query: \"设计系统\"",
+                              "fontFamily": "JetBrains Mono",
+                              "fontSize": 10
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "gSSV0",
+                          "name": "Right",
+                          "layout": "vertical",
+                          "gap": 8,
+                          "alignItems": "end",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "t30PXh",
+                              "name": "Badge",
+                              "fill": "$color.feedback.info.default",
+                              "cornerRadius": "$radius.full",
+                              "padding": [
+                                3,
+                                8
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "vdvaW",
+                                  "name": "Badge Label",
+                                  "fill": "$color.fg.on-accent",
+                                  "content": "PENDING",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 9,
+                                  "fontWeight": "700"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "B4NeU",
+                      "name": "Completed Card",
+                      "width": "fill_container",
+                      "fill": "$color.feedback.success.bg",
+                      "cornerRadius": "$radius.md",
+                      "stroke": "$color.feedback.success.default",
+                      "strokeWidth": 1,
+                      "gap": 12,
+                      "padding": 14,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "o1iTEj",
+                          "name": "Icon Box",
+                          "width": 28,
+                          "height": 28,
+                          "fill": "$color.feedback.success.default",
+                          "cornerRadius": "$radius.full",
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "TthOR",
+                              "name": "Icon",
+                              "width": 16,
+                              "height": 16,
+                              "icon": "check",
+                              "library": "lucide",
+                              "fill": "$color.fg.on-accent"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "C67hp",
+                          "name": "Info",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 4,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "HJ8js",
+                              "name": "Tool Name",
+                              "fill": "$color.feedback.success.default",
+                              "content": "search",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "text",
+                              "id": "jIAYi",
+                              "name": "Desc",
+                              "fill": "$color.fg.secondary",
+                              "content": "找到 3 条相关文档",
+                              "lineHeight": 1.35,
+                              "fontFamily": "Inter",
+                              "fontSize": 11
+                            },
+                            {
+                              "type": "text",
+                              "id": "ne2n1",
+                              "name": "Meta",
+                              "fill": "$color.fg.muted",
+                              "content": "120ms · 3 matches",
+                              "fontFamily": "JetBrains Mono",
+                              "fontSize": 10
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "O8Cewa",
+                          "name": "Right",
+                          "layout": "vertical",
+                          "gap": 8,
+                          "alignItems": "end",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "o5m6JY",
+                              "name": "Badge",
+                              "fill": "$color.feedback.success.default",
+                              "cornerRadius": "$radius.full",
+                              "padding": [
+                                3,
+                                8
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "kVDpi",
+                                  "name": "Badge Label",
+                                  "fill": "$color.fg.on-accent",
+                                  "content": "DONE",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 9,
+                                  "fontWeight": "700"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "icon",
+                              "id": "t6O4P8",
+                              "name": "Chevron",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "chevron-down",
+                              "library": "lucide",
+                              "fill": "$color.fg.muted"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "vlKr1",
+                      "name": "Rejected Card",
+                      "width": "fill_container",
+                      "fill": "$color.feedback.error.bg",
+                      "cornerRadius": "$radius.md",
+                      "stroke": "$color.feedback.error.default",
+                      "strokeWidth": 1,
+                      "gap": 12,
+                      "padding": 14,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "legUX",
+                          "name": "Icon Box",
+                          "width": 28,
+                          "height": 28,
+                          "fill": "$color.feedback.error.default",
+                          "cornerRadius": "$radius.full",
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "H8JRKn",
+                              "name": "Icon",
+                              "width": 16,
+                              "height": 16,
+                              "icon": "x",
+                              "library": "lucide",
+                              "fill": "$color.fg.on-accent"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "XQwFa",
+                          "name": "Info",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 4,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "eBR07",
+                              "name": "Tool Name",
+                              "fill": "$color.feedback.error.default",
+                              "content": "write_file",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "text",
+                              "id": "HkCRI",
+                              "name": "Desc",
+                              "fill": "$color.fg.secondary",
+                              "content": "拒绝写入 notes/a.km",
+                              "lineHeight": 1.35,
+                              "fontFamily": "Inter",
+                              "fontSize": 11
+                            },
+                            {
+                              "type": "text",
+                              "id": "p3E5ba",
+                              "name": "Meta",
+                              "fill": "$color.fg.muted",
+                              "content": "已跳过 · LLM 另寻方案",
+                              "fontFamily": "JetBrains Mono",
+                              "fontSize": 10
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "QnATE",
+                          "name": "Right",
+                          "layout": "vertical",
+                          "gap": 8,
+                          "alignItems": "end",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "W2snp9",
+                              "name": "Badge",
+                              "fill": "$color.feedback.error.default",
+                              "cornerRadius": "$radius.full",
+                              "padding": [
+                                3,
+                                8
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "mkCDi",
+                                  "name": "Badge Label",
+                                  "fill": "$color.fg.on-error",
+                                  "content": "REJECTED",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 9,
+                                  "fontWeight": "700"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "icon",
+                              "id": "v8zaP",
+                              "name": "Chevron",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "chevron-down",
+                              "library": "lucide",
+                              "fill": "$color.fg.muted"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "A4Q74q",
+                  "name": "Completed Expanded",
+                  "width": "fill_container",
+                  "fill": "$color.feedback.success.bg",
+                  "cornerRadius": "$radius.md",
+                  "stroke": "$color.feedback.success.default",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "gap": 12,
+                  "padding": 14,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "Q6I61",
+                      "name": "Exp Header",
+                      "width": "fill_container",
+                      "gap": 12,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "axWyy",
+                          "name": "Icon Box",
+                          "width": 28,
+                          "height": 28,
+                          "fill": "$color.feedback.success.default",
+                          "cornerRadius": "$radius.full",
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "KDjzZ",
+                              "name": "Icon",
+                              "width": 16,
+                              "height": 16,
+                              "icon": "check",
+                              "library": "lucide",
+                              "fill": "$color.fg.on-accent"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "bFgff",
+                          "name": "Info",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 2,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "tycLG",
+                              "name": "Tool Name",
+                              "fill": "$color.feedback.success.default",
+                              "content": "search",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "text",
+                              "id": "m7ql9V",
+                              "name": "Meta",
+                              "fill": "$color.fg.muted",
+                              "content": "120ms · 3 matches",
+                              "fontFamily": "JetBrains Mono",
+                              "fontSize": 10
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "uH7G8",
+                          "name": "Right",
+                          "gap": 8,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "xm83F",
+                              "name": "Badge",
+                              "fill": "$color.feedback.success.default",
+                              "cornerRadius": "$radius.full",
+                              "padding": [
+                                3,
+                                8
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "ZykIL",
+                                  "name": "Badge Label",
+                                  "fill": "$color.fg.on-accent",
+                                  "content": "COMPLETED",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 9,
+                                  "fontWeight": "700"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "icon",
+                              "id": "RzflK",
+                              "name": "Chevron",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "chevron-up",
+                              "library": "lucide",
+                              "fill": "$color.fg.muted"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "iA0Si",
+                      "name": "Divider",
+                      "fill": "$color.feedback.success.default",
+                      "width": "fill_container",
+                      "height": 1
+                    },
+                    {
+                      "type": "text",
+                      "id": "u7dVH",
+                      "name": "Params Label",
+                      "fill": "$color.fg.muted",
+                      "content": "参数",
+                      "fontFamily": "Inter",
+                      "fontSize": 10,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "JNZWW",
+                      "name": "Params Box",
+                      "width": "fill_container",
+                      "fill": "$color.bg.primary",
+                      "cornerRadius": "$radius.sm",
+                      "stroke": "$color.border.subtle",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "gap": 8,
+                      "padding": [
+                        10,
+                        12
+                      ],
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "Az7Ae",
+                          "name": "Param Row",
+                          "width": "fill_container",
+                          "gap": 12,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "M1SL2o",
+                              "name": "Key",
+                              "fill": "$color.fg.muted",
+                              "textGrowth": "fixed-width",
+                              "width": 72,
+                              "content": "查询词",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "text",
+                              "id": "edqX9",
+                              "name": "Value",
+                              "fill": "$color.fg.primary",
+                              "content": "设计系统",
+                              "fontFamily": "Inter",
+                              "fontSize": 11
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "FnBys",
+                          "name": "Param Row",
+                          "width": "fill_container",
+                          "gap": 12,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "a2p3Wr",
+                              "name": "Key",
+                              "fill": "$color.fg.muted",
+                              "textGrowth": "fixed-width",
+                              "width": 72,
+                              "content": "数量上限",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "text",
+                              "id": "szQUV",
+                              "name": "Value",
+                              "fill": "$color.fg.primary",
+                              "content": "5",
+                              "fontFamily": "Inter",
+                              "fontSize": 11
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "RY4hS",
+                      "name": "Results Label",
+                      "fill": "$color.fg.muted",
+                      "content": "结果（3 条）",
+                      "fontFamily": "Inter",
+                      "fontSize": 10,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "O2EpJ9",
+                      "name": "Results Box",
+                      "width": "fill_container",
+                      "fill": "$color.bg.primary",
+                      "cornerRadius": "$radius.sm",
+                      "stroke": "$color.border.subtle",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "gap": 4,
+                      "padding": 6,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "D7vCl",
+                          "name": "Result Row",
+                          "width": "fill_container",
+                          "gap": 10,
+                          "padding": [
+                            4,
+                            6
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "P1pb7",
+                              "name": "Icon",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "file-text",
+                              "library": "lucide",
+                              "fill": "$color.fg.muted"
+                            },
+                            {
+                              "type": "text",
+                              "id": "uVtpM",
+                              "name": "Title",
+                              "fill": "$color.fg.primary",
+                              "content": "Design Tokens",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            },
+                            {
+                              "type": "text",
+                              "id": "OvwXH",
+                              "name": "Path",
+                              "fill": "$color.fg.muted",
+                              "content": "docs/design-system/spec.md",
+                              "fontFamily": "JetBrains Mono",
+                              "fontSize": 10
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "PKwDn",
+                          "name": "Result Row",
+                          "width": "fill_container",
+                          "gap": 10,
+                          "padding": [
+                            4,
+                            6
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "s7VBS",
+                              "name": "Icon",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "file-text",
+                              "library": "lucide",
+                              "fill": "$color.fg.muted"
+                            },
+                            {
+                              "type": "text",
+                              "id": "wAUNs",
+                              "name": "Title",
+                              "fill": "$color.fg.primary",
+                              "content": "ADR-0001 Token Tiering",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            },
+                            {
+                              "type": "text",
+                              "id": "BQozw",
+                              "name": "Path",
+                              "fill": "$color.fg.muted",
+                              "content": "docs/design-system/decisions/0001.md",
+                              "fontFamily": "JetBrains Mono",
+                              "fontSize": 10
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "vFmb2",
+                          "name": "Result Row",
+                          "width": "fill_container",
+                          "gap": 10,
+                          "padding": [
+                            4,
+                            6
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "wD5Xe",
+                              "name": "Icon",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "file-text",
+                              "library": "lucide",
+                              "fill": "$color.fg.muted"
+                            },
+                            {
+                              "type": "text",
+                              "id": "QInDj",
+                              "name": "Title",
+                              "fill": "$color.fg.primary",
+                              "content": "Agent Guide",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            },
+                            {
+                              "type": "text",
+                              "id": "tY8lT",
+                              "name": "Path",
+                              "fill": "$color.fg.muted",
+                              "content": "docs/design-system/agent-guide.md",
+                              "fontFamily": "JetBrains Mono",
+                              "fontSize": 10
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "vHeDL",
+                  "name": "Token Chips",
+                  "width": "fill_container",
+                  "gap": 12,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "X5DHY",
+                      "name": "Chip",
+                      "fill": "$color.bg.secondary",
+                      "cornerRadius": "$radius.full",
+                      "stroke": "$color.border.default",
+                      "strokeWidth": 1,
+                      "gap": 6,
+                      "padding": [
+                        5,
+                        10
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "ellipse",
+                          "id": "PVewv",
+                          "name": "Dot",
+                          "fill": "$color.accent.default",
+                          "width": 6,
+                          "height": 6
+                        },
+                        {
+                          "type": "text",
+                          "id": "wgHlu",
+                          "name": "Label",
+                          "fill": "$color.fg.secondary",
+                          "content": "feedback.info",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "blsFl",
+                      "name": "Chip",
+                      "fill": "$color.bg.secondary",
+                      "cornerRadius": "$radius.full",
+                      "stroke": "$color.border.default",
+                      "strokeWidth": 1,
+                      "gap": 6,
+                      "padding": [
+                        5,
+                        10
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "ellipse",
+                          "id": "R8LMgK",
+                          "name": "Dot",
+                          "fill": "$color.accent.default",
+                          "width": 6,
+                          "height": 6
+                        },
+                        {
+                          "type": "text",
+                          "id": "u2QBar",
+                          "name": "Label",
+                          "fill": "$color.fg.secondary",
+                          "content": "feedback.success",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Cq2vp",
+                      "name": "Chip",
+                      "fill": "$color.bg.secondary",
+                      "cornerRadius": "$radius.full",
+                      "stroke": "$color.border.default",
+                      "strokeWidth": 1,
+                      "gap": 6,
+                      "padding": [
+                        5,
+                        10
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "ellipse",
+                          "id": "Md4tp",
+                          "name": "Dot",
+                          "fill": "$color.accent.default",
+                          "width": 6,
+                          "height": 6
+                        },
+                        {
+                          "type": "text",
+                          "id": "aFKlo",
+                          "name": "Label",
+                          "fill": "$color.fg.secondary",
+                          "content": "feedback.error",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
             }
           ]
         }
