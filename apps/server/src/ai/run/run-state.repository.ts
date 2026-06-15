@@ -6,7 +6,7 @@
  */
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import type { RunRow } from './lease.types';
+import type { LeaseResult, RunRow } from './lease.types';
 
 const ACTIVE_STATUSES = ['pending', 'running', 'interrupted'];
 
@@ -79,5 +79,31 @@ export class RunStateRepository {
 
     async updateLastSeq(runId: string, lastSeq: number): Promise<void> {
         await this.prisma.run.update({ where: { id: runId }, data: { lastSeq } });
+    }
+
+    async acquireLease(runId: string, replicaId: string, ttlMs = 30_000): Promise<LeaseResult> {
+        const leaseUntil = new Date(Date.now() + ttlMs);
+        const result = await this.prisma.run.updateMany({
+            where: {
+                id: runId,
+                OR: [{ ownerId: null }, { ownerId: replicaId }, { leaseUntil: { lt: new Date() } }],
+            },
+            data: { ownerId: replicaId, leaseUntil },
+        });
+        if (result.count === 0) {
+            const current = await this.prisma.run.findUnique({
+                where: { id: runId },
+                select: { ownerId: true, leaseUntil: true },
+            });
+            return {
+                acquired: false,
+                run: null,
+                conflict: current
+                    ? { ownerId: current.ownerId, leaseUntil: current.leaseUntil }
+                    : null,
+            };
+        }
+        const run = await this.prisma.run.findUnique({ where: { id: runId } });
+        return { acquired: true, run, conflict: null };
     }
 }

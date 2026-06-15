@@ -123,4 +123,71 @@ describe('RunStateRepository', () => {
             });
         });
     });
+
+    describe('acquireLease', () => {
+        beforeEach(() => {
+            jest.spyOn(Date, 'now').mockReturnValue(1000000);
+        });
+        afterEach(() => {
+            (Date.now as unknown as jest.Mock).mockRestore();
+        });
+
+        it('acquires when ownerId is null', async () => {
+            (prisma.run.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+            (prisma.run.findUnique as jest.Mock).mockResolvedValue({ id: 'r1', ownerId: 'A' });
+
+            const result = await repo.acquireLease('r1', 'A');
+
+            expect(result.acquired).toBe(true);
+            if (result.acquired) expect(result.run.id).toBe('r1');
+            const where = (prisma.run.updateMany as jest.Mock).mock.calls[0][0].where;
+            expect(where.OR).toEqual([
+                { ownerId: null },
+                { ownerId: 'A' },
+                { leaseUntil: { lt: expect.any(Date) } },
+            ]);
+        });
+
+        it('re-acquires when same replica already owns', async () => {
+            (prisma.run.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+            (prisma.run.findUnique as jest.Mock).mockResolvedValue({ id: 'r1', ownerId: 'A' });
+
+            const result = await repo.acquireLease('r1', 'A');
+            expect(result.acquired).toBe(true);
+        });
+
+        it('acquires when lease expired (other owner stale)', async () => {
+            (prisma.run.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+            (prisma.run.findUnique as jest.Mock).mockResolvedValue({ id: 'r1', ownerId: 'B' });
+
+            const result = await repo.acquireLease('r1', 'A');
+            expect(result.acquired).toBe(true);
+        });
+
+        it('denies when another live owner holds lease', async () => {
+            (prisma.run.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+            (prisma.run.findUnique as jest.Mock).mockResolvedValue({
+                id: 'r1',
+                ownerId: 'B',
+                leaseUntil: new Date(2000000),
+            });
+
+            const result = await repo.acquireLease('r1', 'A');
+
+            expect(result.acquired).toBe(false);
+            if (!result.acquired) {
+                expect(result.conflict?.ownerId).toBe('B');
+            }
+        });
+
+        it('denies with null conflict when run missing', async () => {
+            (prisma.run.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+            (prisma.run.findUnique as jest.Mock).mockResolvedValue(null);
+
+            const result = await repo.acquireLease('missing', 'A');
+
+            expect(result.acquired).toBe(false);
+            if (!result.acquired) expect(result.conflict).toBeNull();
+        });
+    });
 });
