@@ -203,6 +203,14 @@ export class EnvConfig implements OnModuleInit {
         return `redis://${this.redisHost}:${this.redisPort}/${this.redisDb}`;
     }
 
+    /**
+     * AI 事件总线模式（spec 6.3）。
+     * 任何非 'redis' 值一律降级为 'in-process'（本地开发不依赖 Redis）。
+     */
+    get eventBusMode(): 'in-process' | 'redis' {
+        return this.config.AI_EVENT_BUS === 'redis' ? 'redis' : 'in-process';
+    }
+
     get cacheTtl(): number {
         return this.config.CACHE_TTL || 300; // 默认 5 分钟
     }

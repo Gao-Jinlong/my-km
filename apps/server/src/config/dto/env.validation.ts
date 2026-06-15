@@ -292,4 +292,14 @@ export class EnvironmentVariables {
     @IsString()
     @IsOptional()
     CACHE_KEY_PREFIX?: string;
+
+    /**
+     * AI 事件总线模式
+     * - in-process：单进程降级（默认，本地开发不依赖 Redis）
+     * - redis：多副本，跨副本事件分发（spec 6.3）
+     * @default in-process
+     */
+    @IsString()
+    @IsOptional()
+    AI_EVENT_BUS?: string;
 }
