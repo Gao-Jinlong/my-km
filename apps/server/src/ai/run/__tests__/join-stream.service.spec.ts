@@ -35,17 +35,15 @@ function mockRunStateRepo(run: RunRow | null) {
 /** 构造 mock RunEventStore，replay 返回指定事件列表（prisma RunEvent 形状） */
 function mockEventStore(events: Array<{ seq: number; eventType: string; payload: unknown }>) {
     return {
-        replay: jest
-            .fn()
-            .mockResolvedValue(
-                events.map(e => ({
-                    runId: 'r1',
-                    threadId: 't1',
-                    ...e,
-                    eventName: '',
-                    createdAt: new Date(),
-                })),
-            ),
+        replay: jest.fn().mockResolvedValue(
+            events.map(e => ({
+                runId: 'r1',
+                threadId: 't1',
+                ...e,
+                eventName: '',
+                createdAt: new Date(),
+            })),
+        ),
     } as unknown as RunEventStore;
 }
 
@@ -124,5 +122,22 @@ describe('JoinStreamService — terminal replay', () => {
         expect(sink.closed).toBe(true);
         // cleanup 幂等安全（已 close，再调不抛）
         expect(() => cleanup()).not.toThrow();
+    });
+
+    it('closes a cancelled run with no end/error event via the defensive close', async () => {
+        const run = { id: 'r1', status: 'cancelled' } as RunRow;
+        const events = [{ seq: 1, eventType: 'tasks', payload: {} }];
+        const service = new JoinStreamService(
+            eventBus,
+            mockRunStateRepo(run),
+            mockEventStore(events),
+        );
+        const sink = collectorSink();
+
+        const cleanup = await service.joinStream('r1', 0, sink);
+
+        expect(sink.events).toEqual([{ seq: 1, eventType: 'tasks', payload: {} }]);
+        expect(sink.closed).toBe(true); // defensive close（replay 无 end/error，靠循环后的 close()）
+        expect(typeof cleanup).toBe('function');
     });
 });
