@@ -191,6 +191,22 @@ export class AiChatService {
         });
         const langgraphCtx = trace.setSpan(otelContext.active(), langgraphSpan);
 
+        const heartbeatOnce = async () => {
+            try {
+                const alive = await this.runStateRepo.heartbeat(record.id, this.replicaId);
+                if (!alive) {
+                    this.logger.warn(`Lost lease for run ${record.id}, aborting`);
+                    record.abort();
+                }
+            } catch (err) {
+                this.logger.warn(`heartbeat error: ${(err as Error).message}`);
+            }
+        };
+        await heartbeatOnce();
+        const heartbeatTimer = setInterval(() => {
+            void heartbeatOnce();
+        }, 10_000);
+
         try {
             await otelContext.with(langgraphCtx, async () => {
                 // 1. metadata 事件（附加 traceId 给前端）
@@ -354,9 +370,16 @@ export class AiChatService {
                 data: { error: 'execution_error', message: (error as Error).message },
             });
         } finally {
+            clearInterval(heartbeatTimer);
             langgraphSpan.end();
             await this.runManager.finalize(record.id);
             await record.runContext.eventStore.flushRun(record.id);
+            await this.runStateRepo.updateLastSeq(record.id, record.currentSeq);
+            try {
+                await this.runStateRepo.releaseLease(record.id, this.replicaId);
+            } catch (err) {
+                this.logger.warn(`releaseLease error: ${(err as Error).message}`);
+            }
         }
     }
 

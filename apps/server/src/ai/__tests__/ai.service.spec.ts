@@ -838,6 +838,20 @@ describe('AiChatService', () => {
             expect(record.status).toBe(RunStatus.Completed);
         });
 
+        it('should heartbeat during execution and write lastSeq on completion', async () => {
+            const record = await service.startRun({ content: 'Hi', threadId: 't1' });
+            const capture = createEventCapture();
+            record.setSseWriter(capture.sseWriter);
+
+            await service.executeRunProtocol(record);
+
+            const repo = (service as unknown as { __runStateRepo: Record<string, jest.Mock> })
+                .__runStateRepo;
+            expect(repo.heartbeat).toHaveBeenCalledWith(record.id, 'replica-test');
+            expect(repo.updateLastSeq).toHaveBeenCalledWith(record.id, record.currentSeq);
+            expect(repo.releaseLease).toHaveBeenCalledWith(record.id, 'replica-test');
+        });
+
         it('should NOT inject SystemMessage when no editor context', async () => {
             const record = await service.startRun({ content: 'Hello', threadId: 't1' });
 
