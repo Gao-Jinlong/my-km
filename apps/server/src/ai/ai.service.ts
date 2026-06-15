@@ -37,6 +37,8 @@ import { frontendTools } from './tools/tool-definitions';
 import { type MultitaskStrategy, RunStatus } from './types/run.types';
 import { formatEditorContext } from './utils/format-editor-context';
 
+const HEARTBEAT_INTERVAL_MS = 10_000;
+
 export interface StartRunOpts {
     content: string;
     threadId?: string;
@@ -199,13 +201,13 @@ export class AiChatService {
                     record.abort();
                 }
             } catch (err) {
-                this.logger.warn(`heartbeat error: ${(err as Error).message}`);
+                this.logger.warn(`heartbeat error for run ${record.id}: ${(err as Error).message}`);
             }
         };
         await heartbeatOnce();
         const heartbeatTimer = setInterval(() => {
             void heartbeatOnce();
-        }, 10_000);
+        }, HEARTBEAT_INTERVAL_MS);
 
         try {
             await otelContext.with(langgraphCtx, async () => {
@@ -374,11 +376,20 @@ export class AiChatService {
             langgraphSpan.end();
             await this.runManager.finalize(record.id);
             await record.runContext.eventStore.flushRun(record.id);
-            await this.runStateRepo.updateLastSeq(record.id, record.currentSeq);
+            try {
+                // currentSeq is next-to-allocate (cursor), not max-written. Persist it as the resume cursor.
+                await this.runStateRepo.updateLastSeq(record.id, record.currentSeq);
+            } catch (err) {
+                this.logger.warn(
+                    `updateLastSeq error for run ${record.id}: ${(err as Error).message}`,
+                );
+            }
             try {
                 await this.runStateRepo.releaseLease(record.id, this.replicaId);
             } catch (err) {
-                this.logger.warn(`releaseLease error: ${(err as Error).message}`);
+                this.logger.warn(
+                    `releaseLease error for run ${record.id}: ${(err as Error).message}`,
+                );
             }
         }
     }

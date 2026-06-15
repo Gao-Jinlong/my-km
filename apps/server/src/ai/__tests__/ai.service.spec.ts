@@ -874,6 +874,56 @@ describe('AiChatService', () => {
 
             expect(record.status).toBe(RunStatus.Completed);
         });
+
+        it('should still release lease when updateLastSeq fails', async () => {
+            const record = await service.startRun({ content: 'Hi', threadId: 't1' });
+            const capture = createEventCapture();
+            record.setSseWriter(capture.sseWriter);
+            const repo = (service as unknown as { __runStateRepo: Record<string, jest.Mock> })
+                .__runStateRepo;
+            repo.updateLastSeq.mockRejectedValueOnce(new Error('seq write failed'));
+            const warnSpy = jest
+                .spyOn((service as unknown as { logger: { warn: jest.Mock } }).logger, 'warn')
+                .mockImplementation(() => undefined);
+
+            await expect(service.executeRunProtocol(record)).resolves.not.toThrow();
+
+            expect(repo.releaseLease).toHaveBeenCalledWith(record.id, 'replica-test');
+            expect(warnSpy).toHaveBeenCalledWith(
+                expect.stringContaining('updateLastSeq error for run'),
+            );
+        });
+
+        it('should warn but not throw when releaseLease fails', async () => {
+            const record = await service.startRun({ content: 'Hi', threadId: 't1' });
+            const capture = createEventCapture();
+            record.setSseWriter(capture.sseWriter);
+            const repo = (service as unknown as { __runStateRepo: Record<string, jest.Mock> })
+                .__runStateRepo;
+            repo.releaseLease.mockRejectedValueOnce(new Error('release failed'));
+            const warnSpy = jest
+                .spyOn((service as unknown as { logger: { warn: jest.Mock } }).logger, 'warn')
+                .mockImplementation(() => undefined);
+
+            await expect(service.executeRunProtocol(record)).resolves.not.toThrow();
+
+            expect(warnSpy).toHaveBeenCalledWith(
+                expect.stringContaining('releaseLease error for run'),
+            );
+        });
+
+        it('should abort and mark cancelled when heartbeat reports lost lease', async () => {
+            const repo = (service as unknown as { __runStateRepo: Record<string, jest.Mock> })
+                .__runStateRepo;
+            repo.heartbeat.mockResolvedValueOnce(false);
+            const record = await service.startRun({ content: 'Hi', threadId: 't1' });
+            const capture = createEventCapture();
+            record.setSseWriter(capture.sseWriter);
+
+            await service.executeRunProtocol(record);
+
+            expect(record.status).toBe(RunStatus.Cancelled);
+        });
     });
 
     describe('cancel', () => {
