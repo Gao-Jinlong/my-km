@@ -14,7 +14,7 @@ import { RunStatus } from '../types/run.types';
 import type { LeaseResult, RunRow } from './lease.types';
 import type { RunContext } from './run-context';
 import { type RunExecutionSnapshot, RunRecord } from './run-record';
-import { RunStateRepository } from './run-state.repository';
+import { DEFAULT_LEASE_TTL_MS, RunStateRepository } from './run-state.repository';
 
 const ACTIVE_STATUSES: RunStatus[] = [RunStatus.Pending, RunStatus.Running, RunStatus.Interrupted];
 
@@ -56,11 +56,13 @@ export class RunManager {
                 requestContext: snapshot.requestContext ?? null,
                 llmConfig: runContext.llmConfig,
                 ownerId: opts.replicaId,
-                leaseUntil: new Date(Date.now() + 30_000),
+                leaseUntil: new Date(Date.now() + DEFAULT_LEASE_TTL_MS),
                 traceId: opts.traceId ?? null,
             });
         } catch (err) {
+            this.runs.delete(id);
             this.logger.error(`Failed to persist Run ${id}: ${(err as Error).message}`);
+            throw err;
         }
 
         this.logger.log(`Run created: ${id} for thread: ${threadId}`);
@@ -90,9 +92,11 @@ export class RunManager {
         tokenUsage?: { promptTokens: number; completionTokens: number; totalTokens: number },
     ): Promise<void> {
         const record = this.runs.get(runId);
-        const usage =
-            tokenUsage ??
-            (record ? record.finalize() : { promptTokens: 0, completionTokens: 0, totalTokens: 0 });
+        const usage = tokenUsage ?? record?.finalize();
+        if (!usage) {
+            this.logger.warn(`Cannot finalize Run ${runId}: no token usage source`);
+            return;
+        }
         try {
             await this.runStateRepo.updateTokenUsage(runId, usage);
         } catch (err) {

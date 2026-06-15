@@ -100,6 +100,34 @@ describe('RunManager', () => {
         it('returns undefined for unknown run ID', () => {
             expect(manager.getRun('nonexistent')).toBeUndefined();
         });
+
+        it('asserts leaseUntil is a future Date', async () => {
+            const ctx = createMockRunContext();
+            await manager.createRun('thread-1', ctx, { content: 'test' }, { replicaId: 'A' });
+            const createArg = (runStateRepo.createRun as jest.Mock).mock.calls[0][0];
+            expect(createArg.leaseUntil).toBeInstanceOf(Date);
+            expect(createArg.leaseUntil.getTime()).toBeGreaterThan(Date.now());
+        });
+
+        it('removes memory cache and rethrows when persistence fails', async () => {
+            const randomUUIDSpy = jest
+                .spyOn(crypto, 'randomUUID')
+                .mockReturnValue(
+                    'run-failed' as `${string}-${string}-${string}-${string}-${string}`,
+                );
+            try {
+                (runStateRepo.createRun as jest.Mock).mockRejectedValueOnce(new Error('DB down'));
+
+                const ctx = createMockRunContext();
+                await expect(
+                    manager.createRun('thread-1', ctx, { content: 'test' }, { replicaId: 'A' }),
+                ).rejects.toThrow('DB down');
+
+                expect(manager.getRun('run-failed')).toBeUndefined();
+            } finally {
+                randomUUIDSpy.mockRestore();
+            }
+        });
     });
 
     describe('getActiveRunByThread (delegated to PG)', () => {
@@ -128,6 +156,26 @@ describe('RunManager', () => {
             });
             manager.adoptRun(record);
             expect(manager.getRun('recovered-1')).toBe(record);
+        });
+    });
+
+    describe('finalize', () => {
+        it('writes provided token usage even when run is not in memory', async () => {
+            await manager.finalize('missing-run', {
+                promptTokens: 1,
+                completionTokens: 2,
+                totalTokens: 3,
+            });
+            expect(runStateRepo.updateTokenUsage).toHaveBeenCalledWith('missing-run', {
+                promptTokens: 1,
+                completionTokens: 2,
+                totalTokens: 3,
+            });
+        });
+
+        it('does not write zero token usage when no record and no usage provided', async () => {
+            await manager.finalize('missing-run');
+            expect(runStateRepo.updateTokenUsage).not.toHaveBeenCalled();
         });
     });
 

@@ -11,7 +11,7 @@ import type { LeaseResult, RunRow } from './lease.types';
 const ACTIVE_STATUSES = ['pending', 'running', 'interrupted'];
 
 /** 默认租约 TTL（spec 2.4：30s 租约）—— acquireLease 与 heartbeat 共用 */
-const DEFAULT_LEASE_TTL_MS = 30_000;
+export const DEFAULT_LEASE_TTL_MS = 30_000;
 
 export interface CreateRunInput {
     id: string;
