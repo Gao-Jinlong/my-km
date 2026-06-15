@@ -454,6 +454,70 @@ describe('AiChatService', () => {
             expect(r2).toBeDefined();
             expect(r2.id).not.toBe(r1.id);
         });
+
+        it('should abort active run for "rollback" strategy when owned by this replica', async () => {
+            const r1 = await service.startRun({ content: 'First', threadId: 't1' });
+            await runManager.setStatus(r1.id, RunStatus.Running);
+            const abortSpy = jest.spyOn(r1, 'abort');
+
+            const r2 = await service.startRun({
+                content: 'Second',
+                threadId: 't1',
+                multitaskStrategy: 'rollback',
+            });
+
+            expect(abortSpy).toHaveBeenCalled();
+            expect(r2).toBeDefined();
+            expect(r2.id).not.toBe(r1.id);
+        });
+
+        it('should reject and warn for cross-replica "interrupt" strategy', async () => {
+            const loggerSpy = jest
+                .spyOn((service as unknown as { logger: { warn: jest.Mock } }).logger, 'warn')
+                .mockImplementation(() => undefined);
+            (runManager.getActiveRunByThread as jest.Mock).mockResolvedValueOnce({
+                id: 'remote-run',
+                threadId: 't1',
+                status: 'running',
+                ownerId: 'replica-other',
+            });
+
+            await expect(
+                service.startRun({
+                    content: 'Second',
+                    threadId: 't1',
+                    multitaskStrategy: 'interrupt',
+                }),
+            ).rejects.toThrow(ConflictException);
+
+            expect(loggerSpy).toHaveBeenCalledWith(
+                expect.stringContaining('cannot abort cross-replica run remote-run'),
+            );
+        });
+
+        it('should reject and warn for cross-replica "rollback" strategy', async () => {
+            const loggerSpy = jest
+                .spyOn((service as unknown as { logger: { warn: jest.Mock } }).logger, 'warn')
+                .mockImplementation(() => undefined);
+            (runManager.getActiveRunByThread as jest.Mock).mockResolvedValueOnce({
+                id: 'remote-run',
+                threadId: 't1',
+                status: 'running',
+                ownerId: 'replica-other',
+            });
+
+            await expect(
+                service.startRun({
+                    content: 'Second',
+                    threadId: 't1',
+                    multitaskStrategy: 'rollback',
+                }),
+            ).rejects.toThrow(ConflictException);
+
+            expect(loggerSpy).toHaveBeenCalledWith(
+                expect.stringContaining('cannot abort cross-replica run remote-run'),
+            );
+        });
     });
 
     describe('resumeFromCommand', () => {
