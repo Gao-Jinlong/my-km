@@ -201,5 +201,25 @@ describe('RunRecord', () => {
             record.setLastSeq(99);
             expect(record.currentSeq).toBe(99);
         });
+
+        it('uses currentSeq as the next seq allocated by emitEvent', async () => {
+            const eventStore = { append: jest.fn().mockResolvedValue({}) };
+            const record = new RunRecord({
+                id: 'r1',
+                threadId: 't1',
+                runContext: createMockRunContext({ eventStore }),
+                snapshot: { content: '' },
+                lastSeq: 41,
+            });
+
+            await record.emitEvent({ event: 'values', data: { messages: [] } });
+
+            expect(eventStore.append).toHaveBeenCalledWith(
+                'r1',
+                't1',
+                expect.objectContaining({ seq: 41 }),
+            );
+            expect(record.currentSeq).toBe(42);
+        });
     });
 });

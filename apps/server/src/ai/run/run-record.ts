@@ -102,12 +102,12 @@ export class RunRecord {
         return this._pendingResume;
     }
 
-    /** 当前已分配的最大 seq（执行结束回写 Run.lastSeq） */
+    /** 当前下一次将分配的 seq（next-to-allocate）。emitEvent 使用后置自增写入此值后再 +1。 */
     get currentSeq(): number {
         return this.seq;
     }
 
-    /** 重置 seq 起点（resume 路径从 RunRow.lastSeq 锚定） */
+    /** 重置下一次将分配的 seq（resume 路径从 RunRow.lastSeq 锚定）。 */
     setLastSeq(seq: number): void {
         this.seq = seq;
     }
