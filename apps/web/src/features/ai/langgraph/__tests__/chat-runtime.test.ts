@@ -323,4 +323,66 @@ describe('LangGraphChatRuntime', () => {
         await runtime.sendMessage('Hi');
         expect(runtime.getSnapshot().lastSeq).toBe(5);
     });
+
+    it('openThread: no active run → loading → ready', async () => {
+        const client: LangGraphRuntimeClient = {
+            threads: {
+                create: vi.fn(),
+                getState: vi.fn(async () => ({
+                    values: { messages: [{ id: 'h-1', type: 'human', content: 'old' }] },
+                })),
+            },
+            runs: {
+                stream: async function* () {},
+                joinStream: async function* () {},
+                list: vi.fn(async () => [{ id: 'run-old', status: 'completed' }]),
+                cancel: vi.fn(),
+            },
+        };
+        const runtime = new LangGraphChatRuntime({ client, toolExecutor: { dispatch: vi.fn() } });
+
+        await runtime.openThread('thread-1');
+
+        expect(client.threads.getState).toHaveBeenCalledWith('thread-1');
+        expect(client.runs.list).toHaveBeenCalledWith('thread-1');
+        expect(runtime.getSnapshot().messages).toEqual([
+            expect.objectContaining({ id: 'h-1', content: 'old' }),
+        ]);
+        expect(runtime.getSnapshot().connectionPhase).toBe('ready');
+        expect(runtime.getSnapshot().threadId).toBe('thread-1');
+    });
+
+    it('openThread: active running run → joinStream since=0 → streaming', async () => {
+        const joinEvents = [
+            { event: 'metadata', data: { run_id: 'run-live', thread_id: 'thread-1' }, seq: 0 },
+            {
+                event: 'values',
+                data: { messages: [{ id: 'ai-1', type: 'ai', content: 'live' }] },
+                seq: 2,
+            },
+        ];
+        const client: LangGraphRuntimeClient = {
+            threads: {
+                create: vi.fn(),
+                getState: vi.fn(async () => ({ values: { messages: [] } })),
+            },
+            runs: {
+                stream: async function* () {},
+                joinStream: vi.fn(async function* () {
+                    for (const e of joinEvents) yield e;
+                }),
+                list: vi.fn(async () => [{ id: 'run-live', status: 'running' }]),
+                cancel: vi.fn(),
+            },
+        };
+        const runtime = new LangGraphChatRuntime({ client, toolExecutor: { dispatch: vi.fn() } });
+
+        await runtime.openThread('thread-1');
+
+        expect(client.runs.joinStream).toHaveBeenCalledWith('thread-1', 'run-live', 0);
+        expect(runtime.getSnapshot().runId).toBe('run-live');
+        expect(runtime.getSnapshot().lastSeq).toBe(2);
+        // joinStream 流结束（无 end 事件）→ 终态落 ready
+        expect(runtime.getSnapshot().connectionPhase).toBe('ready');
+    });
 });

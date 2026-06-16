@@ -65,12 +65,28 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
         this.currentAbortController?.abort();
         this.handledToolCallIds.clear();
         this.snapshot = { ...EMPTY_SNAPSHOT };
-        this.updateSnapshot({ threadId });
+        this.updateSnapshot({
+            threadId,
+            connectionPhase: 'loading',
+        });
 
+        // [1] 读 checkpoint，渲染历史消息（spec 5.3）
         const state = await this.client.threads.getState?.(threadId);
         const messages = state?.values?.messages;
         if (Array.isArray(messages)) {
             this.setMessages(messages);
+        }
+
+        // [2] 查活跃 run（status ∈ {running, interrupted}）
+        const runs = await this.client.runs.list(threadId);
+        const active = runs.find(r => r.status === 'running' || r.status === 'interrupted');
+
+        // [3] 有活跃 run → joinStream?since=0 回放+续实时；无 → ready
+        if (active) {
+            this.updateSnapshot({ runId: active.id });
+            await this.joinActiveStream(threadId, active.id, 0);
+        } else {
+            this.setPhase('ready');
         }
     }
 
@@ -170,6 +186,22 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
             if (this.currentAbortController === abortController) {
                 this.currentAbortController = null;
             }
+        }
+    }
+
+    /**
+     * 消费 joinStream（openThread 三段式 / 自动重连）。沿用 handleStreamEvent 处理事件 +
+     * trackSeq。流结束（无 end 事件，如 run 已终止或 SSE close）→ finishRun 落 ready。
+     * 流抛错（网络断）→ 重抛交由调用方（重连逻辑，Task 8）处理。
+     */
+    private async joinActiveStream(threadId: string, runId: string, since: number): Promise<void> {
+        this.setPhase('streaming');
+        const stream = this.client.runs.joinStream(threadId, runId, since);
+        for await (const event of stream) {
+            await this.handleStreamEvent(event);
+        }
+        if (this.snapshot.connectionPhase === 'streaming') {
+            this.finishRun();
         }
     }
 
