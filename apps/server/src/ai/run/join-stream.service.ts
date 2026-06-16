@@ -6,6 +6,7 @@ import {
     runChannel,
 } from '../event/event-bus';
 import { RunEventStore } from '../store/run-event-store';
+import type { RunRow } from './lease.types';
 import type { RunEventSink } from './run-event-sink';
 import { RunStateRepository } from './run-state.repository';
 
@@ -37,11 +38,20 @@ export class JoinStreamService {
         private readonly eventStore: RunEventStore,
     ) {}
 
-    async joinStream(runId: string, since: number, sink: RunEventSink): Promise<() => void> {
+    /**
+     * 查 Run 行，不存在抛 NotFoundException。
+     * 供 controller 在 flush SSE headers 前判 404（spec 3.5 Step 1）。
+     */
+    async lookupRun(runId: string): Promise<RunRow> {
         const run = await this.runStateRepo.findById(runId);
         if (!run) {
             throw new NotFoundException(`Run not found: ${runId}`);
         }
+        return run;
+    }
+
+    async joinStream(runId: string, since: number, sink: RunEventSink): Promise<() => void> {
+        const run = await this.lookupRun(runId);
 
         const isTerminal = TERMINAL_STATUSES.includes(run.status);
 

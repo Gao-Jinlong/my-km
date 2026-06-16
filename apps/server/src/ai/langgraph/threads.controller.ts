@@ -288,6 +288,24 @@ export class ThreadsController {
         const since = Number.parseInt(sinceParam ?? '0', 10);
         const safeSince = Number.isFinite(since) && since >= 0 ? since : 0;
 
+        // 先校验 run 存在：404 必须在 SSE headers flush 前（spec 3.5 Step 1）
+        try {
+            await this.joinStreamService.lookupRun(runId);
+        } catch (error) {
+            if (!res.writableEnded) {
+                if (error instanceof NotFoundException) {
+                    res.status(404).json({ error: 'not_found', message: (error as Error).message });
+                } else {
+                    this.logger.error(`joinStream lookup failed: ${(error as Error).message}`);
+                    res.status(500).json({
+                        error: 'execution_error',
+                        message: (error as Error).message,
+                    });
+                }
+            }
+            return;
+        }
+
         this.setSseHeaders(res);
 
         const sink: RunEventSink = {
@@ -309,13 +327,8 @@ export class ThreadsController {
             cleanup = await this.joinStreamService.joinStream(runId, safeSince, sink);
         } catch (error) {
             if (!res.writableEnded) {
-                // NotFoundException → 404；其他 → SSE error 事件
-                if (error instanceof NotFoundException) {
-                    res.status(404).json({ error: 'not_found', message: (error as Error).message });
-                } else {
-                    this.logger.error(`joinStream failed: ${(error as Error).message}`);
-                    this.sendProtocolError(res, 'execution_error', (error as Error).message);
-                }
+                this.logger.error(`joinStream failed: ${(error as Error).message}`);
+                this.sendProtocolError(res, 'execution_error', (error as Error).message);
             }
         }
     }

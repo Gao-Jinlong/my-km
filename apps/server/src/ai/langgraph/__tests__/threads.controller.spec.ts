@@ -117,6 +117,7 @@ describe('ThreadsController', () => {
 
         mockJoinStreamService = {
             joinStream: jest.fn().mockResolvedValue(jest.fn()),
+            lookupRun: jest.fn().mockResolvedValue({ id: 'r1', status: 'running' }),
         } as unknown as jest.Mocked<JoinStreamService>;
 
         controller = new ThreadsController(
@@ -395,16 +396,20 @@ describe('ThreadsController', () => {
             );
         });
 
-        it('maps NotFoundException to 404 JSON before stream starts', async () => {
+        it('maps NotFoundException to 404 JSON before stream starts (before SSE headers flush)', async () => {
             const { res } = createMockResponse();
-            mockJoinStreamService.joinStream.mockRejectedValueOnce(
+            mockJoinStreamService.lookupRun.mockRejectedValueOnce(
                 new NotFoundException('Run not found: run-1'),
             );
 
             await controller.joinStream('thread-1', 'run-1', undefined, res);
 
+            expect(mockJoinStreamService.lookupRun).toHaveBeenCalledWith('run-1');
+            expect(mockJoinStreamService.joinStream).not.toHaveBeenCalled();
             expect(res.status).toHaveBeenCalledWith(404);
             expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: 'not_found' }));
+            // 404 必须发生在 SSE headers flush 前（spec 3.5 Step 1 回归守卫）
+            expect(res.flushHeaders).not.toHaveBeenCalled();
             // SSE error path NOT taken
             expect(res.write).not.toHaveBeenCalled();
         });
