@@ -18,9 +18,16 @@ export interface ParsedSSEEvent {
 }
 
 export async function* fetchSSE(url: string, init: RequestInit): AsyncGenerator<ParsedSSEEvent> {
+    const headers = new Headers({ Accept: 'text/event-stream' });
+    if (init.headers) {
+        // 规范化调用者 headers（Headers 实例 / plain object / array 均可），调用者优先覆盖默认 Accept。
+        for (const [key, value] of new Headers(init.headers)) {
+            headers.set(key, value);
+        }
+    }
     const res = await fetch(url, {
         ...init,
-        headers: { Accept: 'text/event-stream', ...(init.headers ?? {}) },
+        headers,
     });
     if (!res.ok || !res.body) {
         throw new Error(`SSE request failed: ${res.status}`);

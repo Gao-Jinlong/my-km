@@ -76,9 +76,38 @@ describe('fetchSSE', () => {
             'http://x',
             expect.objectContaining({
                 method: 'POST',
-                headers: expect.objectContaining({ Accept: 'text/event-stream' }),
+                // headers 现为 Headers 实例（规范化），其 own props 不可直接 objectContaining，
+                // 故取第 2 参数的 headers 经 .get 验证 Accept 透传。
+                headers: expect.any(Headers),
                 signal: ac.signal,
             }),
         );
+        expect((fetchSpy.mock.calls[0][1] as RequestInit).headers as Headers).toBeInstanceOf(
+            Headers,
+        );
+        expect(((fetchSpy.mock.calls[0][1] as RequestInit).headers as Headers).get('Accept')).toBe(
+            'text/event-stream',
+        );
+    });
+
+    it('handles multi-byte chars split across chunks', async () => {
+        const encoder = new TextEncoder();
+        const full = encoder.encode('event: values\ndata: {"msg":"你好"}\n\n');
+        // 在中间切开（可能切断多字节序列）
+        const mid = Math.floor(full.length / 2);
+        vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+            ok: true,
+            status: 200,
+            body: new ReadableStream<Uint8Array>({
+                start(c) {
+                    c.enqueue(full.slice(0, mid));
+                    c.enqueue(full.slice(mid));
+                    c.close();
+                },
+            }),
+        } as Response);
+        const events = [];
+        for await (const e of fetchSSE('http://x', {})) events.push(e);
+        expect(events).toEqual([{ event: 'values', data: { msg: '你好' }, seq: undefined }]);
     });
 });
