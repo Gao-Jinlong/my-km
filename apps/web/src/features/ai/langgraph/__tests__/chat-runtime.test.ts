@@ -612,4 +612,51 @@ describe('LangGraphChatRuntime', () => {
         ]);
         expect(snapshot.lastSeq).toBe(7);
     });
+
+    it('enters paused phase during tool interrupt and returns to streaming on resume', async () => {
+        const dispatch = vi.fn(async () => ({ success: true }));
+        const client = createClient([
+            [
+                { event: 'metadata', data: { run_id: 'run-1', thread_id: 'thread-1' } },
+                {
+                    event: 'tasks',
+                    data: {
+                        id: 'task-1',
+                        name: 'tools',
+                        input: {},
+                        triggers: [],
+                        interrupts: [
+                            {
+                                id: 'i-1',
+                                value: {
+                                    tool_call_id: 'tc-1',
+                                    tool_name: 'file_ops',
+                                    args: { operation: 'create', path: 'a.km' },
+                                },
+                            },
+                        ],
+                    },
+                },
+            ],
+            [
+                { event: 'metadata', data: { run_id: 'run-2', thread_id: 'thread-1' } },
+                {
+                    event: 'values',
+                    data: { messages: [{ id: 'ai-2', type: 'ai', content: 'Done' }] },
+                },
+                { event: 'end', data: {} },
+            ],
+        ]);
+        const runtime = new LangGraphChatRuntime({ client, toolExecutor: { dispatch } });
+
+        const phases: string[] = [];
+        const sub = runtime.subscribe(() => phases.push(runtime.getSnapshot().connectionPhase));
+
+        await runtime.sendMessage('Create note');
+
+        expect(phases).toContain('paused');
+        expect(phases).toContain('streaming');
+        expect(runtime.getSnapshot().connectionPhase).toBe('ready');
+        sub.dispose();
+    });
 });

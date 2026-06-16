@@ -370,7 +370,8 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
             return;
         }
         this.handledToolCallIds.add(interrupt.toolCallId);
-        this.updateSnapshot({ interrupt });
+        // spec 5.2：interrupt 期间 phase=paused（标记，保持 auto-dispatch；5.6 派生留 P4）
+        this.updateSnapshot({ interrupt, connectionPhase: 'paused' });
 
         const result = await this.toolExecutor.dispatch(interrupt.toolName, interrupt.input);
         await this.resumeWithToolResult(interrupt.toolCallId, result);
