@@ -19,11 +19,14 @@
 import type { Response } from 'express';
 
 /**
- * 将事件编码为 SSE 文本格式并写入 Response
+ * 写一条 SSE 事件。seq（per-run 单调递增，spec 3.4/3.5）作为 SSE 标准 `id:` 行透传，
+ * 供前端 joinStream/断线重连做 since=lastSeq 去重锚。seq 省略时不写 id 行
+ * （向后兼容 writeMetadata/writeEnd/writeError 等无 seq 的内部调用）。
  */
-export function writeSSE(res: Response, event: string, data: unknown): void {
+export function writeSSE(res: Response, event: string, data: unknown, seq?: number): void {
     if (!res.writableEnded) {
-        res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+        const idLine = seq !== undefined ? `id: ${seq}\n` : '';
+        res.write(`event: ${event}\n${idLine}data: ${JSON.stringify(data)}\n\n`);
     }
 }
 
