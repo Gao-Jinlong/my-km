@@ -101,11 +101,13 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
     }
 
     async stop(): Promise<void> {
-        this.currentAbortController?.abort();
+        // spec 3.7：只调 cancel，不 abort 本地 fetch、不立即清 isStreaming。
+        // 后端 cancel → abort → 写 end{finish_reason:'cancelled'} 并关 SSE，
+        // runStream 的 for await 收到流结束 → finally 落定 isStreaming=false。
+        // 本地 abort 仅保留 unmount（dispose）场景。
         if (this.snapshot.threadId && this.snapshot.runId) {
             await this.client.runs.cancel(this.snapshot.threadId, this.snapshot.runId, false);
         }
-        this.updateSnapshot({ isStreaming: false, interrupt: null });
     }
 
     dispose(): void {

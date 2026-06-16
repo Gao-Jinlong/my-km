@@ -24,6 +24,38 @@ function createClient(streams: LangGraphStreamEvent[][]): LangGraphRuntimeClient
     };
 }
 
+/**
+ * 可控 SSE 流：push 入队事件，close 结束生成器。用于测试 stop() 时 runStream 处于
+ * 进行中（stream 未结束）的场景 —— 固定数组的 streamOf 会立刻结束，无法测中途回调。
+ */
+function controllableStream() {
+    const queue: LangGraphStreamEvent[] = [];
+    const waiters: Array<() => void> = [];
+    let closed = false;
+    async function* gen(): AsyncGenerator<LangGraphStreamEvent> {
+        for (;;) {
+            while (queue.length > 0) {
+                yield queue.shift() as LangGraphStreamEvent;
+            }
+            if (closed) return;
+            await new Promise<void>(resolve => waiters.push(resolve));
+        }
+    }
+    return {
+        gen,
+        push(event: LangGraphStreamEvent) {
+            queue.push(event);
+            const waiter = waiters.shift();
+            if (waiter) waiter();
+        },
+        close() {
+            closed = true;
+            const waiter = waiters.shift();
+            if (waiter) waiter();
+        },
+    };
+}
+
 describe('LangGraphChatRuntime', () => {
     it('returns the same snapshot reference until runtime state changes', async () => {
         const client = createClient([
@@ -188,5 +220,47 @@ describe('LangGraphChatRuntime', () => {
 
         expect(dispatch).toHaveBeenCalledTimes(1);
         expect(client.runs.stream).toHaveBeenCalledTimes(2);
+    });
+
+    it('stop() posts cancel without aborting the fetch and waits for the SSE terminal', async () => {
+        const cs = controllableStream();
+        const client: LangGraphRuntimeClient = {
+            threads: {
+                create: vi.fn(async () => ({ thread_id: 'thread-1' })),
+                getState: vi.fn(),
+            },
+            runs: {
+                stream: vi.fn(() => cs.gen()),
+                cancel: vi.fn(async () => {}),
+            },
+        };
+        const runtime = new LangGraphChatRuntime({
+            client,
+            toolExecutor: { dispatch: vi.fn() },
+        });
+
+        // 启动 runStream（不 await —— stream pending，runStream 仍在 for await）
+        const runPromise = runtime.sendMessage('Hello');
+        cs.push({ event: 'metadata', data: { run_id: 'run-1', thread_id: 'thread-1' } });
+        cs.push({
+            event: 'values',
+            data: { messages: [{ id: 'ai-1', type: 'ai', content: 'Hi' }] },
+        });
+
+        // 等 runStream 进入 streaming 态
+        await vi.waitFor(() => expect(runtime.getSnapshot().isStreaming).toBe(true));
+        expect(runtime.getSnapshot().runId).toBe('run-1');
+
+        // stop()：spec 3.7 —— 只调 cancel，不 abort、不立即清 isStreaming
+        await runtime.stop();
+        expect(client.runs.cancel).toHaveBeenCalledWith('thread-1', 'run-1', false);
+        expect(runtime.getSnapshot().isStreaming).toBe(true); // 仍 streaming，等 SSE 终态
+
+        // SSE 推 end{cancelled} 并关闭流 → runStream finally 落定 isStreaming=false
+        cs.push({ event: 'end', data: { finish_reason: 'cancelled' } });
+        cs.close();
+        await vi.waitFor(() => expect(runtime.getSnapshot().isStreaming).toBe(false));
+
+        await runPromise; // stream 结束，runStream resolve
     });
 });
