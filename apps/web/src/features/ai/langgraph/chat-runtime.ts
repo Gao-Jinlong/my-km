@@ -3,6 +3,7 @@ import type { IDisposable } from '@/base/common/lifecycle';
 import type { ConfirmationRequest } from '@/features/ai/tools/types';
 import { extractTaskInterrupts, projectMessages } from './message-projection';
 import type {
+    ConnectionPhase,
     LangGraphChatRuntimeApi,
     LangGraphChatRuntimeOptions,
     LangGraphChatSnapshot,
@@ -22,6 +23,8 @@ const EMPTY_SNAPSHOT: LangGraphChatSnapshot = {
     threadId: null,
     runId: null,
     interrupt: null,
+    connectionPhase: 'idle',
+    lastSeq: 0,
 };
 
 export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
@@ -135,7 +138,8 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
     ): Promise<void> {
         const abortController = new AbortController();
         this.currentAbortController = abortController;
-        this.updateSnapshot({ isStreaming: true, error: null });
+        this.setPhase('streaming');
+        this.updateSnapshot({ error: null });
 
         try {
             const stream = this.client.runs.stream(threadId, this.assistantId, {
@@ -147,21 +151,27 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
             for await (const event of stream) {
                 await this.handleStreamEvent(event);
             }
+            if (this.snapshot.connectionPhase === 'streaming') {
+                this.finishRun();
+            }
         } catch (error) {
             if (!abortController.signal.aborted) {
                 this.updateSnapshot({
                     error: error instanceof Error ? error.message : String(error),
                 });
             }
+            if (this.snapshot.connectionPhase !== 'paused') {
+                this.finishRun();
+            }
         } finally {
             if (this.currentAbortController === abortController) {
                 this.currentAbortController = null;
             }
-            this.updateSnapshot({ isStreaming: false, interrupt: null });
         }
     }
 
     private async handleStreamEvent(event: LangGraphStreamEvent): Promise<void> {
+        this.trackSeq(event.seq);
         switch (event.event) {
             case 'metadata':
                 this.handleMetadata(event.data);
@@ -181,6 +191,10 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
                 return;
             case 'error':
                 this.handleProtocolError(event.data);
+                this.finishRun();
+                return;
+            case 'end':
+                this.finishRun();
                 return;
             default:
                 return;
@@ -275,18 +289,39 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
     }
 
     private updateSnapshot(patch: Partial<LangGraphChatSnapshot>): void {
+        const nextPhase = patch.connectionPhase ?? this.snapshot.connectionPhase;
         const nextMessages = patch.messages ?? this.snapshot.messages;
-        const nextIsStreaming = patch.isStreaming ?? this.snapshot.isStreaming;
+        const nextLastSeq = patch.lastSeq ?? this.snapshot.lastSeq;
+        const nextIsStreaming =
+            patch.isStreaming ?? (nextPhase === 'streaming' || nextPhase === 'reconnecting');
         this.snapshot = {
             ...this.snapshot,
             ...patch,
+            connectionPhase: nextPhase,
+            lastSeq: nextLastSeq,
             messages: nextMessages,
+            isStreaming: nextIsStreaming,
             isLastMessageStreaming:
                 nextIsStreaming &&
                 nextMessages.length > 0 &&
                 nextMessages[nextMessages.length - 1].role === 'ai',
         };
         this._onDidChange.fire();
+    }
+
+    private setPhase(phase: ConnectionPhase): void {
+        this.updateSnapshot({ connectionPhase: phase });
+    }
+
+    /** 记录入站事件的 seq（单调取大），作为重连 since 锚（spec 5.3/5.4） */
+    private trackSeq(seq: number | undefined): void {
+        if (seq !== undefined && seq > this.snapshot.lastSeq) {
+            this.updateSnapshot({ lastSeq: seq });
+        }
+    }
+
+    private finishRun(): void {
+        this.updateSnapshot({ connectionPhase: 'ready', interrupt: null });
     }
 }
 

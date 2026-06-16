@@ -19,6 +19,8 @@ function createClient(streams: LangGraphStreamEvent[][]): LangGraphRuntimeClient
                 const events = streams.shift() ?? [];
                 return streamOf(events);
             }),
+            joinStream: vi.fn(() => streamOf([])),
+            list: vi.fn(async () => []),
             cancel: vi.fn(),
         },
     };
@@ -231,6 +233,8 @@ describe('LangGraphChatRuntime', () => {
             },
             runs: {
                 stream: vi.fn(() => cs.gen()),
+                joinStream: vi.fn(() => streamOf([])),
+                list: vi.fn(async () => []),
                 cancel: vi.fn(async () => {}),
             },
         };
@@ -262,5 +266,61 @@ describe('LangGraphChatRuntime', () => {
         await vi.waitFor(() => expect(runtime.getSnapshot().isStreaming).toBe(false));
 
         await runPromise; // stream 结束，runStream resolve
+    });
+
+    it('tracks connectionPhase: ready → streaming → ready through runStream', async () => {
+        const cs = controllableStream();
+        const client: LangGraphRuntimeClient = {
+            threads: {
+                create: vi.fn(async () => ({ thread_id: 'thread-1' })),
+                getState: vi.fn(),
+            },
+            runs: {
+                stream: vi.fn(() => cs.gen()),
+                joinStream: vi.fn(() => streamOf([])),
+                list: vi.fn(async () => []),
+                cancel: vi.fn(async () => {}),
+            },
+        };
+        const runtime = new LangGraphChatRuntime({ client, toolExecutor: { dispatch: vi.fn() } });
+
+        expect(runtime.getSnapshot().connectionPhase).toBe('idle');
+        expect(runtime.getSnapshot().lastSeq).toBe(0);
+
+        const promise = runtime.sendMessage('Hi');
+        cs.push({ event: 'metadata', data: { run_id: 'run-1', thread_id: 'thread-1' } });
+        cs.push({
+            event: 'values',
+            data: { messages: [{ id: 'ai-1', type: 'ai', content: 'Hi' }] },
+        });
+
+        await vi.waitFor(() => expect(runtime.getSnapshot().connectionPhase).toBe('streaming'));
+        expect(runtime.getSnapshot().isStreaming).toBe(true);
+
+        cs.push({ event: 'end', data: {} });
+        cs.close();
+        await promise;
+
+        expect(runtime.getSnapshot().connectionPhase).toBe('ready');
+        expect(runtime.getSnapshot().isStreaming).toBe(false);
+    });
+
+    it('updates lastSeq from inbound events carrying seq', async () => {
+        const client: LangGraphRuntimeClient = {
+            threads: { create: vi.fn(async () => ({ thread_id: 'thread-1' })), getState: vi.fn() },
+            runs: {
+                stream: async function* () {
+                    yield { event: 'metadata', data: { run_id: 'run-1' }, seq: 0 };
+                    yield { event: 'values', data: { messages: [] }, seq: 3 };
+                    yield { event: 'end', data: {}, seq: 5 };
+                },
+                joinStream: async function* () {},
+                list: vi.fn(async () => []),
+                cancel: vi.fn(async () => {}),
+            },
+        };
+        const runtime = new LangGraphChatRuntime({ client, toolExecutor: { dispatch: vi.fn() } });
+        await runtime.sendMessage('Hi');
+        expect(runtime.getSnapshot().lastSeq).toBe(5);
     });
 });
