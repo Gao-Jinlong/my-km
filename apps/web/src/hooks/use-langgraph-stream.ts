@@ -5,6 +5,12 @@ import type {
     LangGraphChatMessage,
     LangGraphChatRuntimeApi,
     LangGraphChatSnapshot,
+    LangGraphConnectionAtom,
+    LangGraphErrorAtom,
+    LangGraphInterruptStateAtom,
+    LangGraphMessagesAtom,
+    LangGraphRunStateAtom,
+    LangGraphThreadMetaAtom,
     LangGraphToolInterrupt,
 } from '@/features/ai/langgraph/types';
 import type { ConfirmationRequest } from '@/features/ai/tools/types';
@@ -20,17 +26,35 @@ export interface UseLangGraphStreamReturn extends LangGraphChatSnapshot {
     onConfirmationRequest?: Event<ConfirmationRequest>;
 }
 
-const SERVER_SNAPSHOT: LangGraphChatSnapshot = {
-    messages: [],
-    isStreaming: false,
-    isLastMessageStreaming: false,
-    error: null,
-    threadId: null,
-    runId: null,
-    interrupt: null,
-    connectionPhase: 'idle',
-    lastSeq: 0,
-};
+/**
+ * spec 5.5: 精确订阅 hook，只订阅需要的 atom，避免无效重渲染。
+ * 组件可以根据自己需要的数据选择对应的 selector。
+ */
+export function useLangGraphAtom<T>(
+    runtime: LangGraphChatRuntimeApi,
+    selector: (snapshot: LangGraphChatSnapshot) => T,
+    serverSnapshot: T,
+): T {
+    const getSnapshot = () => selector(runtime.getSnapshot());
+
+    return useSyncExternalStore(
+        listener => {
+            // 兼容模式：使用全局 subscribe（所有 atom 变化都触发）
+            // 真正的精确订阅需要每个 atom 独立的 useSyncExternalStore 调用
+            const subscription = runtime.subscribe(listener);
+            return () => subscription.dispose();
+        },
+        getSnapshot,
+        () => serverSnapshot,
+    );
+}
+
+const SERVER_MESSAGES_ATOM: LangGraphMessagesAtom = { messages: [], lastSeq: 0 };
+const SERVER_CONNECTION_ATOM: LangGraphConnectionAtom = { phase: 'idle' };
+const SERVER_ERROR_ATOM: LangGraphErrorAtom = { error: null };
+const SERVER_THREAD_META_ATOM: LangGraphThreadMetaAtom = { threadId: null };
+const SERVER_RUN_STATE_ATOM: LangGraphRunStateAtom = { runId: null };
+const SERVER_INTERRUPT_ATOM: LangGraphInterruptStateAtom = { interrupt: null };
 
 export function useLangGraphStream(
     runtimeFactory: () => LangGraphChatRuntimeApi = createDefaultLangGraphChatRuntime,
@@ -41,26 +65,101 @@ export function useLangGraphStream(
     }
 
     const runtime = runtimeRef.current;
-    const snapshot = useSyncExternalStore(
+
+    // spec 5.5: 独立订阅每个 atom，精确触发重渲染
+    const messagesState = useSyncExternalStore(
         listener => {
-            const subscription = runtime.subscribe(listener);
+            const subscription = runtime.subscribeMessages(listener);
             return () => subscription.dispose();
         },
-        () => runtime.getSnapshot(),
-        () => SERVER_SNAPSHOT,
+        () => ({
+            messages: runtime.getSnapshot().messages,
+            lastSeq: runtime.getSnapshot().lastSeq,
+        }),
+        () => SERVER_MESSAGES_ATOM,
+    );
+
+    const connectionState = useSyncExternalStore(
+        listener => {
+            const subscription = runtime.subscribeConnection(listener);
+            return () => subscription.dispose();
+        },
+        () => ({ phase: runtime.getSnapshot().connectionPhase }),
+        () => SERVER_CONNECTION_ATOM,
+    );
+
+    const errorState = useSyncExternalStore(
+        listener => {
+            const subscription = runtime.subscribeError(listener);
+            return () => subscription.dispose();
+        },
+        () => ({ error: runtime.getSnapshot().error }),
+        () => SERVER_ERROR_ATOM,
+    );
+
+    const threadMetaState = useSyncExternalStore(
+        listener => {
+            const subscription = runtime.subscribeThreadMeta(listener);
+            return () => subscription.dispose();
+        },
+        () => ({ threadId: runtime.getSnapshot().threadId }),
+        () => SERVER_THREAD_META_ATOM,
+    );
+
+    const runStateState = useSyncExternalStore(
+        listener => {
+            const subscription = runtime.subscribeRunState(listener);
+            return () => subscription.dispose();
+        },
+        () => ({ runId: runtime.getSnapshot().runId }),
+        () => SERVER_RUN_STATE_ATOM,
+    );
+
+    const interruptState = useSyncExternalStore(
+        listener => {
+            const subscription = runtime.subscribeInterruptState(listener);
+            return () => subscription.dispose();
+        },
+        () => ({ interrupt: runtime.getSnapshot().interrupt }),
+        () => SERVER_INTERRUPT_ATOM,
     );
 
     useEffect(() => () => runtime.dispose(), [runtime]);
 
+    // 派生状态
+    const isStreaming =
+        connectionState.phase === 'streaming' || connectionState.phase === 'reconnecting';
+    const isLastMessageStreaming =
+        isStreaming &&
+        messagesState.messages.length > 0 &&
+        messagesState.messages[messagesState.messages.length - 1].role === 'ai';
+
     return useMemo(
         () => ({
-            ...snapshot,
+            ...messagesState,
+            ...connectionState,
+            ...errorState,
+            ...threadMetaState,
+            ...runStateState,
+            ...interruptState,
+            isStreaming,
+            isLastMessageStreaming,
             openThread: runtime.openThread.bind(runtime),
             sendMessage: runtime.sendMessage.bind(runtime),
             resumeWithToolResult: runtime.resumeWithToolResult.bind(runtime),
             stop: runtime.stop.bind(runtime),
             onConfirmationRequest: runtime.onConfirmationRequest,
         }),
-        [snapshot, runtime],
+        [
+            messagesState,
+            connectionState,
+            errorState,
+            threadMetaState,
+            runStateState,
+            interruptState,
+            isStreaming,
+            isLastMessageStreaming,
+            runtime,
+        ],
     );
 }

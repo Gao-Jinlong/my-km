@@ -27,6 +27,8 @@ describe('LangGraph message projection', () => {
                 content: 'Hello',
                 toolCalls: undefined,
                 toolCallId: undefined,
+                toolStatus: undefined,
+                toolName: undefined,
             },
             {
                 id: 'ai-1',
@@ -34,6 +36,8 @@ describe('LangGraph message projection', () => {
                 content: 'Reading...',
                 toolCalls: [{ id: 'tc-1', name: 'doc_read' }],
                 toolCallId: undefined,
+                toolStatus: undefined,
+                toolName: 'doc_read',
             },
             {
                 id: 'tool-1',
@@ -41,6 +45,8 @@ describe('LangGraph message projection', () => {
                 content: 'ok',
                 toolCalls: undefined,
                 toolCallId: 'tc-1',
+                toolStatus: undefined,
+                toolName: undefined,
             },
         ]);
     });

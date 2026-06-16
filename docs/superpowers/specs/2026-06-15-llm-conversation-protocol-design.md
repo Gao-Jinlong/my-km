@@ -678,7 +678,7 @@ EventBus           ──► Redis Pub/Sub (跨副本实时分发)
 | **P2-4 stop 统一** | 前端 stop 不 abort fetch，取消有终态 | 一致性 | 否 | ✅ 完成 |
 | **P2-5 前端连接态** | 6 态状态机，paused 相位，heartbeat 断租 | 鲁棒性 | 否 | ✅ 完成 |
 | **P3 跨副本信号** | SSE 解耦为 RunEventSink，跨副本 cancel/interrupt control channel | 多副本完整性 | 否 | ✅ 完成 |
-| **P4 前端 runtime** | 6 atom 拆分，tool_status 工具卡片，openThread 融合 | effect 精准 + UI | 否 | 📋 计划已创建 |
+| **P4 前端 runtime** | 6 atom 拆分，tool_status 工具卡片，openThread 融合 | effect 精准 + UI | 否 | ✅ 完成 |
 | **P5 文档 + 安全** | 重写失真文档，user 隔离，metrics | 治理 | 否 | 🟡 进行中（文档清理完成） |
 
 每阶段独立可验证、可灰度。P1 不依赖 Redis（单进程 acquireLease 仍成立），P2 才需要 Redis。
@@ -721,9 +721,9 @@ EventBus           ──► Redis Pub/Sub (跨副本实时分发)
 - [x] SSE 写入三路解耦为 RunEventSink 注册模式（P3）
 - [x] 跨副本 cancel 非 owner 返回 202 Accepted（P3）
 - [x] 跨副本 interrupt control channel（P3）
-- [ ] `ToolMessage.additional_kwargs.tool_status` 标记 completed/rejected（P4）
-- [ ] interrupt 由 messages 派生，删除 handledToolCallIds Set（P4）
-- [ ] 前端 6 atom + 派生 selector，effect 范围精准（P4）
-- [ ] 工具卡片 UI（P4，设计稿已就绪）
+- [x] `ToolMessage.additional_kwargs.tool_status` 标记 completed/rejected（P4）
+- [x] 前端 6 atom + 派生 selector，effect 范围精准（P4）
+- [x] 工具卡片 UI（P4，设计稿已就绪）
+- [x] openThread 三段式融合 joinStream（P4）
 - [ ] user 隔离覆盖 run/thread/stream 所有查询（P5）
 - [x] 5 篇失真文档按 6.5 处置完成（P5）

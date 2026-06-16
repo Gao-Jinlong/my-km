@@ -10,6 +10,40 @@ export type ConnectionPhase =
     | 'paused'
     | 'reconnecting';
 
+/**
+ * spec 5.5：6 个独立 atom，每个有自己的 Emitter
+ */
+export interface LangGraphMessagesAtom {
+    messages: LangGraphChatMessage[];
+    lastSeq: number;
+}
+
+export interface LangGraphConnectionAtom {
+    phase: ConnectionPhase;
+}
+
+export interface LangGraphErrorAtom {
+    error: string | null;
+}
+
+export interface LangGraphThreadMetaAtom {
+    threadId: string | null;
+}
+
+export interface LangGraphRunStateAtom {
+    runId: string | null;
+}
+
+export interface LangGraphInterruptStateAtom {
+    interrupt: LangGraphToolInterrupt | null;
+}
+
+/** 派生 selector 结果（供 hook 使用） */
+export interface LangGraphDerivedState {
+    isStreaming: boolean; // phase === 'streaming' || 'reconnecting'
+    isLastMessageStreaming: boolean;
+}
+
 /** runs.list 返回的 run 摘要(后端 RunDto 子集,前端只关心 id + status) */
 export interface LangGraphRunSummary {
     id: string;
@@ -32,6 +66,10 @@ export interface LangGraphChatMessage {
     content: string;
     toolCalls?: Array<{ id: string; name: string }>;
     toolCallId?: string;
+    /** spec 5.6: 工具调用状态，由 additional_kwargs.tool_status 派生 */
+    toolStatus?: 'pending' | 'completed' | 'rejected';
+    /** 工具名称（用于 ToolCallCard 显示） */
+    toolName?: string;
 }
 
 export interface LangGraphToolInterrupt {
@@ -116,7 +154,15 @@ export interface LangGraphChatRuntimeOptions {
 export interface LangGraphChatRuntimeApi {
     readonly onConfirmationRequest?: Event<ConfirmationRequest>;
     getSnapshot(): LangGraphChatSnapshot;
+    /** 旧版全局订阅（保留向后兼容） */
     subscribe(listener: () => void): IDisposable;
+    /** spec 5.5：per-atom 精确订阅 */
+    subscribeMessages(listener: (state: LangGraphMessagesAtom) => void): IDisposable;
+    subscribeConnection(listener: (state: LangGraphConnectionAtom) => void): IDisposable;
+    subscribeError(listener: (state: LangGraphErrorAtom) => void): IDisposable;
+    subscribeThreadMeta(listener: (state: LangGraphThreadMetaAtom) => void): IDisposable;
+    subscribeRunState(listener: (state: LangGraphRunStateAtom) => void): IDisposable;
+    subscribeInterruptState(listener: (state: LangGraphInterruptStateAtom) => void): IDisposable;
     openThread(threadId: string): Promise<void>;
     sendMessage(content: string, context?: Record<string, unknown>): Promise<void>;
     resumeWithToolResult(toolCallId: string, result: unknown): Promise<void>;
