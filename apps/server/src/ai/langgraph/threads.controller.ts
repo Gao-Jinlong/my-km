@@ -241,9 +241,9 @@ export class ThreadsController {
                 });
             }
 
-            // 桥接 writeSSE → record.emitEvent，使 SSE 事件同时写入 EventStore
-            record.setSseWriter(event => {
-                writeSSE(res, event.event, event.data);
+            // 桥接 writeSSE → record.emitEvent，使 SSE 事件同时写入 EventStore；透传 seq 写 id: 行
+            record.setSseWriter(sseEvent => {
+                writeSSE(res, sseEvent.event, sseEvent.data, sseEvent.seq);
             });
 
             await this.aiService.executeRunProtocol(record);
@@ -310,7 +310,7 @@ export class ThreadsController {
 
         const sink: RunEventSink = {
             push: (event: RunStreamEvent) => {
-                writeSSE(res, event.eventType, event.payload);
+                writeSSE(res, event.eventType, event.payload, event.seq);
             },
             close: () => {
                 if (!res.writableEnded) {

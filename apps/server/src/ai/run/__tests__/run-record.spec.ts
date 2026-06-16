@@ -346,4 +346,35 @@ describe('RunRecord', () => {
             expect(captured[0].event).toBe('messages');
         });
     });
+
+    describe('emitEvent seq透传', () => {
+        it('sseWriter callback receives seq for emitEvent', async () => {
+            const record = new RunRecord({
+                id: 'run-1',
+                threadId: 'thread-1',
+                runContext: createMockRunContext(),
+                snapshot: { content: '' },
+            });
+            const seen: Array<{ event: string; data: unknown; seq: number }> = [];
+            record.setSseWriter(e => seen.push(e));
+            await record.emitEvent({ event: 'values', data: { messages: [] } });
+            await record.emitEvent({ event: 'end', data: {} });
+            expect(seen[0]).toEqual({ event: 'values', data: { messages: [] }, seq: 0 });
+            expect(seen[1]).toEqual({ event: 'end', data: {}, seq: 1 });
+        });
+
+        it('sseWriter callback receives seq for emitSSEOnly', () => {
+            const record = new RunRecord({
+                id: 'run-1',
+                threadId: 'thread-1',
+                runContext: createMockRunContext(),
+                snapshot: { content: '' },
+            });
+            const seen: number[] = [];
+            record.setSseWriter(e => seen.push(e.seq));
+            record.emitSSEOnly({ event: 'messages', data: { id: 'm-1' } });
+            record.emitSSEOnly({ event: 'messages', data: { id: 'm-2' } });
+            expect(seen).toEqual([0, 1]);
+        });
+    });
 });

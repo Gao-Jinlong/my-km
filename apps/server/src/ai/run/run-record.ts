@@ -60,8 +60,8 @@ export class RunRecord {
 
     private seq: number;
 
-    /** SSE response writer（由 controller 设置） */
-    private sseWriter?: (event: { event: string; data: unknown }) => void;
+    /** SSE response writer（由 controller 设置，回调带 seq 供 SSE id: 行） */
+    private sseWriter?: (event: { event: string; data: unknown; seq: number }) => void;
 
     /**
      * 待恢复的 resume payload（由 resumeFromCommand 注入）
@@ -116,7 +116,7 @@ export class RunRecord {
     /**
      * 设置 SSE writer（controller 调用）
      */
-    setSseWriter(writer: (event: { event: string; data: unknown }) => void) {
+    setSseWriter(writer: (event: { event: string; data: unknown; seq: number }) => void) {
         this.sseWriter = writer;
     }
 
@@ -160,9 +160,9 @@ export class RunRecord {
             payload: event.data,
         };
 
-        // [1] SSE 即时推
+        // [1] SSE 即时推（带 seq，供前端 id: 行重连锚）
         if (this.sseWriter) {
-            this.sseWriter(event);
+            this.sseWriter({ event: event.event, data: event.data, seq });
         }
 
         // [3] PG 落盘（状态边界）
@@ -199,9 +199,9 @@ export class RunRecord {
             payload: event.data,
         };
 
-        // [1] SSE 即时推
+        // [1] SSE 即时推（带 seq）
         if (this.sseWriter) {
-            this.sseWriter(event);
+            this.sseWriter({ event: event.event, data: event.data, seq });
         }
 
         // [2] EventBus 广播（不落盘 [3]）

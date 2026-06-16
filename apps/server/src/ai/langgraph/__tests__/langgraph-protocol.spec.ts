@@ -37,4 +37,10 @@ describe('writeSSE', () => {
         writeSSE(res, 'end', {}, 1);
         expect(chunks).toHaveLength(0);
     });
+
+    it('writes id: 0 when seq is zero (falsy but defined)', () => {
+        const { res, chunks } = mockResponse();
+        writeSSE(res, 'values', {}, 0);
+        expect(chunks[0]).toContain('id: 0\n');
+    });
 });
