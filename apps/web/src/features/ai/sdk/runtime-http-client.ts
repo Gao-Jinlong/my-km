@@ -41,12 +41,14 @@ export function createLangGraphRuntimeClient(): LangGraphRuntimeClient {
         },
         runs: {
             stream: (threadId, _assistantId, payload) => streamRunHttp(base, threadId, payload),
-            joinStream: (threadId, runId, since) => joinStreamHttp(base, threadId, runId, since),
-            list: (threadId: string) => listRunsHttp(base, threadId),
-            cancel: async (threadId, runId, _wait, _action) => {
+            joinStream: (threadId, runId, since, signal) =>
+                joinStreamHttp(base, threadId, runId, since, signal),
+            list: (threadId: string, signal?: AbortSignal) => listRunsHttp(base, threadId, signal),
+            cancel: async (threadId, runId, _wait, _action, signal) => {
                 // 后端 POST /api/threads/:tid/runs/:rid/cancel（无 body，忽略 wait/action）
                 const res = await fetch(`${base}/threads/${threadId}/runs/${runId}/cancel`, {
                     method: 'POST',
+                    signal,
                 });
                 if (!res.ok) throw new Error(`cancel failed: ${res.status}`);
             },
@@ -73,15 +75,21 @@ async function* joinStreamHttp(
     threadId: string,
     runId: string,
     since?: number,
+    signal?: AbortSignal,
 ): AsyncGenerator<LangGraphStreamEvent> {
     const query = since !== undefined ? `?since=${since}` : '';
     yield* fetchSSE(`${base}/threads/${threadId}/runs/${runId}/stream${query}`, {
         method: 'GET',
+        signal,
     });
 }
 
-async function listRunsHttp(base: string, threadId: string): Promise<LangGraphRunSummary[]> {
-    const res = await fetch(`${base}/threads/${threadId}/runs`, { method: 'GET' });
+async function listRunsHttp(
+    base: string,
+    threadId: string,
+    signal?: AbortSignal,
+): Promise<LangGraphRunSummary[]> {
+    const res = await fetch(`${base}/threads/${threadId}/runs`, { method: 'GET', signal });
     if (!res.ok) throw new Error(`listRuns failed: ${res.status}`);
     const runs = (await res.json()) as Array<{ id: string; status: string }>;
     return runs.map(r => ({ id: r.id, status: r.status }));

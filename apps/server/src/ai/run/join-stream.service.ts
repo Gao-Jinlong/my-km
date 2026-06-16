@@ -55,8 +55,13 @@ export class JoinStreamService {
 
         const isTerminal = TERMINAL_STATUSES.includes(run.status);
 
-        // seq 去重游标：回放与实时回调共用，event.seq <= lastSeq 丢弃（spec 3.5）
-        let lastSeq = since;
+        // since 语义（spec 3.5 + controller 默认）：
+        //   - since=0：从头回放（包含 seq=0 metadata）。前端首次 openThread join 用 0。
+        //   - since>0：reconnect lastSeq，回放 seq > since（即客户端尚未确认的事件）。
+        // seq 去重游标：回放与实时回调共用，event.seq <= lastSeq 丢弃。
+        const fromStart = since === 0;
+        const shouldReplay = (seq: number) => (fromStart ? seq >= 0 : seq > since);
+        let lastSeq = fromStart ? -1 : since;
         let closed = false;
         let subscription: EventBusSubscription | null = null;
 
@@ -79,8 +84,9 @@ export class JoinStreamService {
             });
         }
 
-        // 回放 PG（先 subscribe 再回放，spec 3.5 Step 3）：seq > since 且 seq > lastSeq（实时可能已 push）
-        const events = (await this.eventStore.replay(runId)).filter(e => e.seq > since);
+        // 回放 PG（先 subscribe 再回放，spec 3.5 Step 3）。
+        // since=0 包含 seq=0，否则 seq>since；再用 lastSeq 与实时回调去重。
+        const events = (await this.eventStore.replay(runId)).filter(e => shouldReplay(e.seq));
         for (const e of events) {
             if (closed) break;
             if (e.seq <= lastSeq) continue; // 实时回调已 push

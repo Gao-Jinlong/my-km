@@ -45,6 +45,12 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
     private handledToolCallIds = new Set<string>();
     private currentAbortController: AbortController | null = null;
     /**
+     * 控制 openThread 三段式（list/getState/joinStream）+ autoReconnect 的 AbortController。
+     * openThread 入口、sendMessage/resume 入口、dispose 都会 abort 它，确保旧 thread 的
+     * background reconnect 不会以旧 run 覆盖新 run 状态。
+     */
+    private currentJoinAbortController: AbortController | null = null;
+    /**
      * 单调递增的"连接代际"。每次 openThread / dispose 都 bump。
      * 在途的 joinStream / autoReconnect 持有发起时的 generation,
      * 任何 phase/messages 写入前先校验 generation 仍是 current,否则 no-op。
@@ -74,9 +80,12 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
 
     async openThread(threadId: string): Promise<void> {
         this.currentAbortController?.abort();
+        this.currentJoinAbortController?.abort();
         // bump generation:任何旧 join/reconnect 在 await 后都会 no-op,
         // 不会再写入新 thread 的 phase/messages。
         const generation = ++this.connectionGeneration;
+        const joinAbortController = new AbortController();
+        this.currentJoinAbortController = joinAbortController;
         this.handledToolCallIds.clear();
         this.snapshot = { ...EMPTY_SNAPSHOT };
         this.updateSnapshot({
@@ -84,35 +93,67 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
             connectionPhase: 'loading',
         });
 
-        // [1] 读 checkpoint，渲染历史消息（spec 5.3）
-        const state = await this.client.threads.getState?.(threadId);
-        if (!this.isCurrentGeneration(generation)) return;
-        const messages = state?.values?.messages;
-        if (Array.isArray(messages)) {
-            this.setMessages(messages);
-        }
-
-        // [2] 查活跃 run（status ∈ {running, interrupted}）
-        const runs = await this.client.runs.list(threadId);
-        if (!this.isCurrentGeneration(generation)) return;
-        const active = runs.find(r => r.status === 'running' || r.status === 'interrupted');
-
-        // [3] 有活跃 run → joinStream?since=0 回放+续实时；无 → ready
-        if (active) {
-            this.updateSnapshot({ runId: active.id });
-            try {
-                await this.joinActiveStream(threadId, active.id, 0, generation);
-            } catch {
-                if (!this.isCurrentGeneration(generation)) return;
-                await this.autoReconnect(threadId, active.id, generation);
+        try {
+            // [1] 读 checkpoint，渲染历史消息（spec 5.3）
+            const state = await this.client.threads.getState?.(threadId);
+            if (!this.isCurrentGeneration(generation)) return;
+            const messages = state?.values?.messages;
+            if (Array.isArray(messages)) {
+                this.setMessages(messages);
             }
-        } else {
-            this.setPhase('ready');
+
+            // [2] 查活跃 run（status ∈ {running, interrupted}）
+            const runs = await this.client.runs.list(threadId, joinAbortController.signal);
+            if (!this.isCurrentGeneration(generation)) return;
+            const active = runs.find(r => r.status === 'running' || r.status === 'interrupted');
+
+            // [3] 有活跃 run → joinStream?since=0 回放+续实时；无 → ready
+            if (active) {
+                this.updateSnapshot({ runId: active.id });
+                try {
+                    await this.joinActiveStream(
+                        threadId,
+                        active.id,
+                        0,
+                        generation,
+                        joinAbortController.signal,
+                    );
+                } catch {
+                    if (!this.isCurrentGeneration(generation)) return;
+                    await this.autoReconnect(
+                        threadId,
+                        active.id,
+                        generation,
+                        joinAbortController.signal,
+                    );
+                }
+            } else {
+                this.setPhase('ready');
+            }
+        } catch (error) {
+            // getState/list/join 任意一步失败：避免 UI 卡 loading；
+            // 仅在仍是当前 generation 时落 ready+error，否则交给新 openThread 主导。
+            if (!this.isCurrentGeneration(generation)) return;
+            this.updateSnapshot({
+                connectionPhase: 'ready',
+                interrupt: null,
+                error: error instanceof Error ? error.message : String(error),
+            });
+            return;
+        } finally {
+            // 若仍是本 controller（未被 sendMessage/openThread/dispose 接管），保留以便后续 dispose abort。
+            // 但若 phase 已落 ready 且 join 完成，长连接已结束，可清理避免泄漏。
+            // 简化：保持引用（abort 是幂等的，下一次入口会 abort+替换）。
         }
     }
 
     async sendMessage(content: string, context?: Record<string, unknown>): Promise<void> {
         const threadId = await this.ensureThreadId();
+        // bump generation + abort 任何 background autoReconnect/joinStream，
+        // 防止旧 reconnect 用旧 run 覆盖即将开始的新 run snapshot。
+        this.connectionGeneration += 1;
+        this.currentJoinAbortController?.abort();
+        this.currentJoinAbortController = null;
         await this.runStream(threadId, {
             input: {
                 messages: [
@@ -131,6 +172,11 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
         if (!this.snapshot.threadId) {
             throw new Error('Cannot resume without an active LangGraph thread');
         }
+
+        // bump generation + abort:同 sendMessage,防止 background reconnect 干扰 resume run。
+        this.connectionGeneration += 1;
+        this.currentJoinAbortController?.abort();
+        this.currentJoinAbortController = null;
 
         await this.runStream(this.snapshot.threadId, {
             input: null,
@@ -155,6 +201,8 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
 
     dispose(): void {
         this.currentAbortController?.abort();
+        this.currentJoinAbortController?.abort();
+        this.currentJoinAbortController = null;
         // bump generation:在途 join/reconnect 在下一个 await 后 no-op,不再写状态。
         this.connectionGeneration += 1;
         if ('dispose' in this.toolExecutor && typeof this.toolExecutor.dispose === 'function') {
@@ -230,10 +278,11 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
         runId: string,
         since: number,
         generation: number,
+        signal?: AbortSignal,
     ): Promise<void> {
         if (!this.isCurrentGeneration(generation)) return;
         this.setPhase('streaming');
-        const stream = this.client.runs.joinStream(threadId, runId, since);
+        const stream = this.client.runs.joinStream(threadId, runId, since, signal);
         for await (const event of stream) {
             if (!this.isCurrentGeneration(generation)) return;
             await this.handleStreamEvent(event);
@@ -255,21 +304,31 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
         threadId: string,
         runId: string,
         generation: number,
+        signal?: AbortSignal,
     ): Promise<void> {
         for (let attempt = 0; attempt < RECONNECT_MAX_ATTEMPTS; attempt += 1) {
             if (!this.isCurrentGeneration(generation)) return;
+            if (signal?.aborted) return;
             this.setPhase('reconnecting');
             const delay = Math.min(RECONNECT_BASE_DELAY_MS * 2 ** attempt, RECONNECT_MAX_DELAY_MS);
             await sleep(delay);
             if (!this.isCurrentGeneration(generation)) return;
+            if (signal?.aborted) return;
             try {
-                await this.joinActiveStream(threadId, runId, this.snapshot.lastSeq, generation);
+                await this.joinActiveStream(
+                    threadId,
+                    runId,
+                    this.snapshot.lastSeq,
+                    generation,
+                    signal,
+                );
                 return;
             } catch {
                 // 继续退避重试
             }
         }
         if (!this.isCurrentGeneration(generation)) return;
+        if (signal?.aborted) return;
         this.updateSnapshot({
             connectionPhase: 'ready',
             interrupt: null,

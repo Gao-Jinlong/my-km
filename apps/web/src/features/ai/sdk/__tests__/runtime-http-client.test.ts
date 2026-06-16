@@ -138,4 +138,37 @@ describe('runtime-http-client', () => {
             message: expect.stringMatching(/cancel failed: 409/),
         });
     });
+
+    it('joinStream forwards AbortSignal to fetch', async () => {
+        const fetchSpy = vi
+            .spyOn(globalThis, 'fetch')
+            .mockResolvedValue(sseBody(['event: end\nid: 0\ndata: {}\n\n']));
+        const client = createLangGraphRuntimeClient();
+        const ac = new AbortController();
+        for await (const _e of client.runs.joinStream('thread-1', 'run-1', 0, ac.signal)) {
+            void _e;
+        }
+        const [, init] = fetchSpy.mock.calls[0];
+        expect((init as RequestInit | undefined)?.signal).toBe(ac.signal);
+    });
+
+    it('list forwards AbortSignal to fetch', async () => {
+        const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonBody([]));
+        const client = createLangGraphRuntimeClient();
+        const ac = new AbortController();
+        await client.runs.list('thread-1', ac.signal);
+        const [, init] = fetchSpy.mock.calls[0];
+        expect((init as RequestInit | undefined)?.signal).toBe(ac.signal);
+    });
+
+    it('cancel forwards AbortSignal to fetch', async () => {
+        const fetchSpy = vi
+            .spyOn(globalThis, 'fetch')
+            .mockResolvedValue({ ok: true, status: 200 } as Response);
+        const client = createLangGraphRuntimeClient();
+        const ac = new AbortController();
+        await client.runs.cancel('thread-1', 'run-1', false, undefined, ac.signal);
+        const [, init] = fetchSpy.mock.calls[0];
+        expect((init as RequestInit | undefined)?.signal).toBe(ac.signal);
+    });
 });

@@ -61,9 +61,11 @@ describe('JoinStreamService — terminal replay', () => {
         expect(sink.closed).toBe(false);
     });
 
-    it('replays persisted events (seq > since) for a completed run and closes', async () => {
+    it('replays persisted events from start (since=0 includes seq=0) for a completed run and closes', async () => {
         const run = { id: 'r1', status: 'completed' } as RunRow;
+        // since=0 表示从头回放：必须包含 seq=0 的 metadata（前端首次 openThread 不能丢）
         const events = [
+            { seq: 0, eventType: 'metadata', payload: { run_id: 'r1' } },
             { seq: 1, eventType: 'values', payload: { n: 1 } },
             { seq: 2, eventType: 'end', payload: {} },
         ];
@@ -77,6 +79,7 @@ describe('JoinStreamService — terminal replay', () => {
         const cleanup = await service.joinStream('r1', 0, sink);
 
         expect(sink.events).toEqual([
+            { seq: 0, eventType: 'metadata', payload: { run_id: 'r1' } },
             { seq: 1, eventType: 'values', payload: { n: 1 } },
             { seq: 2, eventType: 'end', payload: {} },
         ]);

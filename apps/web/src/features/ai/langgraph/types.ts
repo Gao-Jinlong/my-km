@@ -88,10 +88,17 @@ export interface LangGraphRuntimeClient {
             threadId: string,
             runId: string,
             since?: number,
+            signal?: AbortSignal,
         ): AsyncIterable<LangGraphStreamEvent>;
         /** GET /api/threads/:tid/runs —— 列 run(查活跃 run,spec 5.3) */
-        list(threadId: string): Promise<LangGraphRunSummary[]>;
-        cancel(threadId: string, runId: string, wait?: boolean, action?: string): Promise<void>;
+        list(threadId: string, signal?: AbortSignal): Promise<LangGraphRunSummary[]>;
+        cancel(
+            threadId: string,
+            runId: string,
+            wait?: boolean,
+            action?: string,
+            signal?: AbortSignal,
+        ): Promise<void>;
     };
 }
 

@@ -344,7 +344,7 @@ describe('LangGraphChatRuntime', () => {
         await runtime.openThread('thread-1');
 
         expect(client.threads.getState).toHaveBeenCalledWith('thread-1');
-        expect(client.runs.list).toHaveBeenCalledWith('thread-1');
+        expect(client.runs.list).toHaveBeenCalledWith('thread-1', expect.any(AbortSignal));
         expect(runtime.getSnapshot().messages).toEqual([
             expect.objectContaining({ id: 'h-1', content: 'old' }),
         ]);
@@ -458,7 +458,12 @@ describe('LangGraphChatRuntime', () => {
 
         await runtime.openThread('thread-1');
 
-        expect(client.runs.joinStream).toHaveBeenCalledWith('thread-1', 'run-live', 0);
+        expect(client.runs.joinStream).toHaveBeenCalledWith(
+            'thread-1',
+            'run-live',
+            0,
+            expect.any(AbortSignal),
+        );
         expect(runtime.getSnapshot().runId).toBe('run-live');
         expect(runtime.getSnapshot().lastSeq).toBe(2);
         // joinStream 流结束（无 end 事件）→ 终态落 ready
@@ -501,7 +506,12 @@ describe('LangGraphChatRuntime', () => {
 
         await vi.waitFor(() => expect(runtime.getSnapshot().connectionPhase).toBe('ready'));
         expect(joinCall).toBe(2);
-        expect(client.runs.joinStream).toHaveBeenLastCalledWith('thread-1', 'run-live', 7);
+        expect(client.runs.joinStream).toHaveBeenLastCalledWith(
+            'thread-1',
+            'run-live',
+            7,
+            expect.any(AbortSignal),
+        );
     });
 
     it('switching thread during reconnect does not let the old autoReconnect overwrite new thread', async () => {
@@ -601,7 +611,12 @@ describe('LangGraphChatRuntime', () => {
         // 首轮 + 5 次重试 = 6 次 joinStream
         expect(client.runs.joinStream).toHaveBeenCalledTimes(6);
         // 最后一次 retry 用 lastSeq=7 作为 since
-        expect(client.runs.joinStream).toHaveBeenLastCalledWith('thread-1', 'run-live', 7);
+        expect(client.runs.joinStream).toHaveBeenLastCalledWith(
+            'thread-1',
+            'run-live',
+            7,
+            expect.any(AbortSignal),
+        );
 
         const snapshot = runtime.getSnapshot();
         expect(snapshot.connectionPhase).toBe('ready');
@@ -701,5 +716,121 @@ describe('LangGraphChatRuntime', () => {
         expect(snapshot.connectionPhase).toBe('ready');
         expect(snapshot.error).toBe('tool failed');
         expect(snapshot.interrupt).toBeNull();
+    });
+
+    it('openThread does not stay loading when runs.list rejects (resolves to ready+error)', async () => {
+        const client: LangGraphRuntimeClient = {
+            threads: {
+                create: vi.fn(),
+                getState: vi.fn(async () => ({ values: { messages: [] } })),
+            },
+            runs: {
+                stream: async function* () {},
+                joinStream: async function* () {},
+                list: vi.fn(async () => {
+                    throw new Error('list boom');
+                }),
+                cancel: vi.fn(),
+            },
+        };
+        const runtime = new LangGraphChatRuntime({ client, toolExecutor: { dispatch: vi.fn() } });
+
+        // 不抛：openThread 必须 resolve 让上层 UI 解掉 loading
+        await expect(runtime.openThread('thread-1')).resolves.toBeUndefined();
+
+        const snapshot = runtime.getSnapshot();
+        expect(snapshot.connectionPhase).toBe('ready');
+        expect(snapshot.error).toBe('list boom');
+        expect(snapshot.threadId).toBe('thread-1');
+    });
+
+    it('openThread does not stay loading when threads.getState rejects', async () => {
+        const client: LangGraphRuntimeClient = {
+            threads: {
+                create: vi.fn(),
+                getState: vi.fn(async () => {
+                    throw new Error('getState boom');
+                }),
+            },
+            runs: {
+                stream: async function* () {},
+                joinStream: async function* () {},
+                list: vi.fn(async () => []),
+                cancel: vi.fn(),
+            },
+        };
+        const runtime = new LangGraphChatRuntime({ client, toolExecutor: { dispatch: vi.fn() } });
+
+        await expect(runtime.openThread('thread-1')).resolves.toBeUndefined();
+
+        const snapshot = runtime.getSnapshot();
+        expect(snapshot.connectionPhase).toBe('ready');
+        expect(snapshot.error).toBe('getState boom');
+    });
+
+    it('sendMessage cancels in-flight autoReconnect so old joinStream stops being called', async () => {
+        // openThread('thread-1'): joinStream 第一次抛错 → autoReconnect 进入 sleep。
+        // 在 reconnecting 期间调用 sendMessage('hi'),旧 reconnect 必须 no-op：
+        // 不再以 thread-1/run-live 调用 joinStream;新 run 由 stream() 主导。
+        let joinCalls = 0;
+        const joinStreamMock = vi.fn(
+            (_tid: string, _rid: string, _since?: number): AsyncGenerator<LangGraphStreamEvent> => {
+                joinCalls += 1;
+                // AsyncGenerator that immediately rejects on first .next()
+                return {
+                    [Symbol.asyncIterator]() {
+                        return this;
+                    },
+                    async next(): Promise<IteratorResult<LangGraphStreamEvent>> {
+                        throw new Error('network drop');
+                    },
+                    async return(): Promise<IteratorResult<LangGraphStreamEvent>> {
+                        return { value: undefined, done: true };
+                    },
+                    async throw(): Promise<IteratorResult<LangGraphStreamEvent>> {
+                        return { value: undefined, done: true };
+                    },
+                } as AsyncGenerator<LangGraphStreamEvent>;
+            },
+        );
+        const client: LangGraphRuntimeClient = {
+            threads: {
+                create: vi.fn(async () => ({ thread_id: 'thread-1' })),
+                getState: vi.fn(async () => ({ values: { messages: [] } })),
+            },
+            runs: {
+                stream: vi.fn(async function* () {
+                    yield { event: 'metadata', data: { run_id: 'run-new' }, seq: 0 };
+                    yield { event: 'end', data: {}, seq: 1 };
+                }),
+                joinStream: joinStreamMock,
+                list: vi.fn(async () => [{ id: 'run-live', status: 'running' }]),
+                cancel: vi.fn(),
+            },
+        };
+        const runtime = new LangGraphChatRuntime({ client, toolExecutor: { dispatch: vi.fn() } });
+
+        const open = runtime.openThread('thread-1');
+        await vi.waitFor(() => expect(runtime.getSnapshot().connectionPhase).toBe('reconnecting'));
+
+        const callsBeforeSend = joinCalls;
+
+        // sendMessage 应 abort autoReconnect 并由新 run 主导 phase
+        await runtime.sendMessage('hi');
+
+        // 旧 autoReconnect 不再增加 joinStream 调用
+        expect(joinCalls).toBe(callsBeforeSend);
+        expect(client.runs.stream).toHaveBeenCalledTimes(1);
+
+        // 让旧 open 收尾(可能已被 abort,resolve 即可)
+        await open;
+
+        // 等足够时间：旧 autoReconnect sleep 序列若有任何残留,会在此后调 joinStream
+        await new Promise(r => setTimeout(r, 400));
+        expect(joinCalls).toBe(callsBeforeSend);
+
+        // 新 run snapshot 主导
+        expect(runtime.getSnapshot().connectionPhase).toBe('ready');
+        expect(runtime.getSnapshot().runId).toBe('run-new');
     });
 });
