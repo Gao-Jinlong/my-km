@@ -15,6 +15,10 @@ import type {
 
 const STREAM_MODE = ['messages', 'values', 'tasks'];
 
+const RECONNECT_BASE_DELAY_MS = 10;
+const RECONNECT_MAX_DELAY_MS = 5000;
+const RECONNECT_MAX_ATTEMPTS = 5;
+
 const EMPTY_SNAPSHOT: LangGraphChatSnapshot = {
     messages: [],
     isStreaming: false,
@@ -84,7 +88,11 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
         // [3] 有活跃 run → joinStream?since=0 回放+续实时；无 → ready
         if (active) {
             this.updateSnapshot({ runId: active.id });
-            await this.joinActiveStream(threadId, active.id, 0);
+            try {
+                await this.joinActiveStream(threadId, active.id, 0);
+            } catch {
+                await this.autoReconnect(threadId, active.id);
+            }
         } else {
             this.setPhase('ready');
         }
@@ -206,6 +214,30 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
         if (this.snapshot.connectionPhase === 'streaming') {
             this.finishRun();
         }
+    }
+
+    /**
+     * 自动重连(spec 5.4):joinStream 抛错(网络断,非用户 stop)→ phase=reconnecting
+     * (保留已渲染 messages)→ 指数退避重试 joinStream?since=lastSeq→成功回 streaming;
+     * 达上限→ready + error。
+     */
+    private async autoReconnect(threadId: string, runId: string): Promise<void> {
+        for (let attempt = 0; attempt < RECONNECT_MAX_ATTEMPTS; attempt += 1) {
+            this.setPhase('reconnecting');
+            const delay = Math.min(RECONNECT_BASE_DELAY_MS * 2 ** attempt, RECONNECT_MAX_DELAY_MS);
+            await sleep(delay);
+            try {
+                await this.joinActiveStream(threadId, runId, this.snapshot.lastSeq);
+                return;
+            } catch {
+                // 继续退避重试
+            }
+        }
+        this.updateSnapshot({
+            connectionPhase: 'ready',
+            interrupt: null,
+            error: '连接断开，可重试',
+        });
     }
 
     private async handleStreamEvent(event: LangGraphStreamEvent): Promise<void> {
@@ -364,4 +396,8 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
 
 function isRawMessage(value: unknown): value is LangGraphRawMessage {
     return Boolean(value && typeof value === 'object' && ('type' in value || 'role' in value));
+}
+
+function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }

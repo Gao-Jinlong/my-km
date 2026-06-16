@@ -464,4 +464,43 @@ describe('LangGraphChatRuntime', () => {
         // joinStream 流结束（无 end 事件）→ 终态落 ready
         expect(runtime.getSnapshot().connectionPhase).toBe('ready');
     });
+
+    it('auto-reconnects on joinStream error with exponential backoff and since=lastSeq', async () => {
+        let joinCall = 0;
+        const client: LangGraphRuntimeClient = {
+            threads: {
+                create: vi.fn(),
+                getState: vi.fn(async () => ({ values: {} })),
+            },
+            runs: {
+                stream: async function* () {},
+                joinStream: vi.fn(async function* (_tid, _rid, since) {
+                    joinCall += 1;
+                    if (joinCall === 1) {
+                        yield {
+                            event: 'values',
+                            data: { messages: [{ id: 'ai-1', type: 'ai', content: 'partial' }] },
+                            seq: 7,
+                        };
+                        throw new Error('network drop');
+                    }
+                    yield {
+                        event: 'values',
+                        data: { messages: [{ id: 'ai-2', type: 'ai', content: 'more' }] },
+                        seq: (since ?? 0) + 1,
+                    };
+                    yield { event: 'end', data: {}, seq: (since ?? 0) + 2 };
+                }),
+                list: vi.fn(async () => [{ id: 'run-live', status: 'running' }]),
+                cancel: vi.fn(),
+            },
+        };
+        const runtime = new LangGraphChatRuntime({ client, toolExecutor: { dispatch: vi.fn() } });
+
+        await runtime.openThread('thread-1');
+
+        await vi.waitFor(() => expect(runtime.getSnapshot().connectionPhase).toBe('ready'));
+        expect(joinCall).toBe(2);
+        expect(client.runs.joinStream).toHaveBeenLastCalledWith('thread-1', 'run-live', 7);
+    });
 });
