@@ -352,6 +352,85 @@ describe('LangGraphChatRuntime', () => {
         expect(runtime.getSnapshot().threadId).toBe('thread-1');
     });
 
+    it('openThread aborts a running stream without flipping the new loading phase to ready', async () => {
+        function deferred<T>() {
+            let resolve!: (value: T | PromiseLike<T>) => void;
+            let reject!: (reason?: unknown) => void;
+            const promise = new Promise<T>((res, rej) => {
+                resolve = res;
+                reject = rej;
+            });
+            return { promise, resolve, reject };
+        }
+
+        const getStateGate = deferred<{ values: { messages: LangGraphStreamEvent[] } }>();
+
+        const client: LangGraphRuntimeClient = {
+            threads: {
+                create: vi.fn(async () => ({ thread_id: 'thread-1' })),
+                // 让 openThread 卡在 getState 这步,phase 留在 loading
+                getState: vi.fn(() => getStateGate.promise as never),
+            },
+            runs: {
+                stream: vi.fn((_threadId, _assistantId, payload) => {
+                    const signal = payload?.signal as AbortSignal;
+                    async function* gen(): AsyncGenerator<LangGraphStreamEvent> {
+                        yield {
+                            event: 'metadata',
+                            data: { run_id: 'run-1', thread_id: 'thread-1' },
+                        };
+                        // 等到 abort 时主动抛出,模拟 fetch 在 abort 时 reject
+                        await new Promise<never>((_resolve, reject) => {
+                            if (signal.aborted) {
+                                reject(new DOMException('aborted', 'AbortError'));
+                                return;
+                            }
+                            signal.addEventListener('abort', () => {
+                                reject(new DOMException('aborted', 'AbortError'));
+                            });
+                        });
+                    }
+                    return gen();
+                }),
+                joinStream: vi.fn(() => streamOf([])),
+                list: vi.fn(async () => []),
+                cancel: vi.fn(async () => {}),
+            },
+        };
+
+        const runtime = new LangGraphChatRuntime({
+            client,
+            toolExecutor: { dispatch: vi.fn() },
+        });
+
+        // 启动旧 sendMessage,等进入 streaming
+        const sendPromise = runtime.sendMessage('Hi');
+        await vi.waitFor(() => expect(runtime.getSnapshot().connectionPhase).toBe('streaming'));
+
+        // openThread 切到新 thread:abort 旧 stream,phase 立即 → loading
+        const openPromise = runtime.openThread('thread-2');
+        expect(runtime.getSnapshot().connectionPhase).toBe('loading');
+
+        // 等旧 runStream catch 被触发(microtask)。在 getState 仍 pending 期间,
+        // phase 必须保持 loading,不能被旧 runStream catch finishRun 覆盖成 ready。
+        await Promise.resolve();
+        await Promise.resolve();
+        await vi.waitFor(() =>
+            // 旧 stream 的 abort 已经传播过 catch
+            expect(client.runs.stream).toHaveBeenCalledTimes(1),
+        );
+
+        expect(runtime.getSnapshot().connectionPhase).toBe('loading');
+
+        // 解除 getState gate,openThread 走完三段式 → ready
+        getStateGate.resolve({ values: { messages: [] } });
+        await openPromise;
+        await sendPromise.catch(() => undefined);
+
+        expect(runtime.getSnapshot().connectionPhase).toBe('ready');
+        expect(runtime.getSnapshot().threadId).toBe('thread-2');
+    });
+
     it('openThread: active running run → joinStream since=0 → streaming', async () => {
         const joinEvents = [
             { event: 'metadata', data: { run_id: 'run-live', thread_id: 'thread-1' }, seq: 0 },
