@@ -87,7 +87,17 @@ async function listRunsHttp(base: string, threadId: string): Promise<LangGraphRu
     return runs.map(r => ({ id: r.id, status: r.status }));
 }
 
-/** 前端 payload（camelCase）→ 后端 RunsStreamBody（snake_case multitask_strategy） */
+/**
+ * 前端 payload（camelCase）→ 后端 RunsStreamBody（snake_case multitask_strategy）。
+ *
+ * 后端 RunsStreamBody 当前只消费 `input` / `command` / `context` / `multitask_strategy`，
+ * 因此本函数仅落这些字段：
+ * - `streamMode`：协议层固定（SSE + values/messages/end），由后端忽略，不进 body。
+ * - `metadata`：后端尚未消费，跨进程恢复也不需要，不进 body。
+ *
+ * `LangGraphRunsStreamPayload.streamMode/metadata` 仍保留在类型上，是为了让上层 runtime
+ * payload（与 SDK 保持兼容的形状）能直接传入；HTTP client 这一层只挑后端真正消费的字段。
+ */
 function toRunsStreamBody(payload?: LangGraphRunsStreamPayload): Record<string, unknown> {
     const body: Record<string, unknown> = {};
     if (payload?.input !== undefined) body.input = payload.input;
