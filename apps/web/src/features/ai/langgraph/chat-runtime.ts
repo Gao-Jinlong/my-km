@@ -27,6 +27,11 @@ const EMPTY_SNAPSHOT: LangGraphChatSnapshot = {
     lastSeq: 0,
 };
 
+type LangGraphChatSnapshotPatch = Omit<
+    Partial<LangGraphChatSnapshot>,
+    'isStreaming' | 'isLastMessageStreaming'
+>;
+
 export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
     private readonly client: LangGraphChatRuntimeOptions['client'];
     private readonly toolExecutor: LangGraphChatRuntimeOptions['toolExecutor'];
@@ -59,10 +64,8 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
     async openThread(threadId: string): Promise<void> {
         this.currentAbortController?.abort();
         this.handledToolCallIds.clear();
-        this.updateSnapshot({
-            ...EMPTY_SNAPSHOT,
-            threadId,
-        });
+        this.snapshot = { ...EMPTY_SNAPSHOT };
+        this.updateSnapshot({ threadId });
 
         const state = await this.client.threads.getState?.(threadId);
         const messages = state?.values?.messages;
@@ -288,12 +291,11 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
         this.updateSnapshot({ messages });
     }
 
-    private updateSnapshot(patch: Partial<LangGraphChatSnapshot>): void {
+    private updateSnapshot(patch: LangGraphChatSnapshotPatch): void {
         const nextPhase = patch.connectionPhase ?? this.snapshot.connectionPhase;
         const nextMessages = patch.messages ?? this.snapshot.messages;
         const nextLastSeq = patch.lastSeq ?? this.snapshot.lastSeq;
-        const nextIsStreaming =
-            patch.isStreaming ?? (nextPhase === 'streaming' || nextPhase === 'reconnecting');
+        const nextIsStreaming = nextPhase === 'streaming' || nextPhase === 'reconnecting';
         this.snapshot = {
             ...this.snapshot,
             ...patch,
