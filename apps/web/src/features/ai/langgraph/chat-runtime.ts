@@ -44,6 +44,13 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
     private snapshot: LangGraphChatSnapshot = { ...EMPTY_SNAPSHOT };
     private handledToolCallIds = new Set<string>();
     private currentAbortController: AbortController | null = null;
+    /**
+     * 单调递增的"连接代际"。每次 openThread / dispose 都 bump。
+     * 在途的 joinStream / autoReconnect 持有发起时的 generation,
+     * 任何 phase/messages 写入前先校验 generation 仍是 current,否则 no-op。
+     * 防止旧 thread 的重连循环或 SSE event 覆盖新 thread 的状态。
+     */
+    private connectionGeneration = 0;
 
     constructor(options: LangGraphChatRuntimeOptions) {
         this.client = options.client;
@@ -67,6 +74,9 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
 
     async openThread(threadId: string): Promise<void> {
         this.currentAbortController?.abort();
+        // bump generation:任何旧 join/reconnect 在 await 后都会 no-op,
+        // 不会再写入新 thread 的 phase/messages。
+        const generation = ++this.connectionGeneration;
         this.handledToolCallIds.clear();
         this.snapshot = { ...EMPTY_SNAPSHOT };
         this.updateSnapshot({
@@ -76,6 +86,7 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
 
         // [1] 读 checkpoint，渲染历史消息（spec 5.3）
         const state = await this.client.threads.getState?.(threadId);
+        if (!this.isCurrentGeneration(generation)) return;
         const messages = state?.values?.messages;
         if (Array.isArray(messages)) {
             this.setMessages(messages);
@@ -83,15 +94,17 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
 
         // [2] 查活跃 run（status ∈ {running, interrupted}）
         const runs = await this.client.runs.list(threadId);
+        if (!this.isCurrentGeneration(generation)) return;
         const active = runs.find(r => r.status === 'running' || r.status === 'interrupted');
 
         // [3] 有活跃 run → joinStream?since=0 回放+续实时；无 → ready
         if (active) {
             this.updateSnapshot({ runId: active.id });
             try {
-                await this.joinActiveStream(threadId, active.id, 0);
+                await this.joinActiveStream(threadId, active.id, 0, generation);
             } catch {
-                await this.autoReconnect(threadId, active.id);
+                if (!this.isCurrentGeneration(generation)) return;
+                await this.autoReconnect(threadId, active.id, generation);
             }
         } else {
             this.setPhase('ready');
@@ -142,6 +155,8 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
 
     dispose(): void {
         this.currentAbortController?.abort();
+        // bump generation:在途 join/reconnect 在下一个 await 后 no-op,不再写状态。
+        this.connectionGeneration += 1;
         if ('dispose' in this.toolExecutor && typeof this.toolExecutor.dispose === 'function') {
             this.toolExecutor.dispose();
         }
@@ -204,13 +219,24 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
      * 消费 joinStream（openThread 三段式 / 自动重连）。沿用 handleStreamEvent 处理事件 +
      * trackSeq。流结束（无 end 事件，如 run 已终止或 SSE close）→ finishRun 落 ready。
      * 流抛错（网络断）→ 重抛交由调用方（重连逻辑，Task 8）处理。
+     *
+     * generation 校验:每次 await 前/后检查 connectionGeneration 是否仍 current。
+     * 不 match 表示 openThread/dispose 已切走,本次调用必须 no-op,不能写 phase/messages。
      */
-    private async joinActiveStream(threadId: string, runId: string, since: number): Promise<void> {
+    private async joinActiveStream(
+        threadId: string,
+        runId: string,
+        since: number,
+        generation: number,
+    ): Promise<void> {
+        if (!this.isCurrentGeneration(generation)) return;
         this.setPhase('streaming');
         const stream = this.client.runs.joinStream(threadId, runId, since);
         for await (const event of stream) {
+            if (!this.isCurrentGeneration(generation)) return;
             await this.handleStreamEvent(event);
         }
+        if (!this.isCurrentGeneration(generation)) return;
         if (this.snapshot.connectionPhase === 'streaming') {
             this.finishRun();
         }
@@ -220,24 +246,38 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
      * 自动重连(spec 5.4):joinStream 抛错(网络断,非用户 stop)→ phase=reconnecting
      * (保留已渲染 messages)→ 指数退避重试 joinStream?since=lastSeq→成功回 streaming;
      * 达上限→ready + error。
+     *
+     * generation 校验:openThread/dispose 切走后,sleep/重试不再写新 thread 的 phase。
      */
-    private async autoReconnect(threadId: string, runId: string): Promise<void> {
+    private async autoReconnect(
+        threadId: string,
+        runId: string,
+        generation: number,
+    ): Promise<void> {
         for (let attempt = 0; attempt < RECONNECT_MAX_ATTEMPTS; attempt += 1) {
+            if (!this.isCurrentGeneration(generation)) return;
             this.setPhase('reconnecting');
             const delay = Math.min(RECONNECT_BASE_DELAY_MS * 2 ** attempt, RECONNECT_MAX_DELAY_MS);
             await sleep(delay);
+            if (!this.isCurrentGeneration(generation)) return;
             try {
-                await this.joinActiveStream(threadId, runId, this.snapshot.lastSeq);
+                await this.joinActiveStream(threadId, runId, this.snapshot.lastSeq, generation);
                 return;
             } catch {
                 // 继续退避重试
             }
         }
+        if (!this.isCurrentGeneration(generation)) return;
         this.updateSnapshot({
             connectionPhase: 'ready',
             interrupt: null,
             error: '连接断开，可重试',
         });
+    }
+
+    /** 校验当前是否仍是发起时的连接代际(未被新 openThread / dispose 取代) */
+    private isCurrentGeneration(generation: number): boolean {
+        return this.connectionGeneration === generation;
     }
 
     private async handleStreamEvent(event: LangGraphStreamEvent): Promise<void> {
