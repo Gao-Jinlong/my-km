@@ -1,4 +1,4 @@
-import { createLangGraphClient } from '@/features/ai/sdk/langgraph-client';
+import { createLangGraphRuntimeClient } from '@/features/ai/sdk/runtime-http-client';
 import { FrontendToolExecutor } from '@/features/ai/tools/frontend-tool-executor';
 import { DocEditHandler } from '@/features/ai/tools/handlers/doc-edit';
 import { DocReadHandler } from '@/features/ai/tools/handlers/doc-read';
@@ -10,18 +10,12 @@ import { DocumentStore } from '@/platform/document-store';
 import { FileSystemService } from '@/platform/file-system';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import { LangGraphChatRuntime } from './chat-runtime';
-import type { LangGraphRuntimeClient } from './types';
 
 export function createDefaultLangGraphChatRuntime(): LangGraphChatRuntime {
     return new LangGraphChatRuntime({
         client: createLangGraphRuntimeClient(),
         toolExecutor: createDefaultToolExecutor(),
     });
-}
-
-function createLangGraphRuntimeClient(): LangGraphRuntimeClient {
-    const client = createLangGraphClient();
-    return client as unknown as LangGraphRuntimeClient;
 }
 
 function createDefaultToolExecutor(): FrontendToolExecutor {
