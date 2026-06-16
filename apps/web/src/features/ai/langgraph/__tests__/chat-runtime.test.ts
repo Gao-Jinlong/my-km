@@ -654,9 +654,52 @@ describe('LangGraphChatRuntime', () => {
 
         await runtime.sendMessage('Create note');
 
-        expect(phases).toContain('paused');
-        expect(phases).toContain('streaming');
+        // paused 后必须有第二段 streaming(resume 那段),否则证明不了 paused→streaming 的真实切换
+        const pausedIdx = phases.indexOf('paused');
+        const lastStreamingIdx = phases.lastIndexOf('streaming');
+        expect(pausedIdx).toBeGreaterThanOrEqual(0);
+        expect(lastStreamingIdx).toBeGreaterThan(pausedIdx);
         expect(runtime.getSnapshot().connectionPhase).toBe('ready');
         sub.dispose();
+    });
+
+    it('does not stay paused when toolExecutor.dispatch rejects', async () => {
+        const dispatch = vi.fn(async () => {
+            throw new Error('tool failed');
+        });
+        const client = createClient([
+            [
+                { event: 'metadata', data: { run_id: 'run-1', thread_id: 'thread-1' } },
+                {
+                    event: 'tasks',
+                    data: {
+                        id: 'task-1',
+                        name: 'tools',
+                        input: {},
+                        triggers: [],
+                        interrupts: [
+                            {
+                                id: 'i-1',
+                                value: {
+                                    tool_call_id: 'tc-1',
+                                    tool_name: 'file_ops',
+                                    args: { operation: 'create', path: 'a.km' },
+                                },
+                            },
+                        ],
+                    },
+                },
+            ],
+        ]);
+        const runtime = new LangGraphChatRuntime({ client, toolExecutor: { dispatch } });
+
+        // runStream catch 吞掉 dispatch 抛出的错并写 snapshot.error,不 rethrow
+        await runtime.sendMessage('Use tool');
+
+        expect(dispatch).toHaveBeenCalledTimes(1);
+        const snapshot = runtime.getSnapshot();
+        expect(snapshot.connectionPhase).toBe('ready');
+        expect(snapshot.error).toBe('tool failed');
+        expect(snapshot.interrupt).toBeNull();
     });
 });

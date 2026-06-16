@@ -205,9 +205,11 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
             this.updateSnapshot({
                 error: error instanceof Error ? error.message : String(error),
             });
-            if (this.snapshot.connectionPhase !== 'paused') {
-                this.finishRun();
-            }
+            // dispatch 失败 / stream 错误都必须落 ready 并清 interrupt,
+            // 否则 phase=paused + interrupt 残留会让 runtime 永久卡住。
+            // resume 已发起的正常路径里,inner runStream 会接管 phase,
+            // outer catch 不会触发(无错抛出)。
+            this.finishRun();
         } finally {
             if (this.currentAbortController === abortController) {
                 this.currentAbortController = null;
