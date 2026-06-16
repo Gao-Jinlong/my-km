@@ -1,6 +1,21 @@
 import type { Event, IDisposable } from '@/base/common/event';
 import type { ConfirmationRequest } from '@/features/ai/tools/types';
 
+/** spec 5.2 连接态状态机六态 */
+export type ConnectionPhase =
+    | 'idle'
+    | 'loading'
+    | 'ready'
+    | 'streaming'
+    | 'paused'
+    | 'reconnecting';
+
+/** runs.list 返回的 run 摘要(后端 RunDto 子集,前端只关心 id + status) */
+export interface LangGraphRunSummary {
+    id: string;
+    status: string;
+}
+
 export interface LangGraphRawMessage {
     id?: string;
     type?: string;
@@ -33,12 +48,18 @@ export interface LangGraphChatSnapshot {
     threadId: string | null;
     runId: string | null;
     interrupt: LangGraphToolInterrupt | null;
+    /** spec 5.2 连接态 */
+    connectionPhase: ConnectionPhase;
+    /** 最近一次确认的 seq,重连 since=lastSeq 锚(spec 5.3/5.4) */
+    lastSeq: number;
 }
 
 export interface LangGraphStreamEvent {
     id?: string;
     event: string;
     data: unknown;
+    /** per-run 单调递增序号,重连去重锚(spec 3.5,后端 SSE id: 行透传) */
+    seq?: number;
 }
 
 export interface LangGraphRunsStreamPayload {
@@ -62,6 +83,14 @@ export interface LangGraphRuntimeClient {
             assistantId: string,
             payload?: LangGraphRunsStreamPayload,
         ): AsyncIterable<LangGraphStreamEvent>;
+        /** GET /api/threads/:tid/runs/:rid/stream?since —— 回放 + 续实时(spec 3.5) */
+        joinStream(
+            threadId: string,
+            runId: string,
+            since?: number,
+        ): AsyncIterable<LangGraphStreamEvent>;
+        /** GET /api/threads/:tid/runs —— 列 run(查活跃 run,spec 5.3) */
+        list(threadId: string): Promise<LangGraphRunSummary[]>;
         cancel(threadId: string, runId: string, wait?: boolean, action?: string): Promise<void>;
     };
 }
