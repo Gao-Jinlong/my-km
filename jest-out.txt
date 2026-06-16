@@ -1,0 +1,80 @@
+[31m[Nest] 1400  - [39m2026/06/16 11:56:27 [31m  ERROR[39m [38;5;3m[AiChatService] [39m[31mRun run-1 failed: Error: simulated graph failure[39m
+Error: simulated graph failure
+    at Object.[Symbol.asyncIterator] (D:\projects\my-km\apps\server\src\ai\__tests__\ai.service.spec.ts:680:27)
+    at AsyncGenerator.next (<anonymous>)
+    at D:\projects\my-km\apps\server\src\ai\ai.service.ts:286:34
+    at AiChatService.executeRunProtocol (D:\projects\my-km\apps\server\src\ai\ai.service.ts:213:13)
+    at Object.<anonymous> (D:\projects\my-km\apps\server\src\ai\__tests__\ai.service.spec.ts:690:13)
+PASS src/ai/__tests__/ai.service.spec.ts
+PASS src/ai/__tests__/ai.module.bootstrap.spec.ts
+[31m[Nest] 1400  - [39m2026/06/16 11:56:28 [31m  ERROR[39m [38;5;3m[ThreadsController] [39m[31mstreamRun failed: LLM blew up[39m
+[31m[Nest] 1400  - [39m2026/06/16 11:56:28 [31m  ERROR[39m [38;5;3m[ThreadsController] [39m[31mjoinStream failed: boom[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:27 [32m    LOG[39m [38;5;3m[ProviderRegistry] [39m[32mProvider registered: anthropic[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:27 [32m    LOG[39m [38;5;3m[ProviderRegistry] [39m[32mProvider registered: openai[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:27 [32m    LOG[39m [38;5;3m[ProviderRegistry] [39m[32mProvider registered: zhipu[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:27 [32m    LOG[39m [38;5;3m[ProviderRegistry] [39m[32mProvider registered: dashscope[39m
+[33m[Nest] 1400  - [39m2026/06/16 11:56:27 [33m   WARN[39m [38;5;3m[AiModule] [39m[33mNo LLM API key found in env (ANTHROPIC_API_KEY / OPENAI_API_KEY / ZHIPUAI_API_KEY / DASHSCOPE_API_KEY). Falling back to dashscope/qwen-plus; first request will fail unless DASHSCOPE_API_KEY is set.[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:27 [32m    LOG[39m [38;5;3m[ProviderRegistry] [39m[32mProvider registered: anthropic[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:27 [32m    LOG[39m [38;5;3m[ProviderRegistry] [39m[32mProvider registered: openai[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:27 [32m    LOG[39m [38;5;3m[ProviderRegistry] [39m[32mProvider registered: zhipu[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:27 [32m    LOG[39m [38;5;3m[ProviderRegistry] [39m[32mProvider registered: dashscope[39m
+[33m[Nest] 1400  - [39m2026/06/16 11:56:27 [33m   WARN[39m [38;5;3m[AiModule] [39m[33mNo LLM API key found in env (ANTHROPIC_API_KEY / OPENAI_API_KEY / ZHIPUAI_API_KEY / DASHSCOPE_API_KEY). Falling back to dashscope/qwen-plus; first request will fail unless DASHSCOPE_API_KEY is set.[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:27 [32m    LOG[39m [38;5;3m[ProviderRegistry] [39m[32mProvider registered: anthropic[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:27 [32m    LOG[39m [38;5;3m[ProviderRegistry] [39m[32mProvider registered: openai[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:27 [32m    LOG[39m [38;5;3m[ProviderRegistry] [39m[32mProvider registered: zhipu[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:27 [32m    LOG[39m [38;5;3m[ProviderRegistry] [39m[32mProvider registered: dashscope[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:27 [32m    LOG[39m [38;5;3m[AiModule] [39m[32mDefault LLM provider: anthropic (model: claude-sonnet-4-6-20250514)[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:27 [32m    LOG[39m [38;5;3m[ProviderRegistry] [39m[32mProvider registered: anthropic[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:27 [32m    LOG[39m [38;5;3m[ProviderRegistry] [39m[32mProvider registered: openai[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:27 [32m    LOG[39m [38;5;3m[ProviderRegistry] [39m[32mProvider registered: zhipu[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:27 [32m    LOG[39m [38;5;3m[ProviderRegistry] [39m[32mProvider registered: dashscope[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:27 [32m    LOG[39m [38;5;3m[AiModule] [39m[32mDefault LLM provider: dashscope (model: qwen-max)[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:27 [32m    LOG[39m [38;5;3m[ProviderRegistry] [39m[32mProvider registered: anthropic[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:27 [32m    LOG[39m [38;5;3m[ProviderRegistry] [39m[32mProvider registered: openai[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:27 [32m    LOG[39m [38;5;3m[ProviderRegistry] [39m[32mProvider registered: zhipu[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:27 [32m    LOG[39m [38;5;3m[ProviderRegistry] [39m[32mProvider registered: dashscope[39m
+PASS src/ai/langgraph/__tests__/threads.controller.spec.ts
+PASS src/ai/checkpointer/__tests__/checkpointer.provider.spec.ts
+[32m[Nest] 1400  - [39m2026/06/16 11:56:28 [32m    LOG[39m [38;5;3m[CheckpointerProvider] [39m[32mCheckpointer: MemorySaver (in-memory)[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:28 [32m    LOG[39m [38;5;3m[CheckpointerProvider] [39m[32mCheckpointer: MemorySaver (in-memory)[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:28 [32m    LOG[39m [38;5;3m[CheckpointerProvider] [39m[32mCheckpointer: MemorySaver (in-memory)[39m
+PASS src/ai/run/__tests__/run-state.repository.spec.ts
+PASS src/config/__tests__/env.event-bus.spec.ts
+PASS src/ai/thread/__tests__/thread.service.spec.ts
+[31m[Nest] 1400  - [39m2026/06/16 11:56:28 [31m  ERROR[39m [38;5;3m[RunEventStore] [39m[31mflushRun(run-1) failed: DB down[39m
+PASS src/ai/store/__tests__/run-event-store.spec.ts
+[31m[Nest] 1400  - [39m2026/06/16 11:56:28 [31m  ERROR[39m [38;5;3m[RunManager] [39m[31mFailed to persist Run run-failed: DB down[39m
+[31m[Nest] 1400  - [39m2026/06/16 11:56:28 [31m  ERROR[39m [38;5;3m[RunManager] [39m[31mFailed to update Run b7a28d76-3471-4e43-8ace-76f1eb6651b7 status: DB status failed[39m
+PASS src/ai/run/__tests__/run-manager.spec.ts
+PASS src/ai/run/__tests__/join-stream.service.spec.ts
+[32m[Nest] 1400  - [39m2026/06/16 11:56:28 [32m    LOG[39m [38;5;3m[RunManager] [39m[32mRun created: 8e84f059-b10b-4698-9d47-5238ac211bac for thread: thread-1[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:28 [32m    LOG[39m [38;5;3m[RunManager] [39m[32mRun created: 4d06f36f-ec7a-491e-bd70-6e6622443f48 for thread: thread-1[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:28 [32m    LOG[39m [38;5;3m[RunManager] [39m[32mRun created: ca549705-5ba0-41c0-93c0-0d9db3288442 for thread: thread-1[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:28 [32m    LOG[39m [38;5;3m[RunManager] [39m[32mRun created: a11712ad-8a1b-40a7-8eb7-eb6d554fedf9 for thread: thread-1[39m
+[33m[Nest] 1400  - [39m2026/06/16 11:56:28 [33m   WARN[39m [38;5;3m[RunManager] [39m[33mCannot finalize Run missing-run: no token usage source[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:28 [32m    LOG[39m [38;5;3m[RunManager] [39m[32mRun created: 87bf0b1e-3541-4801-9c87-3e24d9b68587 for thread: thread-1[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:28 [32m    LOG[39m [38;5;3m[RunRecord] [39m[32mRun 87bf0b1e-3541-4801-9c87-3e24d9b68587: cancelled → cancelled[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:28 [32m    LOG[39m [38;5;3m[RunManager] [39m[32mRun cancelled: 87bf0b1e-3541-4801-9c87-3e24d9b68587[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:28 [32m    LOG[39m [38;5;3m[RunManager] [39m[32mRun created: ff730d51-12e3-44fe-a66e-32c0e670257a for thread: t1[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:28 [32m    LOG[39m [38;5;3m[RunManager] [39m[32mRun created: a88dbcf0-2a15-4026-9e91-90b6e8818484 for thread: t2[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:28 [32m    LOG[39m [38;5;3m[RunRecord] [39m[32mRun ff730d51-12e3-44fe-a66e-32c0e670257a: pending → completed[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:28 [32m    LOG[39m [38;5;3m[RunRecord] [39m[32mRun a88dbcf0-2a15-4026-9e91-90b6e8818484: pending → running[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:28 [32m    LOG[39m [38;5;3m[RunManager] [39m[32mRun created: b7a28d76-3471-4e43-8ace-76f1eb6651b7 for thread: thread-1[39m
+[32m[Nest] 1400  - [39m2026/06/16 11:56:28 [32m    LOG[39m [38;5;3m[RunRecord] [39m[32mRun b7a28d76-3471-4e43-8ace-76f1eb6651b7: pending → running[39m
+PASS src/ai/run/__tests__/run-context-factory.spec.ts
+PASS src/ai/run/__tests__/run-record.spec.ts
+PASS src/ai/event/__tests__/redis.event-bus.spec.ts
+[33m[Nest] 1400  - [39m2026/06/16 11:56:29 [33m   WARN[39m [38;5;3m[RunRecord] [39m[33mEventBus publish failed: bus down[39m
+[33m[Nest] 1400  - [39m2026/06/16 11:56:29 [33m   WARN[39m [38;5;3m[RunRecord] [39m[33mEventBus publish failed: bus down[39m
+[33m[Nest] 1400  - [39m2026/06/16 11:56:29 [33m   WARN[39m [38;5;3m[RedisEventBus] [39m[33mDiscarding unparseable message on run:r1: Expected property name or '}' in JSON at position 1 (line 1 column 2)[39m
+PASS src/ai/event/__tests__/in-process.event-bus.spec.ts
+PASS src/ai/tools/__tests__/tool-definitions.spec.ts
+PASS src/ai/utils/__tests__/format-editor-context.spec.ts
+PASS src/ai/llm/__tests__/llm-default-config.spec.ts
+PASS src/ai/run/__tests__/run-context.spec.ts
+
+Test Suites: 18 passed, 18 total
+Tests:       1 skipped, 240 passed, 241 total
+Snapshots:   0 total
+Time:        3.503 s, estimated 4 s
+Ran all test suites matching src/ai|src/config.
