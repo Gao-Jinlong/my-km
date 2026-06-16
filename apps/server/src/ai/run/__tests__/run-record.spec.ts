@@ -113,31 +113,37 @@ describe('RunRecord', () => {
             );
         });
 
-        it('should call sseWriter when set', async () => {
-            const capturedEvents: Array<{ event: string; data: unknown }> = [];
-            record.setSseWriter(e => {
-                capturedEvents.push(e);
+        it('should call sink.push when registered', async () => {
+            const capturedEvents: Array<{ eventType: string; payload: unknown }> = [];
+            record.registerSink({
+                push(e) {
+                    capturedEvents.push({ eventType: e.eventType, payload: e.payload });
+                },
+                close() {},
             });
 
             await record.emitEvent({ event: 'metadata', data: { run_id: 'run-1' } });
             await record.emitEvent({ event: 'values', data: { messages: [] } });
 
             expect(capturedEvents).toHaveLength(2);
-            expect(capturedEvents[0].event).toBe('metadata');
-            expect(capturedEvents[1].event).toBe('values');
+            expect(capturedEvents[0].eventType).toBe('metadata');
+            expect(capturedEvents[1].eventType).toBe('values');
         });
 
-        it('should write to both sseWriter and eventStore', async () => {
-            const capturedEvents: Array<{ event: string; data: unknown }> = [];
-            record.setSseWriter(e => {
-                capturedEvents.push(e);
+        it('should write to both sink.push and eventStore', async () => {
+            const capturedEvents: Array<{ eventType: string; payload: unknown }> = [];
+            record.registerSink({
+                push(e) {
+                    capturedEvents.push({ eventType: e.eventType, payload: e.payload });
+                },
+                close() {},
             });
 
             await record.emitEvent({ event: 'end', data: {} });
 
-            // sseWriter called
+            // sink called
             expect(capturedEvents).toHaveLength(1);
-            expect(capturedEvents[0].event).toBe('end');
+            expect(capturedEvents[0].eventType).toBe('end');
 
             // eventStore.append called
             expect(mockEventStore.append).toHaveBeenCalledWith(
@@ -166,20 +172,25 @@ describe('RunRecord', () => {
             });
         });
 
-        it('should not block SSE/PG when eventBus.publish rejects', async () => {
+        it('should not block sink/PG when eventBus.publish rejects', async () => {
             const eventStore = { append: jest.fn().mockResolvedValue({}) };
             const eventBus = { publish: jest.fn().mockRejectedValue(new Error('bus down')) };
-            const captured: Array<{ event: string; data: unknown }> = [];
+            const captured: Array<{ eventType: string; payload: unknown }> = [];
             const rec = new RunRecord({
                 id: 'r1',
                 threadId: 't1',
                 runContext: createMockRunContext({ eventStore, eventBus }),
                 snapshot: { content: '' },
             });
-            rec.setSseWriter(e => captured.push(e));
+            rec.registerSink({
+                push(e) {
+                    captured.push({ eventType: e.eventType, payload: e.payload });
+                },
+                close() {},
+            });
 
             await expect(rec.emitEvent({ event: 'end', data: {} })).resolves.toBeUndefined();
-            // SSE 仍写
+            // sink 仍写
             expect(captured).toHaveLength(1);
             // PG 仍写
             expect(eventStore.append).toHaveBeenCalled();
@@ -310,60 +321,75 @@ describe('RunRecord', () => {
             expect(rec.currentSeq).toBe(6);
         });
 
-        it('should write to sseWriter when set', () => {
-            const captured: Array<{ event: string; data: unknown }> = [];
+        it('should write to sink.push when registered', () => {
+            const captured: Array<{ eventType: string; payload: unknown }> = [];
             const rec = new RunRecord({
                 id: 'r1',
                 threadId: 't1',
                 runContext: createMockRunContext(),
                 snapshot: { content: '' },
             });
-            rec.setSseWriter(e => captured.push(e));
+            rec.registerSink({
+                push(e) {
+                    captured.push({ eventType: e.eventType, payload: e.payload });
+                },
+                close() {},
+            });
 
             rec.emitSSEOnly({ event: 'messages', data: { chunk: 'x' } });
 
             expect(captured).toHaveLength(1);
-            expect(captured[0].event).toBe('messages');
+            expect(captured[0].eventType).toBe('messages');
         });
 
         it('does not throw when eventBus.publish rejects (catch prevents unhandled rejection)', () => {
             const eventBus = { publish: jest.fn().mockRejectedValue(new Error('bus down')) };
-            const captured: Array<{ event: string; data: unknown }> = [];
+            const captured: Array<{ eventType: string; payload: unknown }> = [];
             const rec = new RunRecord({
                 id: 'r1',
                 threadId: 't1',
                 runContext: createMockRunContext({ eventBus }),
                 snapshot: { content: '' },
             });
-            rec.setSseWriter(e => captured.push(e));
+            rec.registerSink({
+                push(e) {
+                    captured.push({ eventType: e.eventType, payload: e.payload });
+                },
+                close() {},
+            });
 
             // emitSSEOnly is synchronous; the rejected publish is fire-and-forget + .catch'd,
-            // so the synchronous call must not throw and SSE must still be written.
+            // so the synchronous call must not throw and sink must still be written.
             expect(() =>
                 rec.emitSSEOnly({ event: 'messages', data: { chunk: 'x' } }),
             ).not.toThrow();
             expect(captured).toHaveLength(1);
-            expect(captured[0].event).toBe('messages');
+            expect(captured[0].eventType).toBe('messages');
         });
     });
 
     describe('emitEvent seq透传', () => {
-        it('sseWriter callback receives seq for emitEvent', async () => {
+        it('sink.push receives seq for emitEvent', async () => {
             const record = new RunRecord({
                 id: 'run-1',
                 threadId: 'thread-1',
                 runContext: createMockRunContext(),
                 snapshot: { content: '' },
             });
-            const seen: Array<{ event: string; data: unknown; seq: number }> = [];
-            record.setSseWriter(e => seen.push(e));
+            const seen: Array<{ eventType: string; payload: unknown; seq: number }> = [];
+            record.registerSink({
+                push(e) {
+                    seen.push({ eventType: e.eventType, payload: e.payload, seq: e.seq });
+                },
+                close() {},
+            });
             await record.emitEvent({ event: 'values', data: { messages: [] } });
             await record.emitEvent({ event: 'end', data: {} });
-            expect(seen[0]).toEqual({ event: 'values', data: { messages: [] }, seq: 0 });
-            expect(seen[1]).toEqual({ event: 'end', data: {}, seq: 1 });
+            expect(seen[0]).toEqual({ eventType: 'values', payload: { messages: [] }, seq: 0 });
+            expect(seen[1]).toEqual({ eventType: 'end', payload: {}, seq: 1 });
         });
 
-        it('sseWriter callback receives seq for emitSSEOnly', () => {
+        it('sink.push receives seq for emitSSEOnly', () => {
             const record = new RunRecord({
                 id: 'run-1',
                 threadId: 'thread-1',
@@ -371,10 +397,102 @@ describe('RunRecord', () => {
                 snapshot: { content: '' },
             });
             const seen: number[] = [];
-            record.setSseWriter(e => seen.push(e.seq));
+            record.registerSink({
+                push(e) {
+                    seen.push(e.seq);
+                },
+                close() {},
+            });
             record.emitSSEOnly({ event: 'messages', data: { id: 'm-1' } });
             record.emitSSEOnly({ event: 'messages', data: { id: 'm-2' } });
             expect(seen).toEqual([0, 1]);
+        });
+    });
+
+    describe('subscribeControlChannel (P3 跨副本 cancel/interrupt)', () => {
+        it('subscribes to control channel and aborts on cancel signal', () => {
+            const record = new RunRecord({
+                id: 'run-1',
+                threadId: 'thread-1',
+                runContext: createMockRunContext(),
+                snapshot: { content: '' },
+            });
+
+            let capturedHandler:
+                | ((event: { kind: string; sourceReplicaId: string }) => void)
+                | null = null;
+            const mockSubscribe = jest.fn((_channel: string, handler: () => void) => {
+                capturedHandler = handler;
+                return { unsubscribe: jest.fn() };
+            });
+            const mockEventBus = {
+                publish: jest.fn(),
+                subscribe: mockSubscribe,
+            } as unknown as import('../../event/event-bus').EventBus;
+
+            const unsubscribe = record.subscribeControlChannel(mockEventBus, 'replica-A');
+
+            expect(mockSubscribe).toHaveBeenCalledWith('run:run-1:control', expect.any(Function));
+            expect(record.abortSignal.aborted).toBe(false);
+
+            // 收到 cancel 信号（来自其他副本）
+            capturedHandler && capturedHandler({ kind: 'cancel', sourceReplicaId: 'replica-B' });
+            expect(record.abortSignal.aborted).toBe(true);
+            expect(typeof unsubscribe).toBe('function');
+        });
+
+        it('subscribes to control channel and aborts on interrupt signal', () => {
+            const record = new RunRecord({
+                id: 'run-1',
+                threadId: 'thread-1',
+                runContext: createMockRunContext(),
+                snapshot: { content: '' },
+            });
+
+            let capturedHandler:
+                | ((event: { kind: string; sourceReplicaId: string }) => void)
+                | null = null;
+            const mockSubscribe = jest.fn((_channel: string, handler: () => void) => {
+                capturedHandler = handler;
+                return { unsubscribe: jest.fn() };
+            });
+            const mockEventBus = {
+                publish: jest.fn(),
+                subscribe: mockSubscribe,
+            } as unknown as import('../../event/event-bus').EventBus;
+
+            record.subscribeControlChannel(mockEventBus, 'replica-A');
+
+            // 收到 interrupt 信号（来自其他副本）
+            capturedHandler && capturedHandler({ kind: 'interrupt', sourceReplicaId: 'replica-B' });
+            expect(record.abortSignal.aborted).toBe(true);
+        });
+
+        it('ignores signals from own replica (sourceReplicaId deduplication)', () => {
+            const record = new RunRecord({
+                id: 'run-1',
+                threadId: 'thread-1',
+                runContext: createMockRunContext(),
+                snapshot: { content: '' },
+            });
+
+            let capturedHandler:
+                | ((event: { kind: string; sourceReplicaId: string }) => void)
+                | null = null;
+            const mockSubscribe = jest.fn((_channel: string, handler: () => void) => {
+                capturedHandler = handler;
+                return { unsubscribe: jest.fn() };
+            });
+            const mockEventBus = {
+                publish: jest.fn(),
+                subscribe: mockSubscribe,
+            } as unknown as import('../../event/event-bus').EventBus;
+
+            record.subscribeControlChannel(mockEventBus, 'replica-A');
+
+            // 自己发的信号，应该被忽略
+            capturedHandler && capturedHandler({ kind: 'cancel', sourceReplicaId: 'replica-A' });
+            expect(record.abortSignal.aborted).toBe(false);
         });
     });
 });

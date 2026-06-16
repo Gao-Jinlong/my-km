@@ -125,6 +125,7 @@ describe('ThreadsController', () => {
             mockThreadService,
             mockCheckpointReader,
             mockJoinStreamService,
+            'replica-test',
         );
     });
 
@@ -225,7 +226,11 @@ describe('ThreadsController', () => {
 
     describe('streamRun', () => {
         it('starts a new run when input.messages contains human message', async () => {
-            const fakeRecord = { id: 'run-1', threadId: 'thread-1', setSseWriter: jest.fn() };
+            const fakeRecord = {
+                id: 'run-1',
+                threadId: 'thread-1',
+                registerSink: jest.fn(() => jest.fn()),
+            };
             mockAiService.startRun.mockResolvedValueOnce(fakeRecord as never);
             const { res } = createMockResponse();
 
@@ -244,12 +249,16 @@ describe('ThreadsController', () => {
                 context: undefined,
                 multitaskStrategy: 'interrupt',
             });
-            expect(fakeRecord.setSseWriter).toHaveBeenCalled();
+            expect(fakeRecord.registerSink).toHaveBeenCalled();
             expect(mockAiService.executeRunProtocol).toHaveBeenCalledWith(fakeRecord);
         });
 
         it('passes multitask_strategy="enqueue" through to service (service decides fallback)', async () => {
-            const fakeRecord = { id: 'run-1', threadId: 'thread-1', setSseWriter: jest.fn() };
+            const fakeRecord = {
+                id: 'run-1',
+                threadId: 'thread-1',
+                registerSink: jest.fn(() => jest.fn()),
+            };
             mockAiService.startRun.mockResolvedValueOnce(fakeRecord as never);
             const { res } = createMockResponse();
 
@@ -268,7 +277,11 @@ describe('ThreadsController', () => {
         });
 
         it('defaults multitask_strategy to "reject" when omitted', async () => {
-            const fakeRecord = { id: 'run-1', threadId: 'thread-1', setSseWriter: jest.fn() };
+            const fakeRecord = {
+                id: 'run-1',
+                threadId: 'thread-1',
+                registerSink: jest.fn(() => jest.fn()),
+            };
             mockAiService.startRun.mockResolvedValueOnce(fakeRecord as never);
             const { res } = createMockResponse();
 
@@ -284,7 +297,11 @@ describe('ThreadsController', () => {
         });
 
         it('routes to resumeFromCommand when body.command.resume present', async () => {
-            const fakeRecord = { id: 'run-1', threadId: 'thread-1', setSseWriter: jest.fn() };
+            const fakeRecord = {
+                id: 'run-1',
+                threadId: 'thread-1',
+                registerSink: jest.fn(() => jest.fn()),
+            };
             mockAiService.resumeFromCommand.mockResolvedValueOnce(fakeRecord as never);
             const { res } = createMockResponse();
 
@@ -330,9 +347,29 @@ describe('ThreadsController', () => {
     });
 
     describe('cancelRun', () => {
-        it('delegates to AiChatService.cancel', async () => {
-            await controller.cancelRun('thread-1', 'run-1');
+        it('delegates to AiChatService.cancel and returns 204 for owner replica (P3)', async () => {
+            mockAiService.cancel.mockResolvedValueOnce({ accepted: true, ownerId: 'replica-test' });
+            const { res } = createMockResponse();
+
+            await controller.cancelRun('thread-1', 'run-1', res);
+
             expect(mockAiService.cancel).toHaveBeenCalledWith('run-1');
+            expect(res.status).toHaveBeenCalledWith(204);
+            expect(res.end).toHaveBeenCalled();
+        });
+
+        it('returns 202 Accepted for cross-replica cancel (P3)', async () => {
+            mockAiService.cancel.mockResolvedValueOnce({
+                accepted: true,
+                ownerId: 'replica-other',
+            });
+            const { res } = createMockResponse();
+
+            await controller.cancelRun('thread-1', 'run-1', res);
+
+            expect(mockAiService.cancel).toHaveBeenCalledWith('run-1');
+            expect(res.status).toHaveBeenCalledWith(202);
+            expect(res.json).toHaveBeenCalledWith({ accepted: true, ownerId: 'replica-other' });
         });
     });
 

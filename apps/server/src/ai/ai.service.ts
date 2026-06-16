@@ -21,6 +21,7 @@ import { Command } from '@langchain/langgraph';
 import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { context as otelContext, SpanStatusCode, trace } from '@opentelemetry/api';
 import { CheckpointReaderService } from './checkpointer/checkpoint-reader.service';
+import { EventBus, type RunStreamEvent } from './event/event-bus';
 import { ChatGraph } from './langgraph/graphs/chat-graph';
 import { LLMFactory } from './llm/llm-factory';
 import type { LLMConfig } from './llm/provider.types';
@@ -61,6 +62,7 @@ export class AiChatService {
         // checkpointReader 保留供 GET /state 等用途；本服务不再依赖它读取消息
         private readonly _checkpointReader: CheckpointReaderService,
         private readonly runStateRepo: RunStateRepository,
+        private readonly eventBus: EventBus,
         @Inject(REPLICA_ID) private readonly replicaId: string,
     ) {
         // 避免 TS unused 警告，保持构造依赖以便测试与未来用途
@@ -192,6 +194,9 @@ export class AiChatService {
             },
         });
         const langgraphCtx = trace.setSpan(otelContext.active(), langgraphSpan);
+
+        // 订阅控制 channel（跨副本 cancel/interrupt）
+        const unsubscribeControl = record.subscribeControlChannel(this.eventBus, this.replicaId);
 
         const heartbeatOnce = async () => {
             try {
@@ -387,6 +392,7 @@ export class AiChatService {
             });
         } finally {
             clearInterval(heartbeatTimer);
+            unsubscribeControl();
             langgraphSpan.end();
             await this.runManager.finalize(record.id);
             await record.runContext.eventStore.flushRun(record.id);
@@ -409,14 +415,43 @@ export class AiChatService {
     }
 
     /**
-     * 取消 Run
+     * 取消 Run（跨副本支持，P3）。
+     *
+     * - 本副本 owner → 直接内存 abort + 写终态
+     * - 非 owner → 查 PG 校验 status，publish control signal → 202 Accepted
      */
-    async cancel(runId: string): Promise<void> {
+    async cancel(runId: string): Promise<{ accepted: boolean; ownerId: string | null }> {
+        // 先查内存：本副本是否持有该 run
         const record = this.runManager.getRun(runId);
-        if (!record) {
+        if (record) {
+            await this.runManager.cancelRun(runId);
+            return { accepted: true, ownerId: this.replicaId };
+        }
+
+        // 查 PG：run 是否存在、是否活跃、owner 是谁
+        const runRow = await this.runStateRepo.findById(runId);
+        if (!runRow) {
             throw new NotFoundException(`Run not found: ${runId}`);
         }
-        await this.runManager.cancelRun(runId);
+
+        // terminal status 不允许 cancel
+        const TERMINAL_STATUSES: RunStatus[] = [
+            RunStatus.Completed,
+            RunStatus.Failed,
+            RunStatus.Cancelled,
+        ];
+        if (TERMINAL_STATUSES.includes(runRow.status as RunStatus)) {
+            throw new ConflictException(`Run ${runId} is already ${runRow.status}`);
+        }
+
+        // publish cancel signal 给 owner 副本
+        // Control 事件结构不同于 RunStreamEvent，使用类型转换
+        await this.eventBus.publish(`run:${runId}:control`, {
+            kind: 'cancel',
+            sourceReplicaId: this.replicaId,
+        } as unknown as RunStreamEvent);
+
+        return { accepted: true, ownerId: runRow.ownerId };
     }
 
     // ========== Private Helpers ==========
@@ -532,12 +567,12 @@ export class AiChatService {
     }
 
     /**
-     * 并发控制（P1）。
+     * 并发控制（P3 跨副本支持）。
      *
      * - reject: 409
-     * - interrupt: 仅当 active run 由本副本持有（内存可 abort）时生效；
-     *   跨副本无法 abort，退化为 reject + warn（完整跨副本 interrupt 留 P3）
-     * - rollback: 同 interrupt（checkpoint 回滚留 P3）
+     * - interrupt/rollback:
+     *   - 本副本 owner → 内存 abort + 等待（P1）
+     *   - 跨副本 → 通过 EventBus 发送 control signal + 202 Accepted（P3）
      * - enqueue: 未实现，reject + warn
      */
     private async handleConcurrency(
@@ -558,10 +593,15 @@ export class AiChatService {
                         break;
                     }
                 }
-                this.logger.warn(
-                    `multitask_strategy '${strategy}' cannot abort cross-replica run ${activeRow.id} (owner: ${activeRow.ownerId}); falling back to 'reject'`,
-                );
-                throw new ConflictException('Run already in progress for this thread');
+
+                // P3: 跨副本 → 通过 EventBus 发送 control signal
+                // owner 副本收到 signal 后通过 subscribeControlChannel 会 abort run
+                // Control 事件结构不同于 RunStreamEvent，使用类型转换
+                await this.eventBus.publish(`run:${activeRow.id}:control`, {
+                    kind: 'interrupt',
+                    sourceReplicaId: this.replicaId,
+                } as unknown as RunStreamEvent);
+                break;
             }
 
             case 'enqueue':

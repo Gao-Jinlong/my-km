@@ -25,6 +25,7 @@ import {
     Controller,
     Delete,
     Get,
+    Inject,
     Logger,
     NotFoundException,
     Param,
@@ -40,6 +41,7 @@ import { CheckpointReaderService } from '../checkpointer/checkpoint-reader.servi
 import type { RunStreamEvent } from '../event/event-bus';
 import { writeSSE } from '../langgraph/langgraph-protocol';
 import { JoinStreamService } from '../run/join-stream.service';
+import { REPLICA_ID } from '../run/replica-id';
 import type { RunEventSink } from '../run/run-event-sink';
 import { RunRecord } from '../run/run-record';
 import { ThreadService } from '../thread/thread.service';
@@ -119,6 +121,7 @@ export class ThreadsController {
         private readonly threadService: ThreadService,
         private readonly checkpointReader: CheckpointReaderService,
         private readonly joinStreamService: JoinStreamService,
+        @Inject(REPLICA_ID) private readonly replicaId: string,
     ) {}
 
     // ========== Thread CRUD ==========
@@ -242,11 +245,22 @@ export class ThreadsController {
             }
 
             // 桥接 writeSSE → record.emitEvent，使 SSE 事件同时写入 EventStore；透传 seq 写 id: 行
-            record.setSseWriter(sseEvent => {
-                writeSSE(res, sseEvent.event, sseEvent.data, sseEvent.seq);
+            const unregister = record.registerSink({
+                push(e) {
+                    writeSSE(res, e.eventType, e.payload, e.seq);
+                },
+                close() {
+                    if (!res.writableEnded) {
+                        res.end();
+                    }
+                },
             });
 
-            await this.aiService.executeRunProtocol(record);
+            try {
+                await this.aiService.executeRunProtocol(record);
+            } finally {
+                unregister();
+            }
         } catch (error) {
             this.logger.error(`streamRun failed: ${(error as Error).message}`);
             this.sendProtocolError(
@@ -262,14 +276,25 @@ export class ThreadsController {
     }
 
     /**
-     * POST /api/threads/:threadId/runs/:runId/cancel — 取消活跃 run
+     * POST /api/threads/:threadId/runs/:runId/cancel — 取消活跃 run（跨副本支持，P3）。
+     *
+     * - 本副本 owner → 204 No Content
+     * - 非 owner，已转发 signal 给 owner → 202 Accepted
+     * - run 不存在 → 404
+     * - run 已是终态 → 409 Conflict
      */
     @Post(':threadId/runs/:runId/cancel')
     async cancelRun(
         @Param('threadId') _threadId: string,
         @Param('runId') runId: string,
+        @Res() res: import('express').Response,
     ): Promise<void> {
-        await this.aiService.cancel(runId);
+        const result = await this.aiService.cancel(runId);
+        if (result.ownerId === this.replicaId) {
+            res.status(204).end();
+        } else {
+            res.status(202).json({ accepted: true, ownerId: result.ownerId });
+        }
     }
 
     /**

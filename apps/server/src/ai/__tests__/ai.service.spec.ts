@@ -3,7 +3,7 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { AiChatService } from '../ai.service';
 import { CheckpointReaderService } from '../checkpointer/checkpoint-reader.service';
-import type { EventBus } from '../event/event-bus';
+import { EventBus } from '../event/event-bus';
 import { LLMFactory } from '../llm/llm-factory';
 import type { LLMConfig } from '../llm/provider.types';
 import { ProviderRegistry } from '../llm/provider-registry';
@@ -77,8 +77,13 @@ function createEventCapture() {
     const events: Array<{ event: string; data: unknown }> = [];
     return {
         events,
-        sseWriter: (e: { event: string; data: unknown }) => {
-            events.push(e);
+        attachTo: (record: RunRecord) => {
+            record.registerSink({
+                push: (e: { eventType: string; payload: unknown }) => {
+                    events.push({ event: e.eventType, data: e.payload });
+                },
+                close: () => {},
+            });
         },
     };
 }
@@ -237,6 +242,13 @@ describe('AiChatService', () => {
                             checkpoint: { thread_id: 'thread-1' },
                             tasks: [],
                         }),
+                    },
+                },
+                {
+                    provide: EventBus,
+                    useValue: {
+                        publish: jest.fn().mockResolvedValue(undefined),
+                        subscribe: jest.fn().mockReturnValue({ unsubscribe: jest.fn() }),
                     },
                 },
             ],
@@ -475,10 +487,15 @@ describe('AiChatService', () => {
             expect(r2.id).not.toBe(r1.id);
         });
 
-        it('should reject and warn for cross-replica "interrupt" strategy', async () => {
-            const loggerSpy = jest
-                .spyOn((service as unknown as { logger: { warn: jest.Mock } }).logger, 'warn')
-                .mockImplementation(() => undefined);
+        it('should send control signal for cross-replica "interrupt" strategy (P3)', async () => {
+            // 获取 mock EventBus（通过 service 上暴露的 eventBus 属性）
+            const eventBusPublishSpy = jest
+                .spyOn(
+                    (service as unknown as { eventBus: { publish: jest.Mock } }).eventBus,
+                    'publish',
+                )
+                .mockResolvedValue(undefined);
+
             (runManager.getActiveRunByThread as jest.Mock).mockResolvedValueOnce({
                 id: 'remote-run',
                 threadId: 't1',
@@ -486,23 +503,30 @@ describe('AiChatService', () => {
                 ownerId: 'replica-other',
             });
 
-            await expect(
-                service.startRun({
-                    content: 'Second',
-                    threadId: 't1',
-                    multitaskStrategy: 'interrupt',
-                }),
-            ).rejects.toThrow(ConflictException);
+            // P3: 跨副本 interrupt 不再 reject，而是发送 control signal 并继续
+            const r2 = await service.startRun({
+                content: 'Second',
+                threadId: 't1',
+                multitaskStrategy: 'interrupt',
+            });
 
-            expect(loggerSpy).toHaveBeenCalledWith(
-                expect.stringContaining('cannot abort cross-replica run remote-run'),
-            );
+            expect(r2).toBeDefined();
+            expect(r2.id).not.toBe('remote-run'); // 新建了 run
+            // 验证 control signal 已发送
+            expect(eventBusPublishSpy).toHaveBeenCalledWith('run:remote-run:control', {
+                kind: 'interrupt',
+                sourceReplicaId: 'replica-test',
+            });
         });
 
-        it('should reject and warn for cross-replica "rollback" strategy', async () => {
-            const loggerSpy = jest
-                .spyOn((service as unknown as { logger: { warn: jest.Mock } }).logger, 'warn')
-                .mockImplementation(() => undefined);
+        it('should send control signal for cross-replica "rollback" strategy (P3)', async () => {
+            const eventBusPublishSpy = jest
+                .spyOn(
+                    (service as unknown as { eventBus: { publish: jest.Mock } }).eventBus,
+                    'publish',
+                )
+                .mockResolvedValue(undefined);
+
             (runManager.getActiveRunByThread as jest.Mock).mockResolvedValueOnce({
                 id: 'remote-run',
                 threadId: 't1',
@@ -510,17 +534,20 @@ describe('AiChatService', () => {
                 ownerId: 'replica-other',
             });
 
-            await expect(
-                service.startRun({
-                    content: 'Second',
-                    threadId: 't1',
-                    multitaskStrategy: 'rollback',
-                }),
-            ).rejects.toThrow(ConflictException);
+            // P3: 跨副本 rollback 不再 reject，而是发送 control signal 并继续
+            const r2 = await service.startRun({
+                content: 'Second',
+                threadId: 't1',
+                multitaskStrategy: 'rollback',
+            });
 
-            expect(loggerSpy).toHaveBeenCalledWith(
-                expect.stringContaining('cannot abort cross-replica run remote-run'),
-            );
+            expect(r2).toBeDefined();
+            expect(r2.id).not.toBe('remote-run'); // 新建了 run
+            // 验证 control signal 已发送
+            expect(eventBusPublishSpy).toHaveBeenCalledWith('run:remote-run:control', {
+                kind: 'interrupt',
+                sourceReplicaId: 'replica-test',
+            });
         });
     });
 
@@ -631,7 +658,7 @@ describe('AiChatService', () => {
         it('should emit metadata → values → end on happy path', async () => {
             const record = await service.startRun({ content: 'Hi', threadId: 't1' });
             const capture = createEventCapture();
-            record.setSseWriter(capture.sseWriter);
+            capture.attachTo(record);
 
             await service.executeRunProtocol(record);
 
@@ -645,7 +672,7 @@ describe('AiChatService', () => {
         it('should include run_id and thread_id in metadata event', async () => {
             const record = await service.startRun({ content: 'Hi', threadId: 't1' });
             const capture = createEventCapture();
-            record.setSseWriter(capture.sseWriter);
+            capture.attachTo(record);
 
             await service.executeRunProtocol(record);
 
@@ -658,7 +685,7 @@ describe('AiChatService', () => {
         it('should include messages in values event from stream payload', async () => {
             const record = await service.startRun({ content: 'Hi', threadId: 't1' });
             const capture = createEventCapture();
-            record.setSseWriter(capture.sseWriter);
+            capture.attachTo(record);
 
             await service.executeRunProtocol(record);
 
@@ -685,7 +712,7 @@ describe('AiChatService', () => {
 
             const record = await service.startRun({ content: 'Hi', threadId: 't1' });
             const capture = createEventCapture();
-            record.setSseWriter(capture.sseWriter);
+            capture.attachTo(record);
 
             await service.executeRunProtocol(record);
 
@@ -709,7 +736,7 @@ describe('AiChatService', () => {
 
             const record = await service.startRun({ content: 'Hi', threadId: 't1' });
             const capture = createEventCapture();
-            record.setSseWriter(capture.sseWriter);
+            capture.attachTo(record);
 
             await service.executeRunProtocol(record);
 
@@ -719,7 +746,7 @@ describe('AiChatService', () => {
         it('should request tasks stream mode for LangGraph interrupts', async () => {
             const record = await service.startRun({ content: 'Hi', threadId: 't1' });
             const capture = createEventCapture();
-            record.setSseWriter(capture.sseWriter);
+            capture.attachTo(record);
 
             await service.executeRunProtocol(record);
 
@@ -755,7 +782,7 @@ describe('AiChatService', () => {
 
             const record = await service.startRun({ content: 'Hi', threadId: 't1' });
             const capture = createEventCapture();
-            record.setSseWriter(capture.sseWriter);
+            capture.attachTo(record);
 
             await service.executeRunProtocol(record);
 
@@ -774,7 +801,7 @@ describe('AiChatService', () => {
             const record = await service.startRun({ content: 'Hi', threadId: 't1' });
             record.abort();
             const capture = createEventCapture();
-            record.setSseWriter(capture.sseWriter);
+            capture.attachTo(record);
 
             await service.executeRunProtocol(record);
 
@@ -792,7 +819,7 @@ describe('AiChatService', () => {
 
             const record = await service.startRun({ content: 'Hi', threadId: 't1' });
             const capture = createEventCapture();
-            record.setSseWriter(capture.sseWriter);
+            capture.attachTo(record);
             record.abort();
 
             await service.executeRunProtocol(record);
@@ -810,7 +837,7 @@ describe('AiChatService', () => {
         it('should write all events to EventStore via emitEvent', async () => {
             const record = await service.startRun({ content: 'Hi', threadId: 't1' });
             const capture = createEventCapture();
-            record.setSseWriter(capture.sseWriter);
+            capture.attachTo(record);
 
             await service.executeRunProtocol(record);
 
@@ -836,7 +863,7 @@ describe('AiChatService', () => {
                 context: editorCtx,
             });
             const capture = createEventCapture();
-            record.setSseWriter(capture.sseWriter);
+            capture.attachTo(record);
 
             // Verify snapshot has requestContext
             expect(record.snapshot.requestContext).toEqual(editorCtx);
@@ -871,7 +898,7 @@ describe('AiChatService', () => {
         it('should heartbeat during execution and write lastSeq on completion', async () => {
             const record = await service.startRun({ content: 'Hi', threadId: 't1' });
             const capture = createEventCapture();
-            record.setSseWriter(capture.sseWriter);
+            capture.attachTo(record);
 
             await service.executeRunProtocol(record);
 
@@ -889,7 +916,7 @@ describe('AiChatService', () => {
             expect(record.snapshot.requestContext).toBeUndefined();
 
             const capture = createEventCapture();
-            record.setSseWriter(capture.sseWriter);
+            capture.attachTo(record);
 
             await service.executeRunProtocol(record);
 
@@ -908,7 +935,7 @@ describe('AiChatService', () => {
         it('should still release lease when updateLastSeq fails', async () => {
             const record = await service.startRun({ content: 'Hi', threadId: 't1' });
             const capture = createEventCapture();
-            record.setSseWriter(capture.sseWriter);
+            capture.attachTo(record);
             const repo = (service as unknown as { __runStateRepo: Record<string, jest.Mock> })
                 .__runStateRepo;
             repo.updateLastSeq.mockRejectedValueOnce(new Error('seq write failed'));
@@ -927,7 +954,7 @@ describe('AiChatService', () => {
         it('should warn but not throw when releaseLease fails', async () => {
             const record = await service.startRun({ content: 'Hi', threadId: 't1' });
             const capture = createEventCapture();
-            record.setSseWriter(capture.sseWriter);
+            capture.attachTo(record);
             const repo = (service as unknown as { __runStateRepo: Record<string, jest.Mock> })
                 .__runStateRepo;
             repo.releaseLease.mockRejectedValueOnce(new Error('release failed'));
@@ -948,7 +975,7 @@ describe('AiChatService', () => {
             repo.heartbeat.mockResolvedValueOnce(false);
             const record = await service.startRun({ content: 'Hi', threadId: 't1' });
             const capture = createEventCapture();
-            record.setSseWriter(capture.sseWriter);
+            capture.attachTo(record);
 
             await service.executeRunProtocol(record);
 

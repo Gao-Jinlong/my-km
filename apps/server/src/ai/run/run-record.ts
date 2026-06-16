@@ -19,10 +19,11 @@
  */
 
 import { Logger } from '@nestjs/common';
-import { type RunStreamEvent, runChannel } from '../event/event-bus';
+import { type EventBus, type RunStreamEvent, runChannel } from '../event/event-bus';
 import type { TokenUsage } from '../types/ai.types';
 import { RunStatus } from '../types/run.types';
 import type { RunContext } from './run-context';
+import type { RunEventSink } from './run-event-sink';
 
 /**
  * 执行输入快照 — 显式、类型化、可测试
@@ -60,8 +61,19 @@ export class RunRecord {
 
     private seq: number;
 
-    /** SSE response writer（由 controller 设置，回调带 seq 供 SSE id: 行） */
-    private sseWriter?: (event: { event: string; data: unknown; seq: number }) => void;
+    /** Run 事件流 sink（SSE 推送 / 回放推等）。spec 3.8。 */
+    private readonly sinks = new Set<RunEventSink>();
+
+    /**
+     * 注册事件 sink（如 SSE Response 推送），返回注销函数。
+     */
+    registerSink(sink: RunEventSink): () => void {
+        this.sinks.add(sink);
+        return () => {
+            sink.close();
+            this.sinks.delete(sink);
+        };
+    }
 
     /**
      * 待恢复的 resume payload（由 resumeFromCommand 注入）
@@ -114,13 +126,6 @@ export class RunRecord {
     }
 
     /**
-     * 设置 SSE writer（controller 调用）
-     */
-    setSseWriter(writer: (event: { event: string; data: unknown; seq: number }) => void) {
-        this.sseWriter = writer;
-    }
-
-    /**
      * 更新状态
      */
     setStatus(status: RunStatus) {
@@ -160,9 +165,9 @@ export class RunRecord {
             payload: event.data,
         };
 
-        // [1] SSE 即时推（带 seq，供前端 id: 行重连锚）
-        if (this.sseWriter) {
-            this.sseWriter({ event: event.event, data: event.data, seq });
+        // [1] Sink push（如 SSE 即时推，带 seq 供前端 id: 行重连锚）
+        for (const sink of this.sinks) {
+            sink.push({ seq, eventType: event.event, payload: event.data });
         }
 
         // [3] PG 落盘（状态边界）
@@ -199,9 +204,9 @@ export class RunRecord {
             payload: event.data,
         };
 
-        // [1] SSE 即时推（带 seq）
-        if (this.sseWriter) {
-            this.sseWriter({ event: event.event, data: event.data, seq });
+        // [1] Sink push（如 SSE 即时推，带 seq）
+        for (const sink of this.sinks) {
+            sink.push({ seq, eventType: event.event, payload: event.data });
         }
 
         // [2] EventBus 广播（不落盘 [3]）
@@ -215,5 +220,22 @@ export class RunRecord {
      */
     finalize(): TokenUsage {
         return this.tokenUsage;
+    }
+
+    /**
+     * 订阅 run 的控制 channel（cancel/interrupt 等），返回 unsubscribe。
+     * 收到 cancel → this.abort()。收到 interrupt → this.abort()。
+     * sourceReplicaId 排重：自己发的信号跳过，避免循环。
+     * 注意：Control 事件结构不同于 RunStreamEvent，使用类型转换。
+     */
+    subscribeControlChannel(eventBus: EventBus, replicaId: string): () => void {
+        const channel = `run:${this.id}:control`;
+        return eventBus.subscribe(channel, (event: unknown) => {
+            const controlEvent = event as { kind?: string; sourceReplicaId?: string };
+            if (controlEvent.sourceReplicaId === replicaId) return;
+            if (controlEvent.kind === 'cancel' || controlEvent.kind === 'interrupt') {
+                this.abort();
+            }
+        }).unsubscribe;
     }
 }

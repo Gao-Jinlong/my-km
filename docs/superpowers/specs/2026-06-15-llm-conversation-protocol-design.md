@@ -671,13 +671,15 @@ EventBus           ──► Redis Pub/Sub (跨副本实时分发)
 
 ### 6.4 分阶段交付
 
-| 阶段 | 内容 | 价值 | 依赖 Redis |
-|------|------|------|-----------|
-| **P1 权威源迁移** | run 状态/事件落 PG，acquireLease，进程外 resume | 多副本正确性基座 | 否 |
-| **P2 重连** | joinStream + 回放 + Redis EventBus，前端连接态状态机 | 完整重连 | 是 |
-| **P3 协议清理** | SSE 写入解耦，stop 统一，messages 序列化标准化，enqueue/rollback 明确语义 | 性能 + 正确性 | 否 |
-| **P4 前端 runtime** | atom 化 snapshot，tool_status 工具卡片（需先设计稿），openThread 融合 | effect 精准 + UI | 否 |
-| **P5 文档 + 安全** | 重写失真文档，user 隔离，metrics | 治理 | 否 |
+| 阶段 | 内容 | 价值 | 依赖 Redis | 状态 |
+|------|------|------|-----------|------|
+| **P1 权威源迁移** | run 状态/事件落 PG，acquireLease，进程外 resume | 多副本正确性基座 | 否 | ✅ 完成 |
+| **P2 重连** | joinStream + 回放 + Redis EventBus，前端连接态状态机 | 完整重连 | 是 | ✅ 完成 |
+| **P2-4 stop 统一** | 前端 stop 不 abort fetch，取消有终态 | 一致性 | 否 | ✅ 完成 |
+| **P2-5 前端连接态** | 6 态状态机，paused 相位，heartbeat 断租 | 鲁棒性 | 否 | ✅ 完成 |
+| **P3 跨副本信号** | SSE 解耦为 RunEventSink，跨副本 cancel/interrupt control channel | 多副本完整性 | 否 | ✅ 完成 |
+| **P4 前端 runtime** | 6 atom 拆分，tool_status 工具卡片，openThread 融合 | effect 精准 + UI | 否 | 📋 计划已创建 |
+| **P5 文档 + 安全** | 重写失真文档，user 隔离，metrics | 治理 | 否 | 🟡 进行中（文档清理完成） |
 
 每阶段独立可验证、可灰度。P1 不依赖 Redis（单进程 acquireLease 仍成立），P2 才需要 Redis。
 
@@ -709,16 +711,19 @@ EventBus           ──► Redis Pub/Sub (跨副本实时分发)
 
 ## 8. 验收标准
 
-- [ ] run 状态/事件流以 PG 为权威源，进程内 RunSession 为缓存
-- [ ] acquireLease 单一执行者保证，租约 30s + 10s heartbeat
-- [ ] interrupted 状态下 owner 释放执行，resume 可被任意副本接管
-- [ ] joinStream 实现"先订阅 Redis、再回放 PG、seq 去重衔接"
-- [ ] SSE 写入三路解耦，`end`/`error` 终态同步写不丢
-- [ ] stop 只调 cancel 不 abort fetch，取消有终态
-- [ ] `ToolMessage.additional_kwargs.tool_status` 标记 completed/rejected
-- [ ] 前端连接态 6 态状态机，interrupt 由 messages 派生（无 Set）
-- [ ] 前端 6 atom + 派生 selector，effect 范围精准
-- [ ] 工具卡片 UI 先补 Pencil 设计稿，审核后实现
-- [ ] user 隔离覆盖 run/thread/stream 所有查询
-- [ ] 4 篇失真文档按 6.5 处置完成
-- [ ] EventBus 抽象 + 单进程降级可跑
+- [x] run 状态/事件流以 PG 为权威源，进程内 RunSession 为缓存（P1）
+- [x] acquireLease 单一执行者保证，租约 30s + 10s heartbeat（P1）
+- [x] interrupted 状态下 owner 释放执行，resume 可被任意副本接管（P1）
+- [x] joinStream 实现"先订阅 EventBus、再回放 PG、seq 去重衔接"（P2）
+- [x] EventBus 抽象 + 单进程降级可跑（P2）
+- [x] stop 只调 cancel 不 abort fetch，取消有终态（P2-4）
+- [x] 前端连接态 6 态状态机，connectionPhase 字段（P2-5）
+- [x] SSE 写入三路解耦为 RunEventSink 注册模式（P3）
+- [x] 跨副本 cancel 非 owner 返回 202 Accepted（P3）
+- [x] 跨副本 interrupt control channel（P3）
+- [ ] `ToolMessage.additional_kwargs.tool_status` 标记 completed/rejected（P4）
+- [ ] interrupt 由 messages 派生，删除 handledToolCallIds Set（P4）
+- [ ] 前端 6 atom + 派生 selector，effect 范围精准（P4）
+- [ ] 工具卡片 UI（P4，设计稿已就绪）
+- [ ] user 隔离覆盖 run/thread/stream 所有查询（P5）
+- [x] 5 篇失真文档按 6.5 处置完成（P5）
