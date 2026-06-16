@@ -28,6 +28,8 @@ const SERVER_SNAPSHOT: LangGraphChatSnapshot = {
     threadId: null,
     runId: null,
     interrupt: null,
+    connectionPhase: 'idle',
+    lastSeq: 0,
 };
 
 export function useLangGraphStream(
