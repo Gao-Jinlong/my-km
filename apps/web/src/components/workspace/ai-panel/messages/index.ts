@@ -3,6 +3,7 @@
  * 外部通过此文件导入子组件，便于后续重构调整内部结构
  */
 
+export { TextMessage } from './TextMessage';
 export { ToolCallIndicator } from './ToolCallIndicator';
 export type {
     TextMessageProps,
