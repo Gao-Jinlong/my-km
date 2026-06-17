@@ -187,6 +187,65 @@ describe('LangGraphChatRuntime', () => {
         });
     });
 
+    it('does not let the old runStream finishRun overwrite the resumed run when interrupt is followed by end (real backend sequence)', async () => {
+        // 真实后端在 interrupt 后会无条件发 end 事件（ai.service.ts executeRunProtocol 结尾）。
+        // 旧实现里 runStream 没有 generation 守卫，旧 stream 消费完 end 后 finishRun 会把
+        // resume 新 run 设置的 phase='streaming' 覆盖回 'ready'，破坏 resume 链路。
+        const dispatch = vi.fn(async () => ({ success: true }));
+        const client = createClient([
+            [
+                // 第一个 run：interrupt 后紧跟 end（真实后端 seq=13 + seq=14）
+                { event: 'metadata', data: { run_id: 'run-1', thread_id: 'thread-1' } },
+                {
+                    event: 'tasks',
+                    data: {
+                        id: 'task-1',
+                        name: 'tools',
+                        interrupts: [
+                            {
+                                id: 'i-1',
+                                value: {
+                                    tool_call_id: 'tc-1',
+                                    tool_name: 'file_ops',
+                                    args: { operation: 'create', path: 'a.km' },
+                                },
+                            },
+                        ],
+                    },
+                },
+                { event: 'end', data: {} },
+            ],
+            [
+                // resume run（新 generation）：正常完成
+                { event: 'metadata', data: { run_id: 'run-2', thread_id: 'thread-1' } },
+                { event: 'end', data: {} },
+            ],
+        ]);
+        const runtime = new LangGraphChatRuntime({ client, toolExecutor: { dispatch } });
+
+        // 记录 phase 变化序列，重点看 resume 后是否被错误覆盖回 ready
+        const phases: string[] = [];
+        const sub = runtime.subscribeConnection(() =>
+            phases.push(runtime.getConnectionSnapshot().phase),
+        );
+
+        await runtime.sendMessage('Create note');
+
+        sub.dispose();
+
+        // resume 后必须最终落在 ready（正常完成），且 streaming（新 run）出现在 paused 之后
+        const pausedIdx = phases.indexOf('paused');
+        const lastStreamingIdx = phases.lastIndexOf('streaming');
+        expect(pausedIdx).toBeGreaterThanOrEqual(0);
+        expect(lastStreamingIdx).toBeGreaterThan(pausedIdx);
+        expect(runtime.getConnectionSnapshot().phase).toBe('ready');
+
+        // 关键：resume 新 run 的 streaming 不应被旧 run 的 finishRun 提前覆盖。
+        // 如果竞态存在，最终 phase 会在新 run 还没跑完时就被旧 finishRun 设成 ready，
+        // 导致 client.runs.stream 第二次调用可能未完成 —— 这里验证两次调用都发生了。
+        expect(client.runs.stream).toHaveBeenCalledTimes(2);
+    });
+
     it('does not execute the same interrupt twice', async () => {
         const dispatch = vi.fn(async () => ({ success: true }));
         const duplicateInterrupt = {

@@ -133,7 +133,11 @@ export class FrontendToolExecutor {
     }
 
     dispose(): void {
+        // 仅清理运行时副作用（emitter 监听器），不清空 handlers。
+        // handlers 是构造时注册的配置（与 executor 同生命周期），
+        // 清空会破坏 executor 可重用性——React StrictMode 开发模式下会
+        // mount→unmount→remount，useEffect cleanup 会调 dispose，
+        // 若清空 handlers，remount 后 runtime 复用同一 executor 却无 handler 可用。
         this._onConfirmationRequest.dispose();
-        this.handlers.clear();
     }
 }

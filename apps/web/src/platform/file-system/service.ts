@@ -1,3 +1,4 @@
+import { Emitter } from '@/base/common/event';
 import type { IDisposable } from '@/base/common/lifecycle';
 import { ServiceBase } from '@/platform/base/service-base';
 import { Service } from '@/platform/di';
@@ -8,6 +9,18 @@ import { hasCapability } from './utils/capability';
 import { parsePath } from './utils/path';
 
 /**
+ * 文件变更事件载荷
+ */
+export interface FileChangeEvent {
+    /** 发生变更的路径（含 scheme） */
+    path: string;
+    /** 变更类型 */
+    type: 'create' | 'delete' | 'write' | 'rename';
+    /** scheme（file:// 等） */
+    scheme: string;
+}
+
+/**
  * 文件系统服务
  *
  * 统一的文件系统服务入口，负责：
@@ -15,11 +28,17 @@ import { parsePath } from './utils/path';
  * - 路径解析和路由
  * - 能力检查
  * - 方法分发
+ * - 文件变更通知（写操作后发事件，供文件树等视图刷新）
  */
 @Service({ singleton: true })
 export class FileSystemService extends ServiceBase {
     /** 已注册的 Provider 映射表 */
     private providers: Map<string, IFileSystemProvider> = new Map();
+
+    /** 文件变更事件：所有写操作（create/delete/write/rename）后触发 */
+    private readonly _onFileChanged = new Emitter<FileChangeEvent>();
+    /** 订阅文件变更（文件树等视图用它刷新） */
+    readonly onFileChanged = this._onFileChanged.event;
 
     /**
      * 注册 Provider
@@ -132,11 +151,12 @@ export class FileSystemService extends ServiceBase {
      * @param path - 目录路径（包含 scheme）
      */
     async createDirectory(path: string): Promise<void> {
-        const { provider } = this.resolvePath(path);
+        const { parsed, provider } = this.resolvePath(path);
         this.checkCapability(provider, 'createDirectory', FileSystemCapability.Write);
 
         const cleanPath = this.cleanPath(path, provider.scheme);
         await provider.createDirectory(cleanPath);
+        this._onFileChanged.fire({ path, type: 'create', scheme: parsed.scheme });
     }
 
     /**
@@ -145,11 +165,12 @@ export class FileSystemService extends ServiceBase {
      * @param path - 目录路径（包含 scheme）
      */
     async deleteDirectory(path: string): Promise<void> {
-        const { provider } = this.resolvePath(path);
+        const { parsed, provider } = this.resolvePath(path);
         this.checkCapability(provider, 'deleteDirectory', FileSystemCapability.Write);
 
         const cleanPath = this.cleanPath(path, provider.scheme);
         await provider.deleteDirectory(cleanPath);
+        this._onFileChanged.fire({ path, type: 'delete', scheme: parsed.scheme });
     }
 
     /**
@@ -173,11 +194,12 @@ export class FileSystemService extends ServiceBase {
      * @param content - 文件内容
      */
     async writeFile(path: string, content: FileContent): Promise<void> {
-        const { provider } = this.resolvePath(path);
+        const { parsed, provider } = this.resolvePath(path);
         this.checkCapability(provider, 'writeFile', FileSystemCapability.Write);
 
         const cleanPath = this.cleanPath(path, provider.scheme);
         await provider.writeFile(cleanPath, content);
+        this._onFileChanged.fire({ path, type: 'write', scheme: parsed.scheme });
     }
 
     /**
@@ -186,11 +208,12 @@ export class FileSystemService extends ServiceBase {
      * @param path - 文件路径（包含 scheme）
      */
     async deleteFile(path: string): Promise<void> {
-        const { provider } = this.resolvePath(path);
+        const { parsed, provider } = this.resolvePath(path);
         this.checkCapability(provider, 'deleteFile', FileSystemCapability.Write);
 
         const cleanPath = this.cleanPath(path, provider.scheme);
         await provider.deleteFile(cleanPath);
+        this._onFileChanged.fire({ path, type: 'delete', scheme: parsed.scheme });
     }
 
     /**
@@ -214,7 +237,7 @@ export class FileSystemService extends ServiceBase {
      * @param newName - 新名称
      */
     async renameFile(path: string, newName: string): Promise<void> {
-        const { provider } = this.resolvePath(path);
+        const { parsed, provider } = this.resolvePath(path);
         this.checkCapability(provider, 'renameFile', FileSystemCapability.Write);
 
         if (!provider.rename) {
@@ -223,6 +246,7 @@ export class FileSystemService extends ServiceBase {
 
         const cleanPath = this.cleanPath(path, provider.scheme);
         await provider.rename(cleanPath, newName);
+        this._onFileChanged.fire({ path, type: 'rename', scheme: parsed.scheme });
     }
 
     /**
@@ -232,7 +256,7 @@ export class FileSystemService extends ServiceBase {
      * @param newName - 新名称
      */
     async renameDirectory(path: string, newName: string): Promise<void> {
-        const { provider } = this.resolvePath(path);
+        const { parsed, provider } = this.resolvePath(path);
         this.checkCapability(provider, 'renameDirectory', FileSystemCapability.Write);
 
         if (!provider.rename) {
@@ -241,6 +265,7 @@ export class FileSystemService extends ServiceBase {
 
         const cleanPath = this.cleanPath(path, provider.scheme);
         await provider.rename(cleanPath, newName);
+        this._onFileChanged.fire({ path, type: 'rename', scheme: parsed.scheme });
     }
 
     /**
@@ -287,6 +312,7 @@ export class FileSystemService extends ServiceBase {
     }
 
     override dispose(): void {
+        this._onFileChanged.dispose();
         this.providers.clear();
         super.dispose();
     }

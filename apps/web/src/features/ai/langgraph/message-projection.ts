@@ -7,8 +7,13 @@ export function isHiddenFromUI(message: LangGraphRawMessage): boolean {
 export function toLangGraphChatMessage(
     message: LangGraphRawMessage,
     fallbackId: string,
+    resolvedToolCallIds?: Set<string>,
 ): LangGraphChatMessage | null {
     const role = normalizeRole(message.type ?? message.role ?? 'human');
+    // system: 系统提示，不展示。
+    // tool: ToolMessage 是工具执行结果回执，作为 LLM 上下文反馈存在，
+    //       不应在聊天流单独展示——工具调用的状态已由对应 ai 消息的
+    //       ToolCallIndicator（pending/completed）呈现，单独的 tool 消息是冗余的。
     if (role === 'system' || isHiddenFromUI(message)) {
         return null;
     }
@@ -18,20 +23,27 @@ export function toLangGraphChatMessage(
             ? message.tool_calls.map((toolCall, index) => ({
                   id: toolCall.id ?? `${fallbackId}-tool-${index}`,
                   name: toolCall.name ?? 'unknown_tool',
+                  args: isPlainArgs(toolCall.args) ? toolCall.args : undefined,
               }))
             : undefined;
 
-    const toolCallId =
-        role === 'tool' && typeof message.tool_call_id === 'string'
-            ? message.tool_call_id
-            : undefined;
-
+    // tool 消息已在函数顶部过滤（return null），不会到达此处，
+    // 故无需提取 toolCallId。工具调用状态由 ai 消息的 toolStatus 派生。
     const toolStatusRaw = message.additional_kwargs?.tool_status;
-    const toolStatus =
+    const toolStatusFromKwargs =
         typeof toolStatusRaw === 'string' &&
         ['pending', 'completed', 'rejected'].includes(toolStatusRaw)
             ? (toolStatusRaw as 'pending' | 'completed' | 'rejected')
             : undefined;
+
+    // spec 5.6: ai 消息的 tool_calls 状态派生。
+    // 若已有 tool 角色消息匹配 tool_call_id → completed；否则 pending（interrupt 等待中）。
+    // tool 角色消息优先用 additional_kwargs.tool_status（若后端设置）。
+    let toolStatus = toolStatusFromKwargs;
+    if (!toolStatus && role === 'ai' && toolCalls && toolCalls.length > 0) {
+        const resolved = resolvedToolCallIds ?? new Set<string>();
+        toolStatus = toolCalls.every(tc => resolved.has(tc.id)) ? 'completed' : 'pending';
+    }
 
     // 从 tool_calls 中提取第一个工具名称（用于 ToolCallCard 显示）
     const toolName =
@@ -42,16 +54,35 @@ export function toLangGraphChatMessage(
         role,
         content: stringifyContent(message.content),
         toolCalls,
-        toolCallId,
+        // tool 消息已被过滤，toolCallId 永不设置（保留接口兼容）
+        toolCallId: undefined,
         toolStatus,
         toolName,
     };
 }
 
 export function projectMessages(messages: LangGraphRawMessage[]): LangGraphChatMessage[] {
+    // 预扫描：收集所有已「解析」的 tool_call_id（对应存在 tool 角色消息的回执），
+    // 用于派生 ai 消息 tool_calls 的 completed/pending 状态。
+    const resolvedToolCallIds = new Set<string>();
+    for (const msg of messages) {
+        if (
+            normalizeRole(msg.type ?? msg.role ?? '') === 'tool' &&
+            typeof msg.tool_call_id === 'string'
+        ) {
+            resolvedToolCallIds.add(msg.tool_call_id);
+        }
+    }
+
     return messages
-        .map((message, index) => toLangGraphChatMessage(message, `msg-${index}`))
+        .map((message, index) =>
+            toLangGraphChatMessage(message, `msg-${index}`, resolvedToolCallIds),
+        )
         .filter((message): message is LangGraphChatMessage => message !== null);
+}
+
+function isPlainArgs(value: unknown): value is Record<string, unknown> {
+    return value != null && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function extractTaskInterrupts(data: unknown): LangGraphToolInterrupt[] {

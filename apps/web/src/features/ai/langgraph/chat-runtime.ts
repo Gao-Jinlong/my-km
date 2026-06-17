@@ -82,6 +82,31 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
         return this.toolExecutor.onConfirmationRequest;
     }
 
+    /** spec 5.5: per-atom 快照（稳定引用，供 useSyncExternalStore 使用） */
+    getMessagesSnapshot(): LangGraphMessagesAtom {
+        return this.messagesState;
+    }
+
+    getConnectionSnapshot(): LangGraphConnectionAtom {
+        return this.connectionState;
+    }
+
+    getErrorSnapshot(): LangGraphErrorAtom {
+        return this.errorState;
+    }
+
+    getThreadMetaSnapshot(): LangGraphThreadMetaAtom {
+        return this.threadMetaState;
+    }
+
+    getRunStateSnapshot(): LangGraphRunStateAtom {
+        return this.runStateState;
+    }
+
+    getInterruptStateSnapshot(): LangGraphInterruptStateAtom {
+        return this.interruptState;
+    }
+
     /**
      * 向后兼容：由 6 atom 实时拼接
      */
@@ -301,6 +326,11 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
     ): Promise<void> {
         const abortController = new AbortController();
         this.currentAbortController = abortController;
+        // 捕获发起时的 generation。handleToolInterrupt 内部会通过 resumeWithToolResult
+        // bump generation 并发起新 runStream；本 runStream 在 resume 返回后继续消费剩余事件
+        // （如 interrupt 后的 end），finishRun/setInterrupt 前必须校验仍是当前 generation，
+        // 否则会把新 run 的 phase='streaming' 覆盖回 'ready'，破坏 resume 链路。
+        const generation = this.connectionGeneration;
         this.setPhase('streaming');
         this.setError(null);
 
@@ -312,8 +342,10 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
             });
 
             for await (const event of stream) {
+                if (!this.isCurrentGeneration(generation)) return;
                 await this.handleStreamEvent(event);
             }
+            if (!this.isCurrentGeneration(generation)) return;
             if (this.connectionState.phase === 'streaming') {
                 this.finishRun();
             }
@@ -323,6 +355,7 @@ export class LangGraphChatRuntime implements LangGraphChatRuntimeApi {
             if (abortController.signal.aborted) {
                 return;
             }
+            if (!this.isCurrentGeneration(generation)) return;
             this.setError(error instanceof Error ? error.message : String(error));
             // dispatch 失败 / stream 错误都必须落 ready 并清 interrupt,
             // 否则 phase=paused + interrupt 残留会让 runtime 永久卡住。

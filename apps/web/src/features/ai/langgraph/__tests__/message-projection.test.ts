@@ -20,6 +20,8 @@ describe('LangGraph message projection', () => {
             },
         ]);
 
+        // tool 消息（ToolMessage）是 LLM 上下文反馈，不在聊天流展示；
+        // 但其 tool_call_id 仍参与预扫描，使 ai-1 的 toolStatus 派生为 completed。
         expect(messages).toEqual([
             {
                 id: 'h-1',
@@ -34,21 +36,73 @@ describe('LangGraph message projection', () => {
                 id: 'ai-1',
                 role: 'ai',
                 content: 'Reading...',
-                toolCalls: [{ id: 'tc-1', name: 'doc_read' }],
+                toolCalls: [{ id: 'tc-1', name: 'doc_read', args: undefined }],
                 toolCallId: undefined,
-                toolStatus: undefined,
+                // 后续存在 tool_call_id=tc-1 的回执 → completed（即使 tool 消息被隐藏，预扫描仍收集）
+                toolStatus: 'completed',
                 toolName: 'doc_read',
             },
+        ]);
+    });
+
+    it('derives toolStatus=pending for ai message whose tool_call has no matching tool reply (interrupt in flight)', () => {
+        const messages = projectMessages([
+            { id: 'h-1', type: 'human', content: 'create file' },
             {
-                id: 'tool-1',
-                role: 'tool',
-                content: 'ok',
-                toolCalls: undefined,
-                toolCallId: 'tc-1',
-                toolStatus: undefined,
-                toolName: undefined,
+                id: 'ai-1',
+                type: 'ai',
+                content: '',
+                tool_calls: [
+                    {
+                        id: 'tc-1',
+                        name: 'file_ops',
+                        args: { operation: 'create', path: 'ginlon.km' },
+                    },
+                ],
+            },
+            // 无 tool 回执 → 工具调用仍 pending（interrupt 等待前端执行）
+        ]);
+
+        expect(messages).toHaveLength(2);
+        const ai = messages[1];
+        expect(ai.toolStatus).toBe('pending');
+        expect(ai.toolCalls?.[0]).toEqual({
+            id: 'tc-1',
+            name: 'file_ops',
+            args: { operation: 'create', path: 'ginlon.km' },
+        });
+    });
+
+    it('keeps toolStatus=pending when only some tool_calls have replies', () => {
+        const messages = projectMessages([
+            {
+                id: 'ai-1',
+                type: 'ai',
+                content: '',
+                tool_calls: [
+                    { id: 'tc-1', name: 'file_ops' },
+                    { id: 'tc-2', name: 'doc_read' },
+                ],
+            },
+            // 只有 tc-1 有回执，tc-2 没有 → 整体仍 pending
+            { id: 'tool-1', type: 'tool', content: 'ok', tool_call_id: 'tc-1' },
+        ]);
+
+        expect(messages[0].toolStatus).toBe('pending');
+    });
+
+    it('respects explicit additional_kwargs.tool_status over derived status', () => {
+        const messages = projectMessages([
+            {
+                id: 'ai-1',
+                type: 'ai',
+                content: '',
+                tool_calls: [{ id: 'tc-1', name: 'file_ops' }],
+                additional_kwargs: { tool_status: 'rejected' },
             },
         ]);
+
+        expect(messages[0].toolStatus).toBe('rejected');
     });
 
     it('extracts frontend tool interrupts from LangGraph tasks events', () => {

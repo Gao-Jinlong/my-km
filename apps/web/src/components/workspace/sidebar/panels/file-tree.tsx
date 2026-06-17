@@ -258,6 +258,23 @@ export function FileTree({ className, onFileSelect }: FileTreeProps) {
         }
     }, [loadFiles, fileSystemService]);
 
+    // 订阅 FileSystemService 的文件变更事件，外部写入（AI 工具等）后自动刷新文件树。
+    // 防抖：批量写入（如多文件操作）合并为一次刷新。
+    useEffect(() => {
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        const sub = fileSystemService.onFileChanged(() => {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(() => {
+                void refreshTree();
+                timer = null;
+            }, 200);
+        });
+        return () => {
+            if (timer) clearTimeout(timer);
+            sub.dispose();
+        };
+    }, [fileSystemService, refreshTree]);
+
     // 注册文件树右键菜单提供者
     useEffect(() => {
         const dispose = contextMenuService.registerProvider(

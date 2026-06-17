@@ -55,18 +55,30 @@ export interface LangGraphRawMessage {
     type?: string;
     role?: string;
     content?: unknown;
-    tool_calls?: Array<{ id?: string; name?: string }>;
+    tool_calls?: Array<{ id?: string; name?: string; args?: Record<string, unknown> }>;
     tool_call_id?: string;
     additional_kwargs?: Record<string, unknown>;
+}
+
+export interface ToolCallRef {
+    id: string;
+    name: string;
+    /** 工具调用参数（用于 UI 展示摘要，如 file_ops · create ginlon.km） */
+    args?: Record<string, unknown>;
 }
 
 export interface LangGraphChatMessage {
     id: string;
     role: 'human' | 'ai' | 'tool' | 'system';
     content: string;
-    toolCalls?: Array<{ id: string; name: string }>;
+    toolCalls?: ToolCallRef[];
     toolCallId?: string;
-    /** spec 5.6: 工具调用状态，由 additional_kwargs.tool_status 派生 */
+    /**
+     * spec 5.6: 工具调用状态。
+     * - tool 角色消息：由 additional_kwargs.tool_status 派生
+     * - ai 角色消息：由 projectMessages 派生——若后续存在匹配 tool_call_id 的
+     *   tool 消息则 'completed'，否则 'pending'（interrupt 等待中）
+     */
     toolStatus?: 'pending' | 'completed' | 'rejected';
     /** 工具名称（用于 ToolCallCard 显示） */
     toolName?: string;
@@ -153,7 +165,15 @@ export interface LangGraphChatRuntimeOptions {
 
 export interface LangGraphChatRuntimeApi {
     readonly onConfirmationRequest?: Event<ConfirmationRequest>;
+    /** 向后兼容：完整快照 */
     getSnapshot(): LangGraphChatSnapshot;
+    /** spec 5.5：per-atom 快照（稳定引用，供 useSyncExternalStore 使用） */
+    getMessagesSnapshot(): LangGraphMessagesAtom;
+    getConnectionSnapshot(): LangGraphConnectionAtom;
+    getErrorSnapshot(): LangGraphErrorAtom;
+    getThreadMetaSnapshot(): LangGraphThreadMetaAtom;
+    getRunStateSnapshot(): LangGraphRunStateAtom;
+    getInterruptStateSnapshot(): LangGraphInterruptStateAtom;
     /** 旧版全局订阅（保留向后兼容） */
     subscribe(listener: () => void): IDisposable;
     /** spec 5.5：per-atom 精确订阅 */

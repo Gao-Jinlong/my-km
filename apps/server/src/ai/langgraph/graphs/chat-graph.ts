@@ -11,10 +11,10 @@
  * - state.messages 现在是 BaseMessage[](由 MessagesAnnotation 提供)
  */
 
-import { AIMessage } from '@langchain/core/messages';
 import { END, START, StateGraph } from '@langchain/langgraph';
 import { createLLMNode } from '../nodes/llm-node';
 import { createToolNode } from '../nodes/tool-node';
+import { hasToolCalls } from '../types/message-utils';
 import { type WorkflowState, WorkflowStateAnnotation } from '../types/workflow.types';
 
 export class ChatGraph {
@@ -37,7 +37,9 @@ export class ChatGraph {
             .addEdge(START, 'llm_call')
             .addConditionalEdges('llm_call', (state: WorkflowState) => {
                 const last = state.messages[state.messages.length - 1];
-                if (last instanceof AIMessage && last.tool_calls && last.tool_calls.length > 0) {
+                // 不用 instanceof AIMessage：streaming provider 返回 AIMessageChunk，
+                // 它运行时不是 AIMessage 的实例。见 hasToolCalls 注释。
+                if (hasToolCalls(last)) {
                     return 'tools';
                 }
                 return END;

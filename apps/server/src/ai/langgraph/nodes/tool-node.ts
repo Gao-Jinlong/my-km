@@ -13,21 +13,29 @@
  * 3. 将 resume 值包装为 ToolMessage,append 到 state.messages
  */
 
-import { AIMessage, type BaseMessage, ToolMessage } from '@langchain/core/messages';
+import { type BaseMessage, ToolMessage } from '@langchain/core/messages';
 import { interrupt } from '@langchain/langgraph';
 import { endToolSpan, startToolSpan } from '../../../tracing/instrumentations/tool-node.span';
+import { hasToolCalls } from '../types/message-utils';
 import type { WorkflowState } from '../types/workflow.types';
 
 export function createToolNode() {
     return async (state: WorkflowState): Promise<Partial<WorkflowState>> => {
         const lastMessage = state.messages[state.messages.length - 1];
-        if (!(lastMessage instanceof AIMessage) || !lastMessage.tool_calls?.length) {
+        // 不用 instanceof AIMessage：streaming provider 返回 AIMessageChunk，
+        // 它运行时不是 AIMessage 的实例。见 hasToolCalls 注释。
+        if (!hasToolCalls(lastMessage)) {
             return {};
         }
 
         const toolMessages: BaseMessage[] = [];
+        // tool_calls 仅在 AIMessage / AIMessageChunk 子类声明；hasToolCalls 已确认 _getType==='ai'，
+        // 故用结构化断言访问（含 id/name/args 的 OpenAIToolCall 数组）。
+        const toolCalls =
+            (lastMessage as { tool_calls?: Array<{ id?: string; name?: string; args?: unknown }> })
+                .tool_calls ?? [];
 
-        for (const toolCall of lastMessage.tool_calls) {
+        for (const toolCall of toolCalls) {
             if (!toolCall.id || !toolCall.name) continue;
 
             const toolSpan = startToolSpan({
