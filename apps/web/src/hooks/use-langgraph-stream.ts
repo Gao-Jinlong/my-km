@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import type { Event } from '@/base/common/event';
 import { createDefaultLangGraphChatRuntime } from '@/features/ai/langgraph/runtime-factory';
 import type {
@@ -29,13 +29,20 @@ export interface UseLangGraphStreamReturn extends LangGraphChatSnapshot {
 /**
  * spec 5.5: 精确订阅 hook，只订阅需要的 atom，避免无效重渲染。
  * 组件可以根据自己需要的数据选择对应的 selector。
+ *
+ * 警告：selector 必须返回稳定引用（基本类型或记忆化对象），
+ * 否则 useSyncExternalStore 会触发"getSnapshot 未缓存"警告。
  */
 export function useLangGraphAtom<T>(
     runtime: LangGraphChatRuntimeApi,
     selector: (snapshot: LangGraphChatSnapshot) => T,
     serverSnapshot: T,
 ): T {
-    const getSnapshot = () => selector(runtime.getSnapshot());
+    // 使用 useCallback 稳定 getSnapshot 函数引用
+    const getSnapshot = useCallback(
+        () => selector(runtime.getSnapshot()),
+        [runtime, selector],
+    );
 
     return useSyncExternalStore(
         listener => {
@@ -67,15 +74,13 @@ export function useLangGraphStream(
     const runtime = runtimeRef.current;
 
     // spec 5.5: 独立订阅每个 atom，精确触发重渲染
+    // 注意：getSnapshot 必须返回稳定引用，否则会触发 React 无限循环警告
     const messagesState = useSyncExternalStore(
         listener => {
             const subscription = runtime.subscribeMessages(listener);
             return () => subscription.dispose();
         },
-        () => ({
-            messages: runtime.getSnapshot().messages,
-            lastSeq: runtime.getSnapshot().lastSeq,
-        }),
+        () => runtime.getMessagesSnapshot(),
         () => SERVER_MESSAGES_ATOM,
     );
 
@@ -84,7 +89,7 @@ export function useLangGraphStream(
             const subscription = runtime.subscribeConnection(listener);
             return () => subscription.dispose();
         },
-        () => ({ phase: runtime.getSnapshot().connectionPhase }),
+        () => runtime.getConnectionSnapshot(),
         () => SERVER_CONNECTION_ATOM,
     );
 
@@ -93,7 +98,7 @@ export function useLangGraphStream(
             const subscription = runtime.subscribeError(listener);
             return () => subscription.dispose();
         },
-        () => ({ error: runtime.getSnapshot().error }),
+        () => runtime.getErrorSnapshot(),
         () => SERVER_ERROR_ATOM,
     );
 
@@ -102,7 +107,7 @@ export function useLangGraphStream(
             const subscription = runtime.subscribeThreadMeta(listener);
             return () => subscription.dispose();
         },
-        () => ({ threadId: runtime.getSnapshot().threadId }),
+        () => runtime.getThreadMetaSnapshot(),
         () => SERVER_THREAD_META_ATOM,
     );
 
@@ -111,7 +116,7 @@ export function useLangGraphStream(
             const subscription = runtime.subscribeRunState(listener);
             return () => subscription.dispose();
         },
-        () => ({ runId: runtime.getSnapshot().runId }),
+        () => runtime.getRunStateSnapshot(),
         () => SERVER_RUN_STATE_ATOM,
     );
 
@@ -120,7 +125,7 @@ export function useLangGraphStream(
             const subscription = runtime.subscribeInterruptState(listener);
             return () => subscription.dispose();
         },
-        () => ({ interrupt: runtime.getSnapshot().interrupt }),
+        () => runtime.getInterruptStateSnapshot(),
         () => SERVER_INTERRUPT_ATOM,
     );
 
@@ -137,7 +142,7 @@ export function useLangGraphStream(
     return useMemo(
         () => ({
             ...messagesState,
-            ...connectionState,
+            connectionPhase: connectionState.phase,
             ...errorState,
             ...threadMetaState,
             ...runStateState,
