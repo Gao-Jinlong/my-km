@@ -1,13 +1,19 @@
 /**
  * 消息组件统一导出入口
- * 外部通过此文件导入子组件，便于后续重构调整内部结构
+ *
+ * 架构分层：
+ * - 外观层: MessageBubble (外部调用入口)
+ * - 按发送者分发: HumanMessage, AIMessage, ToolMessage(预留), SystemMessage(预留)
+ * - 按内容分发（在 AIMessage 内）: 未来扩展代码块、图片、思考链等
  */
 
-export { TextMessage } from './TextMessage';
+export { AIMessage } from './AIMessage';
+export { HumanMessage } from './HumanMessage';
 export { ToolCallIndicator } from './ToolCallIndicator';
-export { ToolMessage } from './ToolMessage';
 export type {
-    TextMessageProps,
+    AIMessageProps,
+    HumanMessageProps,
+    SystemMessageProps,
     ToolCallIndicatorProps,
     ToolMessageProps,
 } from './types';
