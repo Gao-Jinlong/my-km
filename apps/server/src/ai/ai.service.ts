@@ -18,8 +18,16 @@
 
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { Command } from '@langchain/langgraph';
-import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+    BadRequestException,
+    ConflictException,
+    Inject,
+    Injectable,
+    Logger,
+    NotFoundException,
+} from '@nestjs/common';
 import { context as otelContext, SpanStatusCode, trace } from '@opentelemetry/api';
+import type { Response } from 'express';
 import { CheckpointReaderService } from './checkpointer/checkpoint-reader.service';
 import { EventBus, type RunStreamEvent } from './event/event-bus';
 import { ChatGraph } from './langgraph/graphs/chat-graph';
@@ -27,12 +35,16 @@ import { LLMFactory } from './llm/llm-factory';
 import type { LLMConfig } from './llm/provider.types';
 import { ProviderRegistry } from './llm/provider-registry';
 import type { LeaseResult } from './run/lease.types';
+import { JoinStreamService } from './run/join-stream.service';
 import { REPLICA_ID } from './run/replica-id';
 import type { RunContext } from './run/run-context';
 import { RunContextFactory } from './run/run-context-factory';
 import { RunManager } from './run/run-manager';
 import { RunRecord } from './run/run-record';
 import { RunStateRepository } from './run/run-state.repository';
+import type { RunEventSink } from './run/run-event-sink';
+import { extractLastUserMessage } from './run/run-dto.mapper';
+import { sendProtocolError, setSseHeaders, writeSSE } from './run/sse-helpers';
 import { ThreadService } from './thread/thread.service';
 import { frontendTools } from './tools/tool-definitions';
 import { type MultitaskStrategy, RunStatus } from './types/run.types';
@@ -49,6 +61,26 @@ export interface StartRunOpts {
     llmConfig?: { provider?: string; model?: string };
 }
 
+/**
+ * streamRun 统一编排入口的入参（对应 controller 转发）。
+ */
+export interface StreamRunCommand {
+    threadId: string;
+    input?: { messages?: Array<{ type: string; content: string }> } | null;
+    command?: { resume?: unknown } | null;
+    context?: Record<string, unknown>;
+    multitaskStrategy?: MultitaskStrategy;
+}
+
+/**
+ * streamRun 输入无效（无 user message）时抛出，service 内部映射成 SSE invalid_input 错误帧。
+ */
+export class InvalidRunInputError extends BadRequestException {
+    constructor(message: string) {
+        super(message);
+    }
+}
+
 @Injectable()
 export class AiChatService {
     private readonly logger = new Logger(AiChatService.name);
@@ -63,6 +95,7 @@ export class AiChatService {
         private readonly _checkpointReader: CheckpointReaderService,
         private readonly runStateRepo: RunStateRepository,
         private readonly eventBus: EventBus,
+        private readonly joinStreamService: JoinStreamService,
         @Inject(REPLICA_ID) private readonly replicaId: string,
     ) {
         // 避免 TS unused 警告，保持构造依赖以便测试与未来用途
@@ -452,6 +485,101 @@ export class AiChatService {
         } as unknown as RunStreamEvent);
 
         return { accepted: true, ownerId: runRow.ownerId };
+    }
+
+    // ========== SSE 流编排门面（controller 调用，胶水内聚于此）==========
+
+    /**
+     * 统一编排入口：设 SSE 头 → 判断 resume vs 新 run → 提取 user message →
+     * 建 sink + registerSink → executeRunProtocol。
+     *
+     * controller 只需 `await aiService.streamRun(cmd, res)`，不碰 SSE 细节。
+     *
+     * 异常约定（service 内部 catch 并映射成 SSE 错误帧）：
+     *   - InvalidRunInputError → code: 'invalid_input'
+     *   - ConflictException    → code: 'busy'（multitask reject / resume 非终态）
+     *   - 其他                 → code: 'execution_error'
+     */
+    async streamRun(cmd: StreamRunCommand, res: Response): Promise<void> {
+        setSseHeaders(res);
+        let unregister: () => void = () => {};
+        try {
+            let record: RunRecord;
+            if (cmd.command?.resume !== undefined) {
+                record = await this.resumeFromCommand(cmd.threadId, cmd.command);
+            } else {
+                const content = extractLastUserMessage(cmd.input?.messages ?? []);
+                if (!content) {
+                    throw new InvalidRunInputError('No user message in input');
+                }
+                record = await this.startRun({
+                    content,
+                    threadId: cmd.threadId,
+                    context: cmd.context,
+                    multitaskStrategy: cmd.multitaskStrategy ?? 'reject',
+                });
+            }
+
+            // 胶水：Express Response → RunEventSink（内联构造，不单独抽 adapter 文件）
+            const sink: RunEventSink = {
+                push: e => writeSSE(res, e.eventType, e.payload, e.seq),
+                close: () => {
+                    if (!res.writableEnded) {
+                        res.end();
+                    }
+                },
+            };
+            unregister = record.registerSink(sink);
+            await this.executeRunProtocol(record);
+        } catch (error) {
+            this.logger.error(`streamRun failed: ${(error as Error).message}`);
+            const code = error instanceof InvalidRunInputError
+                ? 'invalid_input'
+                : error instanceof ConflictException
+                  ? 'busy'
+                  : 'execution_error';
+            sendProtocolError(res, code, error instanceof Error ? error.message : 'Unknown error');
+        } finally {
+            unregister();
+            if (!res.writableEnded) {
+                res.end();
+            }
+        }
+    }
+
+    /**
+     * 统一重连入口。
+     *
+     * spec 3.5 Step 1 约束：lookupRun 的 404 必须在 SSE flush 前以 JSON 返回。
+     * 因此 lookupRun 抛 NotFoundException 时不设 SSE 头、直接向上抛，
+     * 由 controller catch 后 res.status(404).json(...) 返回。
+     * 校验通过后才设 SSE 头，之后任何异常都只能写错误帧。
+     */
+    async joinStream(runId: string, since: number, res: Response): Promise<void> {
+        // 1. 先校验 run 存在（抛 NotFoundException 让 controller 返回 JSON）
+        await this.joinStreamService.lookupRun(runId);
+
+        // 2. 校验通过后才设 SSE 头
+        setSseHeaders(res);
+        const sink: RunEventSink = {
+            push: e => writeSSE(res, e.eventType, e.payload, e.seq),
+            close: () => {
+                if (!res.writableEnded) {
+                    res.end();
+                }
+            },
+        };
+
+        // 3. 注册断线清理
+        let cleanup: () => void = () => {};
+        res.on('close', () => cleanup());
+
+        try {
+            cleanup = await this.joinStreamService.joinStream(runId, since, sink);
+        } catch (error) {
+            this.logger.error(`joinStream failed: ${(error as Error).message}`);
+            sendProtocolError(res, 'execution_error', (error as Error).message);
+        }
     }
 
     // ========== Private Helpers ==========
