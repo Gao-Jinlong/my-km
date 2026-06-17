@@ -35,6 +35,7 @@ import { REPLICA_ID } from './run/replica-id';
 import { RunContextFactory } from './run/run-context-factory';
 import { RunManager } from './run/run-manager';
 import { RunStateRepository } from './run/run-state.repository';
+import { RunQueryService } from './run/run-query.service';
 import { RunsController } from './run/runs.controller';
 import { RunEventStore } from './store/run-event-store';
 import { ThreadService } from './thread/thread.service';
@@ -76,6 +77,7 @@ import { ThreadService } from './thread/thread.service';
         RunManager,
         RunContextFactory,
         JoinStreamService,
+        RunQueryService,
 
         // 业务逻辑层
         AiChatService,
