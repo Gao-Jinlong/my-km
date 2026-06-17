@@ -22,7 +22,7 @@ import { CheckpointerProvider } from './checkpointer/checkpointer.provider';
 import { EventBus } from './event/event-bus';
 import { InProcessEventBus } from './event/in-process.event-bus';
 import { RedisEventBus } from './event/redis.event-bus';
-import { ThreadsController } from './langgraph/threads.controller';
+import { ThreadsController } from './thread/threads.controller';
 import { AnthropicProvider } from './llm/anthropic.provider';
 import { DashscopeProvider } from './llm/dashscope.provider';
 import { buildDefaultLlmConfig } from './llm/llm-default-config';
