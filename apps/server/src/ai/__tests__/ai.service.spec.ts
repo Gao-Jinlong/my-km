@@ -13,6 +13,7 @@ import { RunContextFactory } from '../run/run-context-factory';
 import { RunManager } from '../run/run-manager';
 import { RunRecord } from '../run/run-record';
 import { RunStateRepository } from '../run/run-state.repository';
+import { JoinStreamService } from '../run/join-stream.service';
 import type { RunEventStore } from '../store/run-event-store';
 import { ThreadService } from '../thread/thread.service';
 import { RunStatus } from '../types/run.types';
@@ -249,6 +250,13 @@ describe('AiChatService', () => {
                     useValue: {
                         publish: jest.fn().mockResolvedValue(undefined),
                         subscribe: jest.fn().mockReturnValue({ unsubscribe: jest.fn() }),
+                    },
+                },
+                {
+                    provide: JoinStreamService,
+                    useValue: {
+                        lookupRun: jest.fn().mockResolvedValue(undefined),
+                        joinStream: jest.fn().mockResolvedValue(jest.fn()),
                     },
                 },
             ],

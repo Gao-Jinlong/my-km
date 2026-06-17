@@ -22,7 +22,7 @@ import { CheckpointerProvider } from './checkpointer/checkpointer.provider';
 import { EventBus } from './event/event-bus';
 import { InProcessEventBus } from './event/in-process.event-bus';
 import { RedisEventBus } from './event/redis.event-bus';
-import { ThreadsController } from './langgraph/threads.controller';
+import { ThreadsController } from './thread/threads.controller';
 import { AnthropicProvider } from './llm/anthropic.provider';
 import { DashscopeProvider } from './llm/dashscope.provider';
 import { buildDefaultLlmConfig } from './llm/llm-default-config';
@@ -35,6 +35,7 @@ import { REPLICA_ID } from './run/replica-id';
 import { RunContextFactory } from './run/run-context-factory';
 import { RunManager } from './run/run-manager';
 import { RunStateRepository } from './run/run-state.repository';
+import { RunQueryService } from './run/run-query.service';
 import { RunsController } from './run/runs.controller';
 import { RunEventStore } from './store/run-event-store';
 import { ThreadService } from './thread/thread.service';
@@ -76,6 +77,7 @@ import { ThreadService } from './thread/thread.service';
         RunManager,
         RunContextFactory,
         JoinStreamService,
+        RunQueryService,
 
         // 业务逻辑层
         AiChatService,
