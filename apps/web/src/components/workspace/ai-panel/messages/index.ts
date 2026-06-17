@@ -5,6 +5,7 @@
 
 export { TextMessage } from './TextMessage';
 export { ToolCallIndicator } from './ToolCallIndicator';
+export { ToolMessage } from './ToolMessage';
 export type {
     TextMessageProps,
     ToolCallIndicatorProps,
