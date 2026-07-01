@@ -3,8 +3,14 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { EditorTabService } from '@/platform/editor-tab/service';
 import { registerBuiltinBlocks } from '../../registry/builtin-types';
 import { EditorContainer } from '../EditorContainer';
+
+// EditorContainer 构造函数需要 EditorTabService（用于 getActiveInstance）
+function createMockEditorTabService(): EditorTabService {
+    return { getActiveDocumentId: () => null } as unknown as EditorTabService;
+}
 
 describe('EditorContainer', () => {
     beforeEach(() => {
@@ -16,8 +22,8 @@ describe('EditorContainer', () => {
     });
 
     it('should be a singleton', () => {
-        const container1 = new EditorContainer();
-        const container2 = new EditorContainer();
+        const container1 = new EditorContainer(createMockEditorTabService());
+        const container2 = new EditorContainer(createMockEditorTabService());
 
         // Both should be separate instances (DI container manages singleton)
         expect(container1).toBeDefined();
@@ -25,7 +31,7 @@ describe('EditorContainer', () => {
     });
 
     it('should create an editor instance', () => {
-        const container = new EditorContainer();
+        const container = new EditorContainer(createMockEditorTabService());
 
         const service = container.createInstance('doc-123', '/test/doc.md');
 
@@ -35,7 +41,7 @@ describe('EditorContainer', () => {
     });
 
     it('should return existing instance when creating duplicate', () => {
-        const container = new EditorContainer();
+        const container = new EditorContainer(createMockEditorTabService());
 
         const service1 = container.createInstance('doc-123', '/test/doc.md');
         const service2 = container.createInstance('doc-123', '/test/doc.md');
@@ -44,7 +50,7 @@ describe('EditorContainer', () => {
     });
 
     it('should get service by document id', () => {
-        const container = new EditorContainer();
+        const container = new EditorContainer(createMockEditorTabService());
         container.createInstance('doc-123', '/test/doc.md');
 
         const service = container.getService('doc-123');
@@ -54,7 +60,7 @@ describe('EditorContainer', () => {
     });
 
     it('should return null for non-existent service', () => {
-        const container = new EditorContainer();
+        const container = new EditorContainer(createMockEditorTabService());
 
         const service = container.getService('non-existent');
 
@@ -62,7 +68,7 @@ describe('EditorContainer', () => {
     });
 
     it('should dispose instance', () => {
-        const container = new EditorContainer();
+        const container = new EditorContainer(createMockEditorTabService());
         container.createInstance('doc-123', '/test/doc.md');
 
         container.disposeInstance('doc-123');
@@ -72,7 +78,7 @@ describe('EditorContainer', () => {
     });
 
     it('should dispose all instances', () => {
-        const container = new EditorContainer();
+        const container = new EditorContainer(createMockEditorTabService());
         container.createInstance('doc-1', '/test/1.md');
         container.createInstance('doc-2', '/test/2.md');
 
@@ -83,7 +89,7 @@ describe('EditorContainer', () => {
     });
 
     it('should get all document ids', () => {
-        const container = new EditorContainer();
+        const container = new EditorContainer(createMockEditorTabService());
         container.createInstance('doc-1', '/test/1.md');
         container.createInstance('doc-2', '/test/2.md');
 

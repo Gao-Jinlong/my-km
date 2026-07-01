@@ -8,9 +8,8 @@ import 'reflect-metadata';
 import { deserializeFromKmFile } from '@/features/editor/converter/km-serializer';
 import { serializeToMarkdown } from '@/features/editor/converter/markdown-serializer';
 import { ServiceBase } from '@/platform/base/service-base';
-import { container } from '@/platform/bootstrap';
-import { Service } from '@/platform/di';
-import type { FileSystemService } from '@/platform/file-system/service';
+import { Inject, Service } from '@/platform/di';
+import { FileSystemService } from '@/platform/file-system/service';
 
 /**
  * 导出格式
@@ -34,11 +33,11 @@ export interface ExportOptions {
  */
 @Service({ singleton: true })
 export class DocumentExportService extends ServiceBase {
-    private fileService: FileSystemService;
+    private readonly fileService: FileSystemService;
 
-    constructor() {
+    constructor(@Inject(FileSystemService) fileService: FileSystemService) {
         super();
-        this.fileService = container.get('FileSystemService') as FileSystemService;
+        this.fileService = fileService;
     }
 
     /**
@@ -90,6 +89,7 @@ export class DocumentExportService extends ServiceBase {
     /**
      * 将 Block[] 转换为纯文本
      */
+    // biome-ignore lint/suspicious/noExplicitAny: block 结构是动态的联合类型，此处按 type 字段逐分支处理
     private blocksToPlainText(blocks: any[]): string {
         const lines: string[] = [];
 
@@ -144,6 +144,7 @@ export class DocumentExportService extends ServiceBase {
                         const rowCells: string[] = [];
                         for (let c = 0; c < block.content.cols; c++) {
                             const cell = block.content.cells.find(
+                                // biome-ignore lint/suspicious/noExplicitAny: cell 结构动态，按 row/col 匹配
                                 (cell: any) => cell.row === r && cell.col === c,
                             );
                             rowCells.push(cell?.content || '');
@@ -161,6 +162,7 @@ export class DocumentExportService extends ServiceBase {
     /**
      * 将 Inline[] 转换为纯文本
      */
+    // biome-ignore lint/suspicious/noExplicitAny: inline 元素结构动态，仅取 .text 字段
     private inlineToPlainText(inline: any[]): string {
         return inline.map(item => item.text).join('');
     }

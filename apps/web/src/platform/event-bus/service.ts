@@ -1,5 +1,4 @@
-import { container } from '@/platform/bootstrap';
-import { Service } from '@/platform/di';
+import { Inject, Service } from '@/platform/di';
 import type { Logger } from '@/platform/monitor';
 import { MonitorService } from '@/platform/monitor/service';
 import { Emitter } from '../../base/common/event';
@@ -23,16 +22,18 @@ interface Subscription {
  */
 @Service({ singleton: true })
 export class EventBusService extends ServiceBase {
-    private _logger?: Logger;
+    private readonly _logger: Logger;
 
     /**
-     * 惰性获取 logger（避免在容器初始化前访问）
+     * 获取 logger
      */
     protected get logger(): Logger {
-        if (!this._logger) {
-            this._logger = container.get(MonitorService).getLogger('event-bus');
-        }
         return this._logger;
+    }
+
+    constructor(@Inject(MonitorService) monitorService: MonitorService) {
+        super();
+        this._logger = monitorService.getLogger('event-bus');
     }
 
     // 事件发射器

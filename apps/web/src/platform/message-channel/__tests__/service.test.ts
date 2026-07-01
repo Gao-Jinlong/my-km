@@ -1,5 +1,7 @@
 // apps/web/src/platform/message-channel/__tests__/service.test.ts
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createMockMonitorService } from '@/platform/monitor/__tests__/mock-monitor';
+import type { MonitorService } from '@/platform/monitor/service';
 import { MessageChannelService } from '../service';
 import { type Message, MessageChannelState } from '../types';
 
@@ -7,7 +9,9 @@ describe('MessageChannelService', () => {
     let service: MessageChannelService;
 
     beforeEach(() => {
-        service = new MessageChannelService();
+        service = new MessageChannelService(
+            createMockMonitorService() as unknown as MonitorService,
+        );
     });
 
     afterEach(() => {

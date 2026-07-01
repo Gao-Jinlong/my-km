@@ -6,8 +6,7 @@
 
 import { Emitter, type IDisposable, toDisposable } from '@/base/common/event';
 import { ServiceBase } from '@/platform/base/service-base';
-import { container } from '@/platform/bootstrap';
-import { Service } from '@/platform/di';
+import { Inject, Service } from '@/platform/di';
 import type { Logger } from '@/platform/monitor';
 import { MonitorService } from '@/platform/monitor/service';
 
@@ -89,15 +88,12 @@ export interface PanelServiceOptions {
 export class PanelService extends ServiceBase {
     private readonly _panels = new Map<string, PanelConfig>();
     private readonly _states = new Map<string, PanelState>();
-    private _logger?: Logger;
+    private readonly _logger: Logger;
 
     /**
-     * 惰性获取 logger（避免在容器初始化前访问）
+     * 获取 logger
      */
     protected get logger(): Logger {
-        if (!this._logger) {
-            this._logger = container.get(MonitorService).getLogger('panel');
-        }
         return this._logger;
     }
 
@@ -114,8 +110,9 @@ export class PanelService extends ServiceBase {
     /** 面板大小变化事件 */
     readonly onDidChangeSize = this._onDidChangeSize.event;
 
-    constructor() {
+    constructor(@Inject(MonitorService) monitorService: MonitorService) {
         super();
+        this._logger = monitorService.getLogger('panel');
         this._options = {
             autoHideThreshold: 10, // 默认 10% 阈值
             restoreSize: 20, // 默认恢复 20%

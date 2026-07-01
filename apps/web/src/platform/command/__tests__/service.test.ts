@@ -1,12 +1,16 @@
 // apps/web/src/platform/command/__tests__/service.test.ts
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createMockMonitorService } from '@/platform/monitor/__tests__/mock-monitor';
+import type { MonitorService } from '@/platform/monitor/service';
 import { CommandService } from '../service';
 
 describe('CommandService', () => {
     let commandService: CommandService;
 
     beforeEach(() => {
-        commandService = new CommandService();
+        commandService = new CommandService(
+            createMockMonitorService() as unknown as MonitorService,
+        );
     });
 
     afterEach(() => {

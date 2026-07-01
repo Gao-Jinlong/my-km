@@ -18,6 +18,7 @@
 | [docs/frontend/architecture.md](docs/frontend/architecture.md) | 前端分层架构：platform / features / components |
 | [docs/frontend/platform/services.md](docs/frontend/platform/services.md) | DI 容器和服务注册机制 |
 | [docs/guides/code-style.md](docs/guides/code-style.md) | 代码风格规范 |
+| [docs/guides/frontend-di.md](docs/guides/frontend-di.md) | 前端 DI 使用规范：构造函数注入、@Inject/@Lazy/@Optional、useService、测试约束 |
 
 ## 后端开发
 

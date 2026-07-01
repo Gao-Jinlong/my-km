@@ -1,7 +1,6 @@
 // apps/web/src/platform/message-channel/service.ts
 
-import { container } from '@/platform/bootstrap';
-import { Service } from '@/platform/di';
+import { Inject, Service } from '@/platform/di';
 import type { Logger } from '@/platform/monitor';
 import { MonitorService } from '@/platform/monitor/service';
 import { Emitter, type IDisposable } from '../../base/common/event';
@@ -19,16 +18,18 @@ import { MessageChannelState } from './types';
 export class MessageChannelService extends ServiceBase {
     /** 通道注册表 */
     private readonly channels = new Map<string, IMessageChannel>();
-    private _logger?: Logger;
+    private readonly _logger: Logger;
 
     /**
-     * 惰性获取 logger（避免在容器初始化前访问）
+     * 获取 logger
      */
     protected get logger(): Logger {
-        if (!this._logger) {
-            this._logger = container.get(MonitorService).getLogger('message-channel');
-        }
         return this._logger;
+    }
+
+    constructor(@Inject(MonitorService) monitorService: MonitorService) {
+        super();
+        this._logger = monitorService.getLogger('message-channel');
     }
 
     /** 通道配置 */

@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createMockMonitorService } from '@/platform/monitor/__tests__/mock-monitor';
+import type { MonitorService } from '@/platform/monitor/service';
 import { EventBusService } from '../service';
 
 describe('EventBusService', () => {
     let eventBus: EventBusService;
 
     beforeEach(() => {
-        eventBus = new EventBusService();
+        eventBus = new EventBusService(createMockMonitorService() as unknown as MonitorService);
     });
 
     afterEach(() => {

@@ -7,6 +7,7 @@
 // reflect-metadata 必须在所有装饰器被求值前加载
 import 'reflect-metadata';
 
+import { DocumentExportService } from '@/features/editor/service/DocumentExportService';
 import { CommandService } from './command/service';
 import { registerConditionEvaluators } from './conditional/evaluators';
 import { ConditionalService } from './conditional/service';
@@ -56,7 +57,7 @@ export interface AppServices {
 function createServiceContainer(): ServiceContainer {
     const container = new ServiceContainer();
 
-    // 注册所有服务（MonitorService 最先注册，无依赖）
+    // 注册所有服务。注册顺序无关——容器在 get() 时按需实例化并自动解析依赖。
     container.register(MonitorService);
     container.register(FileSystemService);
     container.register(ContextMenuService);
@@ -72,6 +73,7 @@ function createServiceContainer(): ServiceContainer {
     container.register(PanelService);
     container.register(ConditionalService);
     container.register(TracingService);
+    container.register(DocumentExportService);
 
     return container;
 }

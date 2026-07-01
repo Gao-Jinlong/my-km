@@ -26,8 +26,7 @@
  */
 
 import { ServiceBase } from '@/platform/base/service-base';
-import { container } from '@/platform/bootstrap';
-import { Service } from '@/platform/di';
+import { Inject, Service } from '@/platform/di';
 import type { Logger } from '@/platform/monitor';
 import { MonitorService } from '@/platform/monitor/service';
 import type {
@@ -41,16 +40,18 @@ import type {
 
 @Service({ singleton: true })
 export class ConditionalService extends ServiceBase implements IConditionalService {
-    private _logger?: Logger;
+    private readonly _logger: Logger;
 
     /**
-     * 惰性获取 logger（避免在容器初始化前访问）
+     * 获取 logger
      */
     protected get logger(): Logger {
-        if (!this._logger) {
-            this._logger = container.get(MonitorService).getLogger('conditional');
-        }
         return this._logger;
+    }
+
+    constructor(@Inject(MonitorService) monitorService: MonitorService) {
+        super();
+        this._logger = monitorService.getLogger('conditional');
     }
 
     /** 条件注册表 */

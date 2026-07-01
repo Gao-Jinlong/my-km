@@ -1,10 +1,12 @@
 /**
  * 条件评估器注册
  *
- * 在应用启动时注册所有条件评估器
+ * 在应用启动时注册所有条件评估器。
+ * 这是一个 bootstrap 期的 wiring 函数（非 service 构造函数），
+ * 因此通过 container.get 获取已实例化的服务是合理的。
  */
 
-import { container } from '@/platform/bootstrap';
+import { getContainer } from '@/platform/bootstrap';
 import { ConditionalService } from '@/platform/conditional/service';
 import { ConditionId } from '@/platform/conditional/types';
 import { EditorTabService } from '@/platform/editor-tab/service';
@@ -16,6 +18,7 @@ import { PanelService } from '@/platform/panel/service';
  * 在应用启动时调用一次
  */
 export function registerConditionEvaluators(): void {
+    const container = getContainer();
     const conditionalService = container.get(ConditionalService);
     const panelService = container.get(PanelService);
     const editorTabService = container.get(EditorTabService);

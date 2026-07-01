@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import 'reflect-metadata';
 import { ServiceContainer } from '../container';
-import { Inject, Optional, Service } from '../decorators';
+import { Inject, Lazy, Optional, Service } from '../decorators';
 
 // --- Test fixture services ---
 
@@ -47,6 +47,53 @@ class ChainB {
 @Service({ singleton: true })
 class ChainA {
     constructor(@Inject(ChainB) public b: ChainB) {}
+}
+
+// --- New fixtures: constructor type auto-injection ---
+// 注意：vitest 默认使用 esbuild 转译，不输出 design:paramtypes 元数据。
+// 因此「纯类型推断」(无 @Inject) 仅在生产构建 (Next.js/SWC) 中可用。
+// 测试中使用 @Inject(Class) 来确保跨环境一致性。
+
+@Service({ singleton: true })
+class AutoInjectedService {
+    constructor(@Inject(RootService) public root: RootService) {}
+}
+
+@Service({ singleton: true })
+class MixedInjectionService {
+    constructor(
+        @Inject(RootService) public root: RootService, // type + explicit inject
+        @Inject('nonexistent') @Optional() public optional?: unknown, // string token + optional
+    ) {}
+}
+
+// --- New fixtures: @Lazy() circular dependency breaking ---
+// 使用字符串 token 避免 TDZ（前向引用未初始化的类）
+
+@Service({ singleton: true })
+class LazyA {
+    constructor(@Inject('LazyB') @Lazy() public b: LazyB) {}
+    greet() {
+        return 'hello from A';
+    }
+}
+
+@Service({ singleton: true })
+class LazyB {
+    constructor(@Inject('LazyA') @Lazy() public a: LazyA) {}
+    greet() {
+        return 'hello from B';
+    }
+}
+
+// --- New fixtures: lazy proxy resolves real singleton ---
+
+@Service({ singleton: true })
+class LazySingle {}
+
+@Service({ singleton: true })
+class LazyConsumer {
+    constructor(@Inject(LazySingle) @Lazy() public dep: LazySingle) {}
 }
 
 // --- Tests ---
@@ -155,6 +202,35 @@ describe('ServiceContainer', () => {
         });
     });
 
+    describe('constructor type auto-injection (NestJS-style)', () => {
+        it('should inject by constructor parameter type without @Inject', () => {
+            container.register(RootService);
+            container.register(AutoInjectedService);
+
+            const service = container.get(AutoInjectedService);
+            expect(service.root).toBeInstanceOf(RootService);
+            expect(service.root).toBe(container.get(RootService));
+        });
+
+        it('should support mixed auto-injection + explicit @Inject', () => {
+            container.register(RootService);
+            container.register(MixedInjectionService);
+
+            const service = container.get(MixedInjectionService);
+            expect(service.root).toBeInstanceOf(RootService);
+            expect(service.optional).toBeUndefined();
+        });
+
+        it('should report unresolvable type in dependency graph', () => {
+            // AutoInjectedService needs RootService but it's not registered
+            container.register(AutoInjectedService);
+
+            const result = container.validate();
+            expect(result.valid).toBe(false);
+            expect(result.errors.some(e => e.includes('RootService'))).toBe(true);
+        });
+    });
+
     describe('circular dependency detection', () => {
         it('should detect circular dependencies at resolve time', () => {
             container.register(CircularA);
@@ -179,6 +255,49 @@ describe('ServiceContainer', () => {
 
             const cycles = container.detectCircularDependencies();
             expect(cycles).toEqual([]);
+        });
+    });
+
+    describe('@Lazy() circular dependency breaking', () => {
+        it('should resolve mutual circular deps with @Lazy()', () => {
+            container.register(LazyA);
+            container.register(LazyB);
+
+            const a = container.get(LazyA);
+            const b = container.get(LazyB);
+
+            expect(a).toBeInstanceOf(LazyA);
+            expect(b).toBeInstanceOf(LazyB);
+            // lazy proxy forwards property access to the real singleton instance
+            expect(a.b).toBeInstanceOf(LazyB);
+            expect(b.a).toBeInstanceOf(LazyA);
+        });
+
+        it('should correctly forward method calls through lazy proxy', () => {
+            container.register(LazyA);
+            container.register(LazyB);
+
+            const a = container.get(LazyA);
+            expect(a.b.greet()).toBe('hello from B');
+        });
+
+        it('should forward property access to the real singleton via proxy', () => {
+            container.register(LazySingle);
+            container.register(LazyConsumer);
+
+            const consumer = container.get(LazyConsumer);
+            // proxy forwards `instanceof` and property access to the real singleton
+            expect(consumer.dep).toBeInstanceOf(LazySingle);
+        });
+
+        it('lazy proxy should not be mistaken for a Promise', async () => {
+            container.register(LazySingle);
+            container.register(LazyConsumer);
+
+            const consumer = container.get(LazyConsumer);
+            // The proxy must not be thenable
+            expect(await Promise.resolve(consumer.dep)).toBe(consumer.dep);
+            expect((consumer.dep as unknown as { then?: unknown }).then).toBeUndefined();
         });
     });
 
@@ -219,6 +338,14 @@ describe('ServiceContainer', () => {
             const graph = container.getDependencyGraph();
             expect(graph.RootService).toEqual([]);
             expect(graph.DependentService).toEqual(['RootService']);
+        });
+
+        it('should reflect auto-injected dependencies in graph', () => {
+            container.register(RootService);
+            container.register(AutoInjectedService);
+
+            const graph = container.getDependencyGraph();
+            expect(graph.AutoInjectedService).toEqual(['RootService']);
         });
     });
 

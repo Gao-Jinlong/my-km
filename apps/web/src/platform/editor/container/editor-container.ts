@@ -11,9 +11,8 @@ import { Emitter } from '@/base/common/event';
 import type { EditorService, EditorState } from '@/features/editor/service/EditorService';
 import { createEditorService } from '@/features/editor/service/EditorService';
 import { ServiceBase } from '@/platform/base/service-base';
-import { getContainer } from '@/platform/bootstrap';
-import { Service } from '@/platform/di';
-import type { EditorTabService } from '@/platform/editor-tab/service';
+import { Inject, Service } from '@/platform/di';
+import { EditorTabService } from '@/platform/editor-tab/service';
 
 /**
  * 编辑器服务接口
@@ -75,11 +74,18 @@ export class EditorContainer extends ServiceBase {
     /** 编辑器实例映射表 */
     private editors: Map<string, IEditorService> = new Map();
 
+    private readonly _editorTabService: EditorTabService;
+
     private readonly _onDidChangeEditorState = new Emitter<{
         documentId: string;
         state: EditorState;
     }>();
     readonly onDidChangeEditorState = this._onDidChangeEditorState.event;
+
+    constructor(@Inject(EditorTabService) editorTabService: EditorTabService) {
+        super();
+        this._editorTabService = editorTabService;
+    }
 
     /**
      * 创建编辑器实例
@@ -137,8 +143,7 @@ export class EditorContainer extends ServiceBase {
      * @returns EditorService 实例或 null
      */
     getActiveInstance(): EditorService | null {
-        const editorTabService = getContainer().get('EditorTabService') as EditorTabService;
-        const activeDocumentId = editorTabService.getActiveDocumentId();
+        const activeDocumentId = this._editorTabService.getActiveDocumentId();
         if (!activeDocumentId) {
             return null;
         }

@@ -16,8 +16,7 @@ import {
 import { parseMarkdown } from '@/features/editor/converter/markdown-parser';
 import type { Document } from '@/features/editor/types';
 import { ServiceBase } from '@/platform/base/service-base';
-import { container } from '@/platform/bootstrap';
-import { Service } from '@/platform/di';
+import { Inject, Service } from '@/platform/di';
 import { DocumentStore } from '@/platform/document-store/service';
 import type { DocumentMetadata } from '@/platform/document-store/types';
 import { EditorContainer } from '@/platform/editor/container';
@@ -32,54 +31,51 @@ import { MonitorService } from '@/platform/monitor/service';
  */
 @Service({ singleton: true })
 export class FileOpenService extends ServiceBase {
-    private _fileService?: FileSystemService;
-    private _editorContainer?: EditorContainer;
-    private _editorTabService?: EditorTabService;
-    private _documentStore?: DocumentStore;
-    private _logger?: Logger;
+    private readonly _fileService: FileSystemService;
+    private readonly _editorContainer: EditorContainer;
+    private readonly _editorTabService: EditorTabService;
+    private readonly _documentStore: DocumentStore;
+    private readonly _logger: Logger;
     private _closeListenerDisposable?: { dispose(): void };
 
     private get fileService(): FileSystemService {
-        if (!this._fileService) {
-            this._fileService = container.get(FileSystemService);
-        }
         return this._fileService;
     }
 
     private get editorContainer(): EditorContainer {
-        if (!this._editorContainer) {
-            this._editorContainer = container.get(EditorContainer);
-        }
         return this._editorContainer;
     }
 
     private get editorTabService(): EditorTabService {
-        if (!this._editorTabService) {
-            this._editorTabService = container.get(EditorTabService);
-        }
         return this._editorTabService;
     }
 
     private get documentStore(): DocumentStore {
-        if (!this._documentStore) {
-            this._documentStore = container.get(DocumentStore);
-        }
         return this._documentStore;
     }
 
     protected get logger(): Logger {
-        if (!this._logger) {
-            this._logger = container.get(MonitorService).getLogger('file-open');
-        }
         return this._logger;
     }
 
-    constructor() {
+    constructor(
+        @Inject(FileSystemService) fileService: FileSystemService,
+        @Inject(EditorContainer) editorContainer: EditorContainer,
+        @Inject(EditorTabService) editorTabService: EditorTabService,
+        @Inject(DocumentStore) documentStore: DocumentStore,
+        @Inject(MonitorService) monitorService: MonitorService,
+    ) {
         super();
+        this._fileService = fileService;
+        this._editorContainer = editorContainer;
+        this._editorTabService = editorTabService;
+        this._documentStore = documentStore;
+        this._logger = monitorService.getLogger('file-open');
+
         // 监听 tab 关闭事件，清理 DocumentStore 和 EditorContainer
-        this._closeListenerDisposable = this.editorTabService.onDidCloseDocument(id => {
-            this.documentStore.remove(id);
-            this.editorContainer.disposeInstance(id);
+        this._closeListenerDisposable = this._editorTabService.onDidCloseDocument(id => {
+            this._documentStore.remove(id);
+            this._editorContainer.disposeInstance(id);
         });
     }
 
